@@ -53,7 +53,7 @@ export default function RegisterPage() {
       }
 
       // Use window.location for a full page reload to ensure session cookie is picked up
-      window.location.href = "/";
+      window.location.href = "/dashboard";
     } catch (err: any) {
       console.error("Registration error:", err);
       setError(err.message || "Error registering. The email might already be in use.");
