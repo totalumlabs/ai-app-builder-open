@@ -322,43 +322,42 @@ export function ChatPanel({
       )}
 
       {/* Input */}
-      <div className="p-3 border-t bg-white">
-        <div className="flex items-end gap-2 bg-gray-50 rounded-2xl border border-gray-200 focus-within:border-violet-300 focus-within:ring-2 focus-within:ring-violet-100 px-3 py-2 transition-all">
-          {/* File upload */}
-          <label className="cursor-pointer shrink-0 self-end pb-0.5">
-            <input type="file" className="hidden" onChange={handleFileUpload} accept="image/*,.pdf,.svg" />
-            {uploading ? (
-              <Loader2 className="w-4 h-4 text-gray-400 animate-spin" />
-            ) : (
-              <Paperclip className="w-4 h-4 text-gray-400 hover:text-violet-600 transition-colors" />
-            )}
-          </label>
-
+      <div className="shrink-0 border-t bg-white p-2.5">
+        <div className="bg-gray-50 rounded-xl border border-gray-200 focus-within:border-violet-300 focus-within:ring-2 focus-within:ring-violet-100 transition-all overflow-hidden">
           <textarea
             ref={textareaRef}
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={isBuilding ? "Agent is working..." : "Describe what to build..."}
-            className="flex-1 bg-transparent border-0 resize-none text-sm outline-none placeholder:text-gray-400 min-h-[24px] max-h-[160px] py-0.5 leading-relaxed"
+            className="w-full bg-transparent border-0 resize-none text-sm outline-none placeholder:text-gray-400 min-h-[36px] max-h-[120px] px-3 pt-2.5 pb-1 leading-relaxed"
             disabled={isBuilding}
             rows={1}
           />
-
-          {isBuilding ? (
-            <Button variant="ghost" size="icon" className="shrink-0 w-8 h-8 rounded-xl text-red-500 hover:bg-red-50" onClick={onStop}>
-              <Square className="w-3.5 h-3.5" />
-            </Button>
-          ) : (
-            <Button
-              size="icon"
-              className="shrink-0 w-8 h-8 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700"
-              onClick={handleSend}
-              disabled={(!prompt.trim() && attachedFiles.length === 0) || sending}
-            >
-              {sending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
-            </Button>
-          )}
+          <div className="flex items-center justify-between px-2 pb-2">
+            <label className="cursor-pointer p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
+              <input type="file" className="hidden" onChange={handleFileUpload} accept="image/*,.pdf,.svg" />
+              {uploading ? (
+                <Loader2 className="w-4 h-4 text-gray-400 animate-spin" />
+              ) : (
+                <Paperclip className="w-4 h-4 text-gray-400 hover:text-violet-600" />
+              )}
+            </label>
+            {isBuilding ? (
+              <Button variant="ghost" size="icon" className="w-7 h-7 rounded-lg text-red-500 hover:bg-red-50" onClick={onStop}>
+                <Square className="w-3.5 h-3.5" />
+              </Button>
+            ) : (
+              <Button
+                size="icon"
+                className="w-7 h-7 rounded-lg bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700"
+                onClick={handleSend}
+                disabled={(!prompt.trim() && attachedFiles.length === 0) || sending}
+              >
+                {sending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
+              </Button>
+            )}
+          </div>
         </div>
       </div>
     </div>
