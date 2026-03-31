@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -24,6 +24,8 @@ import {
   MoreVertical,
   Server,
   Sparkles,
+  PanelLeftClose,
+  PanelLeft,
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -51,9 +53,7 @@ const TABS = [
 
 function getPreviewUrlFromProject(proj: VcaasProject): string | null {
   const field = proj.developmentUrlFieldToUse || "temporalDevelopmentProjectUrl";
-  const url =
-    (proj as unknown as Record<string, unknown>)[field] ||
-    proj.temporalDevelopmentProjectUrl;
+  const url = (proj as unknown as Record<string, unknown>)[field] || proj.temporalDevelopmentProjectUrl;
   return (url as string) || null;
 }
 
@@ -70,23 +70,47 @@ export default function WorkspacePage() {
   const [deploying, setDeploying] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewKey, setPreviewKey] = useState(0);
+  const [chatWidth, setChatWidth] = useState(380);
+  const [isResizing, setIsResizing] = useState(false);
+  const [chatCollapsed, setChatCollapsed] = useState(false);
+  const [mobileTab, setMobileTab] = useState<"chat" | "panel">("chat");
 
   const mountedRef = useRef(true);
   const pollingRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const resizeRef = useRef<{ startX: number; startWidth: number } | null>(null);
 
   useEffect(() => {
     mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
-    };
+    return () => { mountedRef.current = false; };
   }, []);
 
-  // ─── Data fetching ───
+  // Resize handlers
+  const handleResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    resizeRef.current = { startX: e.clientX, startWidth: chatWidth };
+    setIsResizing(true);
+  }, [chatWidth]);
 
+  useEffect(() => {
+    if (!isResizing) return;
+    const handleMove = (e: MouseEvent) => {
+      if (!resizeRef.current) return;
+      const diff = e.clientX - resizeRef.current.startX;
+      const newWidth = Math.max(280, Math.min(600, resizeRef.current.startWidth + diff));
+      setChatWidth(newWidth);
+    };
+    const handleUp = () => setIsResizing(false);
+    window.addEventListener("mousemove", handleMove);
+    window.addEventListener("mouseup", handleUp);
+    return () => {
+      window.removeEventListener("mousemove", handleMove);
+      window.removeEventListener("mouseup", handleUp);
+    };
+  }, [isResizing]);
+
+  // Data fetching
   async function fetchProject(): Promise<VcaasProject | null> {
-    const res = await api.get<VcaasProject>(
-      `/api/vcaas/projects/${projectId}`
-    );
+    const res = await api.get<VcaasProject>(`/api/vcaas/projects/${projectId}`);
     if (res.ok && res.data && mountedRef.current) {
       setProject(res.data);
       setPreviewUrl(getPreviewUrlFromProject(res.data));
@@ -104,8 +128,7 @@ export default function WorkspacePage() {
     }
   }
 
-  // ─── Agent polling ───
-
+  // Agent polling
   function startAgentPolling() {
     stopAgentPolling();
     pollAgentOnce();
@@ -120,52 +143,34 @@ export default function WorkspacePage() {
 
   async function pollAgentOnce() {
     if (!mountedRef.current) return;
-
-    const res = await api.get<AgentStatus>(
-      `/api/vcaas/projects/${projectId}/agent/status`
-    );
+    const res = await api.get<AgentStatus>(`/api/vcaas/projects/${projectId}/agent/status`);
     if (!mountedRef.current) return;
 
     if (res.ok && res.data) {
       const rt = res.data.realtimeConversation || [];
       if (rt.length > 0) {
         setMessages((prev) => {
-          const keys = new Set(
-            prev.map((m) => `${m.createdAt}|${m.message?.slice(0, 80)}`)
-          );
-          const fresh = rt.filter(
-            (m) => !keys.has(`${m.createdAt}|${m.message?.slice(0, 80)}`)
-          );
+          const keys = new Set(prev.map((m) => `${m.createdAt}|${m.message?.slice(0, 80)}`));
+          const fresh = rt.filter((m) => !keys.has(`${m.createdAt}|${m.message?.slice(0, 80)}`));
           return fresh.length > 0 ? [...prev, ...fresh] : prev;
         });
       }
-
       if (res.data.status === "done" || res.data.status === "idle") {
-        console.log("[Workspace] Agent finished, refreshing data...");
-        // Refresh project & conversation
+        console.log("[Workspace] Agent finished");
         const proj = await fetchProject();
         await fetchConversation();
-        if (proj && mountedRef.current) {
-          setPreviewKey((k) => k + 1);
-        }
-        return; // Stop polling
+        if (proj && mountedRef.current) setPreviewKey((k) => k + 1);
+        return;
       }
     }
-
-    // Schedule next poll
     pollingRef.current = setTimeout(pollAgentOnce, 10000);
   }
 
-  // ─── Deploy polling ───
-
+  // Deploy polling
   async function pollDeployOnce() {
     if (!mountedRef.current) return;
-
-    const res = await api.get<{ status: string }>(
-      `/api/vcaas/projects/${projectId}/deployments/status`
-    );
+    const res = await api.get<{ status: string }>(`/api/vcaas/projects/${projectId}/deployments/status`);
     if (!mountedRef.current) return;
-
     if (res.ok && res.data) {
       if (res.data.status === "success") {
         setDeploying(false);
@@ -179,50 +184,28 @@ export default function WorkspacePage() {
         return;
       }
     }
-
     setTimeout(pollDeployOnce, 10000);
   }
 
-  // ─── Initial load ───
-
+  // Initial load
   useEffect(() => {
     let cancelled = false;
-
     async function init() {
       setLoading(true);
-      console.log("[Workspace] Loading project:", projectId);
-
       const [proj] = await Promise.all([fetchProject(), fetchConversation()]);
-
       if (cancelled) return;
       setLoading(false);
-
-      if (proj?.agentProcessStatus === "init") {
-        console.log("[Workspace] Agent is running, starting poll...");
-        startAgentPolling();
-      }
-
-      if (proj?.deployment?.status === "deploying") {
-        setDeploying(true);
-        pollDeployOnce();
-      }
+      if (proj?.agentProcessStatus === "init") startAgentPolling();
+      if (proj?.deployment?.status === "deploying") { setDeploying(true); pollDeployOnce(); }
     }
-
     init();
-
-    return () => {
-      cancelled = true;
-      stopAgentPolling();
-    };
+    return () => { cancelled = true; stopAgentPolling(); };
   }, [projectId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ─── Actions ───
-
-  const handleSendPrompt = async () => {
-    if (!prompt.trim() || sending || project?.agentProcessStatus === "init")
-      return;
+  // Actions
+  const handleSendPrompt = async (files?: { name: string; url: string; imageDescription: string }[]) => {
+    if ((!prompt.trim() && (!files || files.length === 0)) || sending || project?.agentProcessStatus === "init") return;
     setSending(true);
-
     const userMsg: ConversationMessage = {
       author: "user",
       message: prompt,
@@ -230,92 +213,50 @@ export default function WorkspacePage() {
       createdAt: new Date().toISOString(),
     };
     setMessages((prev) => [...prev, userMsg]);
-
     const currentPrompt = prompt;
     setPrompt("");
 
-    console.log("[Workspace] Sending prompt:", currentPrompt.slice(0, 100));
-    const res = await api.post(
-      `/api/vcaas/projects/${projectId}/agent/start`,
-      { prompt: currentPrompt, inputFiles: [] }
-    );
-
+    const res = await api.post(`/api/vcaas/projects/${projectId}/agent/start`, {
+      prompt: currentPrompt,
+      inputFiles: files || [],
+    });
     if (res.ok) {
-      setProject((prev) =>
-        prev ? { ...prev, agentProcessStatus: "init" } : prev
-      );
+      setProject((prev) => prev ? { ...prev, agentProcessStatus: "init" } : prev);
       startAgentPolling();
     } else {
       toast.error(res.error || "Failed to start agent");
-      console.error("[Workspace] Agent start error:", res.error);
     }
-
     setSending(false);
   };
 
   const handleStopAgent = async () => {
-    console.log("[Workspace] Stopping agent...");
     await api.post(`/api/vcaas/projects/${projectId}/agent/stop`, {});
-    toast.info("Stop signal sent to agent");
+    toast.info("Stop signal sent");
   };
 
   const handleDeploy = async () => {
     if (deploying) return;
     setDeploying(true);
-    console.log("[Workspace] Starting deployment...");
-
-    const res = await api.post(
-      `/api/vcaas/projects/${projectId}/deployments/deploy`,
-      {}
-    );
-    if (res.ok) {
-      toast.success("Deployment started...");
-      pollDeployOnce();
-    } else {
-      toast.error(res.error || "Failed to deploy");
-      setDeploying(false);
-    }
+    const res = await api.post(`/api/vcaas/projects/${projectId}/deployments/deploy`, {});
+    if (res.ok) { toast.success("Deployment started..."); pollDeployOnce(); }
+    else { toast.error(res.error || "Failed to deploy"); setDeploying(false); }
   };
 
   const handleRestartServer = async () => {
-    console.log("[Workspace] Restarting server...");
-    const res = await api.post(
-      `/api/vcaas/projects/${projectId}/agent/server/start-or-restart`,
-      {}
-    );
-    if (res.ok) {
-      toast.success("Server restart started. This may take a few minutes.");
-    } else {
-      toast.error(res.error || "Failed to restart server");
-    }
+    const res = await api.post(`/api/vcaas/projects/${projectId}/agent/server/start-or-restart`, {});
+    if (res.ok) toast.success("Server restart initiated");
+    else toast.error(res.error || "Failed to restart");
   };
-
-  const handleRefreshPreview = () => {
-    fetchProject();
-    setPreviewKey((k) => k + 1);
-  };
-
-  // ─── Derived state ───
 
   const isBuilding = project?.agentProcessStatus === "init";
 
   const getServerStatusColor = () => {
     switch (project?.agentServerStatus) {
-      case "Active":
-        return "bg-emerald-500";
-      case "Creating":
-      case "Starting":
-      case "Unarchiving":
-        return "bg-amber-500 animate-pulse";
-      case "Archived":
-      case "Archiving":
-        return "bg-gray-400";
-      default:
-        return "bg-gray-400";
+      case "Active": return "bg-emerald-500";
+      case "Creating": case "Starting": case "Unarchiving": return "bg-amber-500 animate-pulse";
+      default: return "bg-gray-400";
     }
   };
-
-  // ─── Loading & error states ───
 
   if (loading) {
     return (
@@ -330,88 +271,64 @@ export default function WorkspacePage() {
     return (
       <div className="h-screen flex flex-col items-center justify-center gap-4 bg-white">
         <p className="text-gray-500">Project not found</p>
-        <Link href="/dashboard">
-          <Button variant="outline">Back to Dashboard</Button>
-        </Link>
+        <Link href="/dashboard"><Button variant="outline">Back to Dashboard</Button></Link>
       </div>
     );
   }
 
-  // ─── Render ───
-
   return (
     <div className="h-screen flex flex-col bg-white overflow-hidden">
-      {/* ── Header ── */}
-      <header className="h-14 border-b flex items-center px-4 gap-3 shrink-0 bg-white z-10">
+      {/* Header */}
+      <header className="h-12 border-b flex items-center px-3 gap-2 shrink-0 bg-white z-10">
         <Link href="/dashboard">
-          <Button variant="ghost" size="icon" className="w-8 h-8">
-            <ArrowLeft className="w-4 h-4" />
+          <Button variant="ghost" size="icon" className="w-7 h-7">
+            <ArrowLeft className="w-3.5 h-3.5" />
           </Button>
         </Link>
-
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-md bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center">
-            <Sparkles className="w-3.5 h-3.5 text-white" />
+        <div className="flex items-center gap-1.5 min-w-0">
+          <div className="w-6 h-6 rounded-md bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center shrink-0">
+            <Sparkles className="w-3 h-3 text-white" />
           </div>
-          <h1 className="font-semibold text-sm">{projectId}</h1>
-          <div className="flex items-center gap-1.5 ml-1">
-            <span className={`w-2 h-2 rounded-full ${getServerStatusColor()}`} />
-            <span className="text-[11px] text-gray-400">
-              {project.agentServerStatus || "Unknown"}
-            </span>
-          </div>
+          <h1 className="font-semibold text-sm truncate">{projectId}</h1>
+          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${getServerStatusColor()}`} />
         </div>
 
-        <div className="ml-auto flex items-center gap-2">
-          {project.totalCreditsSpent !== undefined && (
-            <span className="text-xs text-gray-400 hidden md:block">
-              {project.totalCreditsSpent.toFixed(1)} credits used
-            </span>
-          )}
+        <div className="ml-auto flex items-center gap-1.5">
+          {/* Mobile tab toggle */}
+          <div className="flex sm:hidden bg-gray-100 rounded-lg p-0.5">
+            <button onClick={() => setMobileTab("chat")} className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${mobileTab === "chat" ? "bg-white shadow text-gray-900" : "text-gray-500"}`}>Chat</button>
+            <button onClick={() => setMobileTab("panel")} className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${mobileTab === "panel" ? "bg-white shadow text-gray-900" : "text-gray-500"}`}>Preview</button>
+          </div>
 
-          <Button
-            size="sm"
-            onClick={handleDeploy}
-            disabled={deploying || isBuilding}
-            className="bg-emerald-600 hover:bg-emerald-700 h-8 text-xs"
-          >
-            {deploying ? (
-              <>
-                <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
-                Deploying...
-              </>
-            ) : (
-              <>
-                <Rocket className="w-3.5 h-3.5 mr-1.5" />
-                Publish
-              </>
-            )}
+          <Button size="sm" onClick={handleDeploy} disabled={deploying || isBuilding} className="bg-emerald-600 hover:bg-emerald-700 h-7 text-xs hidden sm:flex">
+            {deploying ? <><Loader2 className="w-3 h-3 mr-1 animate-spin" />Deploying</> : <><Rocket className="w-3 h-3 mr-1" />Publish</>}
           </Button>
-
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="w-8 h-8">
-                <MoreVertical className="w-4 h-4" />
-              </Button>
+              <Button variant="ghost" size="icon" className="w-7 h-7"><MoreVertical className="w-3.5 h-3.5" /></Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={handleRestartServer}>
-                <Server className="w-4 h-4 mr-2" />
-                Restart Server
+              <DropdownMenuItem onClick={handleDeploy} disabled={deploying || isBuilding} className="sm:hidden">
+                <Rocket className="w-4 h-4 mr-2" />{deploying ? "Deploying..." : "Publish"}
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={handleRefreshPreview}>
-                <RefreshCw className="w-4 h-4 mr-2" />
-                Refresh Preview
+              <DropdownMenuItem onClick={handleRestartServer}>
+                <Server className="w-4 h-4 mr-2" />Restart Server
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => { fetchProject(); setPreviewKey((k) => k + 1); }}>
+                <RefreshCw className="w-4 h-4 mr-2" />Refresh
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
       </header>
 
-      {/* ── Main workspace ── */}
+      {/* Main workspace */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Chat panel (left) */}
-        <div className="w-[360px] lg:w-[400px] border-r flex flex-col shrink-0">
+        {/* Chat panel - desktop */}
+        <div
+          className={`hidden sm:flex flex-col shrink-0 border-r transition-all ${chatCollapsed ? "w-0 overflow-hidden" : ""}`}
+          style={chatCollapsed ? {} : { width: chatWidth }}
+        >
           <ChatPanel
             messages={messages}
             isBuilding={isBuilding}
@@ -420,25 +337,60 @@ export default function WorkspacePage() {
             onSend={handleSendPrompt}
             onStop={handleStopAgent}
             sending={sending}
+            projectId={projectId}
+          />
+        </div>
+
+        {/* Resize handle - desktop */}
+        {!chatCollapsed && (
+          <div
+            className="hidden sm:flex w-1 hover:w-1.5 bg-transparent hover:bg-violet-200 cursor-col-resize transition-all items-center justify-center shrink-0"
+            onMouseDown={handleResizeStart}
+          >
+            <div className="w-0.5 h-8 bg-gray-200 rounded-full" />
+          </div>
+        )}
+
+        {/* Chat collapse toggle - desktop */}
+        <div className="hidden sm:flex items-start pt-2 shrink-0">
+          <button
+            onClick={() => setChatCollapsed(!chatCollapsed)}
+            className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            {chatCollapsed ? <PanelLeft className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
+          </button>
+        </div>
+
+        {/* Chat panel - mobile */}
+        <div className={`sm:hidden flex flex-col flex-1 ${mobileTab !== "chat" ? "hidden" : ""}`}>
+          <ChatPanel
+            messages={messages}
+            isBuilding={isBuilding}
+            prompt={prompt}
+            setPrompt={setPrompt}
+            onSend={handleSendPrompt}
+            onStop={handleStopAgent}
+            sending={sending}
+            projectId={projectId}
           />
         </div>
 
         {/* Right panel */}
-        <div className="flex-1 flex flex-col min-w-0">
+        <div className={`flex-1 flex flex-col min-w-0 ${mobileTab !== "panel" ? "hidden sm:flex" : ""}`}>
           {/* Tab bar */}
-          <div className="h-11 border-b flex items-center px-2 gap-1 shrink-0 bg-gray-50/80 overflow-x-auto">
+          <div className="h-10 border-b flex items-center px-2 gap-0.5 shrink-0 bg-gray-50/80 overflow-x-auto">
             {TABS.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all whitespace-nowrap ${
+                className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-medium transition-all whitespace-nowrap ${
                   activeTab === tab.id
                     ? "bg-white text-gray-900 shadow-sm border border-gray-200"
                     : "text-gray-500 hover:text-gray-700 hover:bg-white/60"
                 }`}
               >
-                <tab.icon className="w-3.5 h-3.5" />
-                {tab.label}
+                <tab.icon className="w-3 h-3" />
+                <span className="hidden sm:inline">{tab.label}</span>
               </button>
             ))}
           </div>
@@ -450,33 +402,14 @@ export default function WorkspacePage() {
                 key={previewKey}
                 previewUrl={previewUrl}
                 productionUrl={project.productionProjectUrl}
-                onRefresh={handleRefreshPreview}
+                onRefresh={() => { fetchProject(); setPreviewKey((k) => k + 1); }}
+                loading={isBuilding}
               />
             )}
-            {activeTab === "database" && (
-              <DatabasePanel projectId={projectId} />
-            )}
-            {activeTab === "versions" && (
-              <VersionsPanel
-                projectId={projectId}
-                onVersionRestored={() => fetchProject()}
-              />
-            )}
-            {activeTab === "secrets" && (
-              <SecretsPanel
-                projectId={projectId}
-                secrets={project.secrets || []}
-                onSecretsChanged={() => fetchProject()}
-              />
-            )}
-            {activeTab === "domain" && (
-              <DomainPanel
-                projectId={projectId}
-                domain={project.customDomain}
-                productionUrl={project.productionProjectUrl}
-                onDomainChanged={() => fetchProject()}
-              />
-            )}
+            {activeTab === "database" && <DatabasePanel projectId={projectId} />}
+            {activeTab === "versions" && <VersionsPanel projectId={projectId} onVersionRestored={() => fetchProject()} />}
+            {activeTab === "secrets" && <SecretsPanel projectId={projectId} secrets={project.secrets || []} onSecretsChanged={() => fetchProject()} />}
+            {activeTab === "domain" && <DomainPanel projectId={projectId} domain={project.customDomain} productionUrl={project.productionProjectUrl} onDomainChanged={() => fetchProject()} />}
             {activeTab === "logs" && <LogsPanel projectId={projectId} />}
           </div>
         </div>
