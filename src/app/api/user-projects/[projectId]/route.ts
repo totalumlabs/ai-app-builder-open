@@ -18,9 +18,8 @@ export async function DELETE(
 
     console.log("[UserProjects] Deleting association:", userId, projectId);
 
-    // Find the record
     const result = await totalumSdk.crud.query("user_project", {
-      _filter: { user_id: userId, project_id: projectId },
+      _filter: { owner_id: userId, project_id: projectId },
       _limit: 1,
     });
     const records = result.data || [];

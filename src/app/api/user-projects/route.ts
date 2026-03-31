@@ -14,12 +14,13 @@ export async function GET() {
     console.log("[UserProjects] Listing projects for user:", userId);
 
     const result = await totalumSdk.crud.query("user_project", {
-      _filter: { user_id: userId },
+      _filter: { owner_id: userId },
       _sort: { createdAt: "desc" },
       _limit: 100,
     });
 
     const projects = result.data || [];
+    console.log("[UserProjects] Found", Array.isArray(projects) ? projects.length : 0, "projects");
     return NextResponse.json({ ok: true, data: projects });
   } catch (error) {
     console.error("[UserProjects] GET error:", error);
@@ -40,7 +41,7 @@ export async function POST(req: NextRequest) {
     console.log("[UserProjects] Creating association:", userId, body.project_id);
 
     const result = await totalumSdk.crud.createRecord("user_project", {
-      user_id: userId,
+      owner_id: userId,
       project_id: body.project_id,
       description: body.description || "",
     });
