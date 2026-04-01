@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Sparkles, Plus, LogOut, Loader2, Trash2, Send, Paperclip, X, ArrowRight, User } from "lucide-react";
+import { Sparkles, Plus, LogOut, Loader2, Trash2, Send, Paperclip, X, ArrowRight, User, Shield } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import type { VcaasProject } from "@/lib/vcaas-types";
@@ -30,6 +30,7 @@ export default function DashboardPage() {
   const [sendingFirst, setSendingFirst] = useState(false);
   const [attachedFiles, setAttachedFiles] = useState<{ name: string; url: string; imageDescription: string }[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -49,6 +50,11 @@ export default function DashboardPage() {
   }, []);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  // Check admin role (lightweight — just hit stats endpoint)
+  useEffect(() => {
+    api.get("/api/admin/stats").then((res) => { if (res.ok) setIsAdmin(true); });
+  }, []);
 
   const handleCreateProject = async () => {
     const id = newProjectId.trim().toLowerCase().replace(/\s+/g, "-");
@@ -118,6 +124,13 @@ export default function DashboardPage() {
             <span className="font-semibold tracking-tight text-gray-900 text-sm">VibeBuild</span>
           </Link>
           <div className="flex items-center gap-2">
+            {isAdmin && (
+              <Link href="/admin">
+                <button className="p-1.5 rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 transition-colors" title="Admin Panel">
+                  <Shield className="w-4 h-4" />
+                </button>
+              </Link>
+            )}
             <Link href="/profile">
               <button className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-black/5 transition-colors">
                 <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-[10px] font-semibold text-gray-600">{userInitial}</div>
