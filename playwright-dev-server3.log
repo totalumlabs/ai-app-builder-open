@@ -1,0 +1,60 @@
+
+> test:serve
+> TESTING_MODE=true NEXT_TELEMETRY_DISABLED=1 DISABLE_OPENNEXT=true PORT=3000 next start
+
+   ▲ Next.js 15.3.9
+   - Local:        http://localhost:3000
+   - Network:      http://200.234.234.64:3000
+
+ ✓ Starting...
+ ✓ Ready in 506ms
+[UserProjects] Listing projects for user: 69ccc99662c853ee4b4d3385
+[UserProjects] Found 1 projects
+[VCaaS Proxy] GET /projects/a-landing-page-for
+[VCaaS] GET https://api-accounts.totalum.app/api/v1/vcaas/projects/a-landing-page-for
+[VCaaS] Response: 200
+[Admin] Admin access granted for: neosynergiesoa@gmail.com
+[Admin Stats] Fetching stats...
+[Admin Stats] getRecords returned 3 users
+[VCaaS] GET https://api-accounts.totalum.app/api/v1/vcaas/projects/a-landing-page-for
+[VCaaS] GET https://api-accounts.totalum.app/api/v1/vcaas/projects/create-a-landing-for
+[VCaaS] Response: 200
+[VCaaS] Response: 200
+[Admin Stats] totalUsers: 3 totalProjects: 2 credits: 40 active: 1
+[Admin] Admin access granted for: neosynergiesoa@gmail.com
+[Admin Stats] Fetching stats...
+[Admin Stats] getRecords returned 3 users
+[VCaaS] GET https://api-accounts.totalum.app/api/v1/vcaas/projects/a-landing-page-for
+[VCaaS] GET https://api-accounts.totalum.app/api/v1/vcaas/projects/create-a-landing-for
+[VCaaS] Response: 200
+[VCaaS] Response: 200
+[Admin Stats] totalUsers: 3 totalProjects: 2 credits: 40 active: 1
+[Admin] Admin access granted for: neosynergiesoa@gmail.com
+[Admin Users] Listing users - search:  limit: 10 offset: 0
+[Admin Users] Found 3 users, total: 3
+[Admin] Admin access granted for: neosynergiesoa@gmail.com
+[Admin Users] Listing users - search: neo limit: 10 offset: 0
+[Admin Users] Found 1 users, total: 1
+[Admin] Admin access granted for: neosynergiesoa@gmail.com
+[Admin UserDetail] Fetching user: 69ccc99662c853ee4b4d3385
+[VCaaS] GET https://api-accounts.totalum.app/api/v1/vcaas/projects/a-landing-page-for
+[VCaaS] Response: 200
+[Admin UserDetail] User: neosynergiesoa@gmail.com projects: 1 credits: 29
+[Admin] Admin access granted for: neosynergiesoa@gmail.com
+[Admin UserEdit] Editing user: 69ccc99662c853ee4b4d3385 { name: 'Neo Admin' }
+[Admin UserEdit] Updated user: 69ccc99662c853ee4b4d3385
+[Admin] Admin access granted for: neosynergiesoa@gmail.com
+[Admin Projects] Listing projects - search:  limit: 10 offset: 0
+[VCaaS] GET https://api-accounts.totalum.app/api/v1/vcaas/projects/a-landing-page-for
+[VCaaS] GET https://api-accounts.totalum.app/api/v1/vcaas/projects/create-a-landing-for
+[VCaaS] Response: 200
+[VCaaS] Response: 200
+[Admin Projects] Found 2 projects, total: 2
+[Admin] Admin access granted for: neosynergiesoa@gmail.com
+[Admin Projects] Listing projects - search: landing limit: 10 offset: 0
+[VCaaS] GET https://api-accounts.totalum.app/api/v1/vcaas/projects/create-a-landing-for
+[VCaaS] GET https://api-accounts.totalum.app/api/v1/vcaas/projects/a-landing-page-for
+[VCaaS] Response: 200
+[VCaaS] Response: 200
+[Admin Projects] Found 2 projects, total: 2
+[Admin] No session found

@@ -1,0 +1,14 @@
+
+> test:serve
+> TESTING_MODE=true NEXT_TELEMETRY_DISABLED=1 DISABLE_OPENNEXT=true PORT=3000 next start
+
+ ⨯ Failed to start server
+Error: listen EADDRINUSE: address already in use :::3000
+    at <unknown> (Error: listen EADDRINUSE: address already in use :::3000)
+    at new Promise (<anonymous>) {
+  code: 'EADDRINUSE',
+  errno: -98,
+  syscall: 'listen',
+  address: '::',
+  port: 3000
+}

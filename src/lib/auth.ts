@@ -268,7 +268,12 @@ export const auth = betterAuth({
   // ============================================================================
   user: {
     additionalFields: {
-      // Add your custom user fields here (see examples above)
+      role: {
+        type: "string",
+        required: false,
+        defaultValue: "user",
+        input: false,
+      },
     },
   },
 });
@@ -276,3 +281,15 @@ export const auth = betterAuth({
 // Base types from Better Auth
 export type Session = typeof auth.$Infer.Session;
 export type User = Session["user"];
+
+// Extended user type with custom fields
+export interface ExtendedUser {
+  id: string;
+  email: string;
+  name: string;
+  image?: string | null;
+  emailVerified: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+  role?: string;
+}
