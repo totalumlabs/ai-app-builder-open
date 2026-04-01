@@ -59,7 +59,7 @@ function groupMessages(messages: ConversationMessage[]): MessageGroup[] {
 function FormattedText({ text }: { text: string }) {
   const parts = text.split(/(```[\s\S]*?```)/g);
   return (
-    <div className="text-base text-gray-700 dark:text-gray-300 leading-relaxed space-y-1">
+    <div className="text-[15px] text-gray-700 dark:text-gray-300 leading-relaxed space-y-1">
       {parts.map((part, i) => {
         if (part.startsWith("```") && part.endsWith("```")) {
           const code = part.slice(3, -3).replace(/^\w+\n/, "");
@@ -145,7 +145,7 @@ function BuildGroup({ group }: { group: MessageGroup }) {
         </div>
       )}
       {!isComplete && !hasBuildMsgs && group.startMsg && (
-        <div className="flex items-center gap-2 text-base text-gray-500 py-1"><Loader2 className="w-4 h-4 animate-spin" /><span>{group.startMsg.message}</span></div>
+        <div className="flex items-center gap-2 text-[15px] text-gray-500 py-1"><Loader2 className="w-4 h-4 animate-spin" /><span>{group.startMsg.message}</span></div>
       )}
     </div>
   );
@@ -184,7 +184,7 @@ export function ChatPanel({ messages, isBuilding, prompt, setPrompt, onSend, onS
         {messages.length === 0 && !isBuilding && (
           <div className="flex flex-col items-center justify-center h-full text-center px-4">
             <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-3"><Bot className="w-5 h-5 text-gray-400" /></div>
-            <p className="text-base text-gray-500 dark:text-gray-400 mb-1">{t("startBuilding2")}</p>
+            <p className="text-[15px] text-gray-500 dark:text-gray-400 mb-1">{t("startBuilding2")}</p>
             <p className="text-sm text-gray-400">{t("describeIdea")}</p>
           </div>
         )}
@@ -196,7 +196,7 @@ export function ChatPanel({ messages, isBuilding, prompt, setPrompt, onSend, onS
             return (
               <div key={gi} className="flex justify-end">
                 <div className="max-w-[88%] rounded-2xl rounded-br-sm px-4 py-2.5" style={{ background: "var(--user-bubble, #eeecea)" }}>
-                  <p className="text-base leading-relaxed whitespace-pre-wrap text-gray-800 dark:text-gray-200">{msg.message}</p>
+                  <p className="text-[15px] leading-relaxed whitespace-pre-wrap text-gray-800 dark:text-gray-200">{msg.message}</p>
                 </div>
               </div>
             );
