@@ -330,10 +330,10 @@ export default function WorkspacePage() {
         </div>
 
         {/* Fixed switch: Preview / Chat */}
-        <div className="shrink-0 flex items-center justify-center py-1.5 px-3" style={{ background: pageBg }}>
-          <div className="flex bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5 w-full max-w-xs">
-            <button onClick={() => setMobileTab("panel")} className={`flex-1 py-1.5 rounded-md text-xs font-medium text-center transition-colors ${mobileTab === "panel" ? "bg-white dark:bg-gray-700 shadow text-gray-900 dark:text-white" : "text-gray-500"}`}>{t("preview")}</button>
-            <button onClick={() => setMobileTab("chat")} className={`flex-1 py-1.5 rounded-md text-xs font-medium text-center transition-colors ${mobileTab === "chat" ? "bg-white dark:bg-gray-700 shadow text-gray-900 dark:text-white" : "text-gray-500"}`}>{t("chat")}</button>
+        <div className="shrink-0 flex items-center justify-center py-2 px-4" style={{ background: pageBg }}>
+          <div className="flex bg-gray-100 dark:bg-gray-800 rounded-full p-1 w-full max-w-xs">
+            <button onClick={() => setMobileTab("panel")} className={`w-1/2 py-2 rounded-full text-sm font-medium text-center transition-colors ${mobileTab === "panel" ? "bg-white dark:bg-gray-700 shadow text-gray-900 dark:text-white" : "text-gray-500"}`}>{t("preview")}</button>
+            <button onClick={() => setMobileTab("chat")} className={`w-1/2 py-2 rounded-full text-sm font-medium text-center transition-colors ${mobileTab === "chat" ? "bg-white dark:bg-gray-700 shadow text-gray-900 dark:text-white" : "text-gray-500"}`}>{t("chat")}</button>
           </div>
         </div>
       </div>
