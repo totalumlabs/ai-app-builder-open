@@ -78,7 +78,15 @@ export default function WorkspacePage() {
   // Close menu on outside click or iframe blur
   useEffect(() => {
     if (!menuOpen) return;
-    const handleClick = (e: MouseEvent) => { if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false); };
+    const handleClick = (e: MouseEvent) => {
+      const target = e.target as Node;
+      // Check if click is inside the menu trigger OR the popup itself
+      if (menuRef.current && menuRef.current.contains(target)) return;
+      // Also check by data attribute on the popup
+      const popup = document.querySelector("[data-popup-menu]");
+      if (popup && popup.contains(target)) return;
+      setMenuOpen(false);
+    };
     const handleBlur = () => setMenuOpen(false);
     window.addEventListener("mousedown", handleClick);
     window.addEventListener("blur", handleBlur);
@@ -184,7 +192,7 @@ export default function WorkspacePage() {
 
   // Popup menu content (shared between desktop and mobile)
   const popupMenu = menuOpen && (
-    <div className="absolute top-full left-0 mt-1.5 w-56 rounded-xl shadow-xl z-[60] overflow-hidden" style={{ background: darkMode ? "#2a2a2a" : "#fff", border: `1px solid ${darkMode ? "#444" : "#e5e5e5"}` }}>
+    <div data-popup-menu className="absolute top-full left-0 mt-1.5 w-56 rounded-xl shadow-xl z-[60] overflow-hidden" style={{ background: darkMode ? "#2a2a2a" : "#fff", border: `1px solid ${darkMode ? "#444" : "#e5e5e5"}` }}>
       <div className="px-3 py-2 border-b" style={{ borderColor: darkMode ? "#444" : "#eee" }}>
         <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wider">{projectId}</p>
       </div>
