@@ -9,7 +9,7 @@ import Link from "next/link";
 import {
   Sparkles, ArrowRight, Palette, DollarSign, Users, Rocket,
   Globe, Shield, Code2, Zap, Mail, Building2, Megaphone,
-  Lock, Server, Loader2, ChevronRight,
+  Lock, Server, Loader2, ChevronRight, Trophy, Gauge,
 } from "lucide-react";
 
 export default function LandingPage() {
@@ -35,21 +35,16 @@ export default function LandingPage() {
       <nav className="sticky top-0 z-50 backdrop-blur-sm" style={{ background: "rgba(252,251,248,0.85)" }}>
         <div className="max-w-6xl mx-auto px-5 h-14 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-gray-900 flex items-center justify-center">
-              <Sparkles className="w-3.5 h-3.5 text-white" />
-            </div>
+            <div className="w-7 h-7 rounded-lg bg-gray-900 flex items-center justify-center"><Sparkles className="w-3.5 h-3.5 text-white" /></div>
             <span className="font-semibold text-gray-900 text-sm">VibeBuild</span>
           </div>
           <div className="flex items-center gap-3">
+            <a href="#competitors" className="text-sm text-gray-500 hover:text-gray-800 hidden sm:block">{en ? "Why Us" : "Por que"}</a>
             <a href="#features" className="text-sm text-gray-500 hover:text-gray-800 hidden sm:block">{en ? "Features" : "Funciones"}</a>
             <a href="#use-cases" className="text-sm text-gray-500 hover:text-gray-800 hidden sm:block">{en ? "Use Cases" : "Casos de uso"}</a>
             <a href="#contact" className="text-sm text-gray-500 hover:text-gray-800 hidden sm:block">{en ? "Contact" : "Contacto"}</a>
-            <Link href="/login">
-              <button className="text-sm text-gray-600 hover:text-gray-900 px-3 py-1.5 rounded-lg hover:bg-black/5 transition-colors">{en ? "Sign In" : "Iniciar sesion"}</button>
-            </Link>
-            <Link href="/register">
-              <button className="text-sm font-medium text-white bg-gray-900 hover:bg-gray-800 px-4 py-1.5 rounded-lg transition-colors">{en ? "Get Started" : "Comenzar"}</button>
-            </Link>
+            <Link href="/login"><button className="text-sm text-gray-600 hover:text-gray-900 px-3 py-1.5 rounded-lg hover:bg-black/5 transition-colors">{en ? "Sign In" : "Iniciar sesion"}</button></Link>
+            <Link href="/register"><button className="text-sm font-medium text-white bg-gray-900 hover:bg-gray-800 px-4 py-1.5 rounded-lg transition-colors">{en ? "Get Started" : "Comenzar"}</button></Link>
           </div>
         </div>
       </nav>
@@ -57,9 +52,9 @@ export default function LandingPage() {
       {/* ── Hero ── */}
       <section className="pt-20 pb-24 px-5">
         <div className="max-w-4xl mx-auto text-center">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-gray-200 text-sm text-gray-600 mb-8">
-            <Sparkles className="w-3.5 h-3.5" />
-            {en ? "Whitelabel AI App Builder" : "Constructor de Apps IA Whitelabel"}
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-gray-200 text-sm text-gray-600 mb-4">
+            <Trophy className="w-3.5 h-3.5 text-amber-500" />
+            {en ? "The First Whitelabel AI App Builder" : "El Primer Constructor de Apps IA Whitelabel"}
           </div>
           <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight text-gray-900 leading-[1.1] mb-6">
             {en ? (
@@ -70,8 +65,8 @@ export default function LandingPage() {
           </h1>
           <p className="text-lg text-gray-500 max-w-2xl mx-auto mb-10 leading-relaxed">
             {en
-              ? "A fully customizable AI-powered app builder you can rebrand, resell, and deploy as your own product. Change the logo, set your prices, choose your niche — and launch your own SaaS builder in minutes."
-              : "Un constructor de apps con IA totalmente personalizable que puedes rebrancear, revender y desplegar como tu propio producto. Cambia el logo, pon tus precios, elige tu nicho — y lanza tu propio builder SaaS en minutos."}
+              ? "The world's first whitelabel AI app builder. Fully customizable, rebrandable, and resellable. Change the logo, set your prices, choose your niche — and launch your own SaaS builder in minutes."
+              : "El primer constructor de apps IA whitelabel del mundo. Totalmente personalizable, remarcable y revendible. Cambia el logo, pon tus precios, elige tu nicho — y lanza tu propio builder SaaS en minutos."}
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
             <Link href="/register">
@@ -88,21 +83,65 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── Powered by Totalum ── */}
-      <section className="py-12 px-5">
-        <div className="max-w-3xl mx-auto text-center">
-          <p className="text-xs text-gray-400 uppercase tracking-widest mb-4">{en ? "Powered by" : "Desarrollado por"}</p>
-          <img src={files.totalumLogo.url} alt="Totalum" className="h-8 sm:h-10 mx-auto mb-4 object-contain" />
-          <p className="text-sm text-gray-500 max-w-xl mx-auto">
+      {/* ── Competitors: Don't use theirs, build yours ── */}
+      <section id="competitors" className="py-16 px-5 bg-white">
+        <div className="max-w-4xl mx-auto text-center">
+          <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-3">
+            {en ? "Stop using their builders. Own yours." : "Deja de usar sus constructores. Ten el tuyo."}
+          </h2>
+          <p className="text-gray-500 mb-10 max-w-xl mx-auto">
             {en
-              ? "This builder runs on the Totalum VCaaS API. All infrastructure, hosting, database, deployments, and AI capabilities are provided by Totalum behind the scenes."
-              : "Este constructor funciona con la API VCaaS de Totalum. Toda la infraestructura, hosting, base de datos, despliegues y capacidades de IA son proporcionadas por Totalum entre bastidores."}
+              ? "Instead of recommending Lovable, Replit, Base44, Bolt or others — launch your own AI app builder, as powerful as theirs, under your brand."
+              : "En vez de recomendar Lovable, Replit, Base44, Bolt u otros — lanza tu propio constructor de apps IA, tan potente como los suyos, bajo tu marca."}
           </p>
+          {/* Competitor logos as text badges */}
+          <div className="flex flex-wrap items-center justify-center gap-3 mb-10">
+            {["Lovable", "Replit", "Base44", "Bolt.new", "v0.dev", "Cursor"].map((name) => (
+              <div key={name} className="px-4 py-2 rounded-full bg-gray-100 text-sm text-gray-500 font-medium">{name}</div>
+            ))}
+          </div>
+          <div className="bg-gray-50 rounded-2xl p-6 sm:p-8 max-w-2xl mx-auto">
+            <p className="text-gray-600 leading-relaxed">
+              {en
+                ? <>These platforms are great — but they're <strong>their</strong> brand, <strong>their</strong> pricing, <strong>their</strong> audience. With VibeBuild, you get the <strong>same AI capabilities</strong> packaged as <strong>your own product</strong>. Your logo, your domain, your prices, your users.</>
+                : <>Estas plataformas son geniales — pero son <strong>su</strong> marca, <strong>sus</strong> precios, <strong>su</strong> audiencia. Con VibeBuild, obtienes las <strong>mismas capacidades de IA</strong> empaquetadas como <strong>tu propio producto</strong>. Tu logo, tu dominio, tus precios, tus usuarios.</>}
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Powered by Totalum + Performance ── */}
+      <section className="py-16 px-5">
+        <div className="max-w-4xl mx-auto">
+          <div className="text-center mb-10">
+            <p className="text-xs text-gray-400 uppercase tracking-widest mb-4">{en ? "Technology" : "Tecnologia"}</p>
+            <img src={files.totalumLogo.url} alt="Totalum" className="h-8 sm:h-10 mx-auto mb-4 object-contain" />
+          </div>
+          <div className="grid sm:grid-cols-2 gap-5">
+            <div className="bg-white border border-gray-100 rounded-xl p-5">
+              <Gauge className="w-6 h-6 text-gray-700 mb-3" />
+              <h3 className="font-semibold text-gray-900 mb-2">{en ? "Top Market Performance" : "Rendimiento Top del Mercado"}</h3>
+              <p className="text-sm text-gray-500 leading-relaxed">
+                {en
+                  ? "Built on Totalum technology, one of the best performing AI code generation engines in the market. Fast builds, reliable deploys, production-grade infrastructure."
+                  : "Construido sobre tecnologia Totalum, uno de los motores de generacion de codigo IA con mejor rendimiento del mercado. Builds rapidos, deploys fiables, infraestructura de produccion."}
+              </p>
+            </div>
+            <div className="bg-white border border-gray-100 rounded-xl p-5">
+              <Server className="w-6 h-6 text-gray-700 mb-3" />
+              <h3 className="font-semibold text-gray-900 mb-2">{en ? "Totalum VCaaS API" : "API VCaaS de Totalum"}</h3>
+              <p className="text-sm text-gray-500 leading-relaxed">
+                {en
+                  ? "All infrastructure runs on the Totalum VCaaS API behind the scenes. Database, hosting, CDN, SSL, deployments, AI agent — everything managed automatically."
+                  : "Toda la infraestructura funciona con la API VCaaS de Totalum entre bastidores. Base de datos, hosting, CDN, SSL, despliegues, agente IA — todo gestionado automaticamente."}
+              </p>
+            </div>
+          </div>
         </div>
       </section>
 
       {/* ── What is this ── */}
-      <section className="py-20 px-5">
+      <section className="py-20 px-5 bg-white">
         <div className="max-w-5xl mx-auto">
           <div className="grid md:grid-cols-2 gap-12 items-center">
             <div>
@@ -128,7 +167,7 @@ export default function LandingPage() {
                 ))}
               </div>
             </div>
-            <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
+            <div className="bg-gray-50 rounded-2xl border border-gray-100 p-6">
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-10 h-10 rounded-xl bg-gray-900 flex items-center justify-center"><Sparkles className="w-5 h-5 text-white" /></div>
                 <div>
@@ -148,7 +187,7 @@ export default function LandingPage() {
       </section>
 
       {/* ── Use Cases ── */}
-      <section id="use-cases" className="py-20 px-5 bg-white">
+      <section id="use-cases" className="py-20 px-5">
         <div className="max-w-5xl mx-auto">
           <h2 className="text-3xl font-bold text-gray-900 text-center mb-4">
             {en ? "Perfect for these niches" : "Perfecto para estos nichos"}
@@ -165,8 +204,8 @@ export default function LandingPage() {
               { icon: Users, title: en ? "SaaS Founders" : "Fundadores SaaS", desc: en ? "Validate ideas in minutes, not months. Build MVPs instantly and test with real users." : "Valida ideas en minutos, no meses. Construye MVPs al instante y testea con usuarios reales." },
               { icon: Zap, title: en ? "Freelancers" : "Freelancers", desc: en ? "Multiply your output. Deliver complete apps to clients while you focus on strategy." : "Multiplica tu produccion. Entrega apps completas a clientes mientras te enfocas en estrategia." },
             ].map((item, i) => (
-              <div key={i} className="bg-gray-50 rounded-xl p-5 hover:bg-gray-100/80 transition-colors">
-                <div className="w-9 h-9 rounded-lg bg-white border border-gray-100 flex items-center justify-center mb-3"><item.icon className="w-4.5 h-4.5 text-gray-700" /></div>
+              <div key={i} className="bg-white rounded-xl border border-gray-100 p-5 hover:shadow-sm transition-shadow">
+                <div className="w-9 h-9 rounded-lg bg-gray-50 border border-gray-100 flex items-center justify-center mb-3"><item.icon className="w-4.5 h-4.5 text-gray-700" /></div>
                 <h3 className="font-semibold text-gray-900 mb-1.5 text-sm">{item.title}</h3>
                 <p className="text-xs text-gray-500 leading-relaxed">{item.desc}</p>
               </div>
@@ -176,14 +215,10 @@ export default function LandingPage() {
       </section>
 
       {/* ── Features ── */}
-      <section id="features" className="py-20 px-5">
+      <section id="features" className="py-20 px-5 bg-white">
         <div className="max-w-5xl mx-auto">
-          <h2 className="text-3xl font-bold text-gray-900 text-center mb-4">
-            {en ? "Everything included" : "Todo incluido"}
-          </h2>
-          <p className="text-gray-500 text-center mb-12 max-w-xl mx-auto">
-            {en ? "Built on the Totalum VCaaS API — infrastructure, AI, hosting, and more, all managed for you" : "Construido sobre la API VCaaS de Totalum — infraestructura, IA, hosting y mas, todo gestionado para ti"}
-          </p>
+          <h2 className="text-3xl font-bold text-gray-900 text-center mb-4">{en ? "Everything included" : "Todo incluido"}</h2>
+          <p className="text-gray-500 text-center mb-12 max-w-xl mx-auto">{en ? "Built on the Totalum VCaaS API — infrastructure, AI, hosting, and more, all managed for you" : "Construido sobre la API VCaaS de Totalum — infraestructura, IA, hosting y mas, todo gestionado para ti"}</p>
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {[
               { icon: Sparkles, t: en ? "AI Agent" : "Agente IA", d: en ? "Natural language to full-stack app" : "Lenguaje natural a app full-stack" },
@@ -195,7 +230,7 @@ export default function LandingPage() {
               { icon: Globe, t: en ? "Custom Domains" : "Dominios", d: en ? "SSL certificates automatic" : "Certificados SSL automaticos" },
               { icon: Code2, t: en ? "Version History" : "Versiones", d: en ? "Restore any previous state" : "Restaura cualquier estado" },
             ].map((f, i) => (
-              <div key={i} className="bg-white border border-gray-100 rounded-xl p-4 hover:shadow-sm transition-shadow">
+              <div key={i} className="bg-gray-50 border border-gray-100 rounded-xl p-4 hover:bg-white hover:shadow-sm transition-all">
                 <f.icon className="w-5 h-5 text-gray-600 mb-2" />
                 <h4 className="font-medium text-gray-900 text-sm mb-1">{f.t}</h4>
                 <p className="text-xs text-gray-400">{f.d}</p>
@@ -206,14 +241,10 @@ export default function LandingPage() {
       </section>
 
       {/* ── How it works ── */}
-      <section className="py-20 px-5 bg-white">
+      <section className="py-20 px-5">
         <div className="max-w-3xl mx-auto text-center">
-          <h2 className="text-3xl font-bold text-gray-900 mb-4">
-            {en ? "How to get your own builder" : "Como obtener tu propio constructor"}
-          </h2>
-          <p className="text-gray-500 mb-12 max-w-xl mx-auto">
-            {en ? "Contact us to customize this builder with your branding, pricing and domain" : "Contactanos para personalizar este constructor con tu marca, precios y dominio"}
-          </p>
+          <h2 className="text-3xl font-bold text-gray-900 mb-4">{en ? "How to get your own builder" : "Como obtener tu propio constructor"}</h2>
+          <p className="text-gray-500 mb-12 max-w-xl mx-auto">{en ? "Contact us to customize this builder with your branding, pricing and domain" : "Contactanos para personalizar este constructor con tu marca, precios y dominio"}</p>
           <div className="grid sm:grid-cols-3 gap-8">
             {[
               { n: "1", t: en ? "Contact us" : "Contactanos", d: en ? "Reach out via email and tell us about your project" : "Escribenos por email y cuentanos sobre tu proyecto" },
@@ -231,12 +262,10 @@ export default function LandingPage() {
       </section>
 
       {/* ── Contact ── */}
-      <section id="contact" className="py-20 px-5">
+      <section id="contact" className="py-20 px-5 bg-white">
         <div className="max-w-2xl mx-auto text-center">
           <Mail className="w-10 h-10 text-gray-400 mx-auto mb-4" />
-          <h2 className="text-3xl font-bold text-gray-900 mb-3">
-            {en ? "Ready to launch your builder?" : "Listo para lanzar tu constructor?"}
-          </h2>
+          <h2 className="text-3xl font-bold text-gray-900 mb-3">{en ? "Ready to launch your builder?" : "Listo para lanzar tu constructor?"}</h2>
           <p className="text-gray-500 mb-8 max-w-lg mx-auto">
             {en
               ? "Contact us to learn how to fully customize this AI app builder with your brand, logo, colors, pricing and domain. We'll walk you through everything."
@@ -246,8 +275,7 @@ export default function LandingPage() {
             <Mail className="w-4 h-4" /> contacto@totalum.app
           </a>
           <p className="text-xs text-gray-400 mt-4">
-            {en ? "Or try the builder right now:" : "O prueba el constructor ahora mismo:"}
-            {" "}
+            {en ? "Or try the builder right now:" : "O prueba el constructor ahora mismo:"}{" "}
             <Link href="/register" className="text-gray-600 hover:text-gray-900 underline">{en ? "Create an account" : "Crea una cuenta"}</Link>
           </p>
         </div>
@@ -256,9 +284,7 @@ export default function LandingPage() {
       {/* ── Footer ── */}
       <footer className="py-10 px-5 border-t border-gray-100">
         <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <img src={files.totalumLogo.url} alt="Totalum" className="h-5 object-contain" />
-          </div>
+          <img src={files.totalumLogo.url} alt="Totalum" className="h-5 object-contain" />
           <div className="flex items-center gap-4 text-xs text-gray-400">
             <Link href="/login" className="hover:text-gray-600">{en ? "Sign In" : "Iniciar sesion"}</Link>
             <Link href="/register" className="hover:text-gray-600">{en ? "Register" : "Registrarse"}</Link>
