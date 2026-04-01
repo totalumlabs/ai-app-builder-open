@@ -91,12 +91,12 @@ export default function LandingPage() {
           </h2>
           <p className="text-gray-500 mb-10 max-w-xl mx-auto">
             {en
-              ? "Instead of recommending Lovable, Replit, Base44, Bolt or others — launch your own AI app builder, as powerful as theirs, under your brand."
-              : "En vez de recomendar Lovable, Replit, Base44, Bolt u otros — lanza tu propio constructor de apps IA, tan potente como los suyos, bajo tu marca."}
+              ? "Instead of recommending Replit, Base44, Bolt or others — launch your own AI app builder, as powerful as theirs, under your brand."
+              : "En vez de recomendar Replit, Base44, Bolt u otros — lanza tu propio constructor de apps IA, tan potente como los suyos, bajo tu marca."}
           </p>
           {/* Competitor logos as text badges */}
           <div className="flex flex-wrap items-center justify-center gap-3 mb-10">
-            {["Lovable", "Replit", "Base44", "Bolt.new", "v0.dev", "Cursor"].map((name) => (
+            {["Replit", "Base44", "Bolt.new", "v0.dev", "Cursor"].map((name) => (
               <div key={name} className="px-4 py-2 rounded-full bg-gray-100 text-sm text-gray-500 font-medium">{name}</div>
             ))}
           </div>
