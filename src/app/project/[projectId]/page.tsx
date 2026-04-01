@@ -199,18 +199,18 @@ export default function WorkspacePage() {
       {/* Invisible overlay when resizing to prevent iframe from stealing mouse events */}
       {isResizing && <div className="fixed inset-0 z-50 cursor-col-resize" />}
 
-      {/* ── Header ── */}
-      <header className="h-11 flex items-center px-2 shrink-0 bg-white border-b border-gray-100 z-10">
+      {/* ── Header ── no background, no border, same as page */}
+      <header className="h-11 flex items-center px-2 shrink-0 z-10">
         <div className="flex items-center gap-1">
           <Link href="/dashboard">
-            <button className="p-1.5 rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-50 transition-colors">
+            <button className="p-1.5 rounded-md text-gray-400 hover:text-gray-700 hover:bg-black/5 transition-colors">
               <ArrowLeft className="w-4 h-4" />
             </button>
           </Link>
-          <button onClick={() => setChatCollapsed(!chatCollapsed)} className="hidden sm:flex p-1.5 rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-50 transition-colors">
+          <button onClick={() => setChatCollapsed(!chatCollapsed)} className="hidden sm:flex p-1.5 rounded-md text-gray-400 hover:text-gray-700 hover:bg-black/5 transition-colors">
             {chatCollapsed ? <PanelLeft className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
           </button>
-          <div className="w-px h-5 bg-gray-100 mx-1 hidden sm:block" />
+          <div className="w-px h-5 bg-gray-200/50 mx-1 hidden sm:block" />
           <h1 className="text-sm font-medium text-gray-700 max-w-[200px] sm:max-w-[300px] truncate">{projectId}</h1>
           <span className={`w-1.5 h-1.5 rounded-full shrink-0 ml-1 ${getServerStatusColor()}`} />
         </div>
@@ -237,7 +237,7 @@ export default function WorkspacePage() {
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="p-1.5 rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-50"><MoreVertical className="w-4 h-4" /></button>
+              <button className="p-1.5 rounded-md text-gray-400 hover:text-gray-700 hover:bg-black/5"><MoreVertical className="w-4 h-4" /></button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={handleDeploy} disabled={deploying || isBuilding} className="sm:hidden"><Rocket className="w-4 h-4 mr-2" />Publish</DropdownMenuItem>
@@ -264,9 +264,9 @@ export default function WorkspacePage() {
         <div className={`sm:hidden flex flex-col flex-1 bg-white ${mobileTab !== "chat" ? "hidden" : ""}`}>
           <ChatPanel messages={messages} isBuilding={isBuilding} prompt={prompt} setPrompt={setPrompt} onSend={handleSendPrompt} onStop={handleStopAgent} sending={sending} projectId={projectId} />
         </div>
-        {/* Right panel */}
+        {/* Right panel - no top/left margin for preview, slight padding for other tabs */}
         <div className={`flex-1 flex flex-col min-w-0 ${mobileTab !== "panel" ? "hidden sm:flex" : ""}`}>
-          <div className="flex-1 overflow-hidden m-2 sm:m-3 rounded-xl bg-white shadow-sm">
+          <div className={`flex-1 overflow-hidden bg-white ${activeTab === "preview" ? "rounded-none" : "m-2 sm:m-3 rounded-xl shadow-sm"}`}>
             {activeTab === "preview" && <PreviewPanel key={previewKey} previewUrl={previewUrl} onRefresh={() => { fetchProject(); setPreviewKey((k) => k + 1); }} loading={isBuilding} />}
             {activeTab === "database" && <DatabasePanel projectId={projectId} />}
             {activeTab === "versions" && <VersionsPanel projectId={projectId} onVersionRestored={() => fetchProject()} />}

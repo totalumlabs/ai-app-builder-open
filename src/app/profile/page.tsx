@@ -1,27 +1,29 @@
 "use client";
 
+import { useState } from "react";
 import { useSession, signOut } from "@/lib/auth-client";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import Link from "next/link";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Mail, User, Shield } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { ArrowLeft, Mail, User, LogOut, Shield, Sparkles, Loader2 } from "lucide-react";
 
 export default function ProfilePage() {
   const router = useRouter();
   const { data: session, isPending } = useSession();
   const user = session?.user;
+  const [loggingOut, setLoggingOut] = useState(false);
 
   const handleLogout = async () => {
-    await signOut();
-    router.push("/");
+    setLoggingOut(true);
+    await signOut({ fetchOptions: { onSuccess: () => router.push("/") } });
   };
 
   if (isPending) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p>Loading...</p>
+      <div className="min-h-screen flex items-center justify-center" style={{ background: "linear-gradient(135deg, #faf9f7 0%, #f5f0eb 25%, #ede4db 50%, #e8dfd6 75%, #f2ece6 100%)" }}>
+        <Loader2 className="w-6 h-6 animate-spin text-gray-500" />
       </div>
     );
   }
@@ -31,86 +33,97 @@ export default function ProfilePage() {
     return null;
   }
 
+  const userName = user.name || user.email?.split("@")[0] || "";
+  const userInitial = userName.charAt(0).toUpperCase();
+
   return (
-    <div className="min-h-screen bg-background">
-      <div className="container mx-auto p-6">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold">Profile</h1>
-          <Link href="/">
-            <Button variant="outline">Back to Home</Button>
-          </Link>
+    <div className="min-h-screen relative overflow-hidden">
+      {/* Same gradient background as dashboard */}
+      <div className="fixed inset-0 -z-10">
+        <div className="absolute inset-0" style={{ background: "linear-gradient(135deg, #faf9f7 0%, #f5f0eb 25%, #ede4db 50%, #e8dfd6 75%, #f2ece6 100%)" }} />
+        <div className="absolute top-0 right-0 w-[600px] h-[600px] rounded-full opacity-30" style={{ background: "radial-gradient(circle, #e8d5c4 0%, transparent 70%)" }} />
+        <div className="absolute bottom-0 left-0 w-[500px] h-[500px] rounded-full opacity-20" style={{ background: "radial-gradient(circle, #d4c4b0 0%, transparent 70%)" }} />
+      </div>
+
+      {/* Header - same as dashboard */}
+      <header className="sticky top-0 z-50">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 h-12 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Link href="/dashboard">
+              <button className="p-1.5 rounded-md text-gray-400 hover:text-gray-700 hover:bg-black/5 transition-colors">
+                <ArrowLeft className="w-4 h-4" />
+              </button>
+            </Link>
+            <Link href="/dashboard" className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg bg-gray-900 flex items-center justify-center">
+                <Sparkles className="w-3.5 h-3.5 text-white" />
+              </div>
+              <span className="font-semibold tracking-tight text-gray-900 text-sm">VibeBuild</span>
+            </Link>
+          </div>
+        </div>
+      </header>
+
+      <div className="max-w-lg mx-auto px-4 sm:px-6 py-12">
+        {/* Avatar and name */}
+        <div className="text-center mb-8">
+          <div className="w-20 h-20 rounded-full bg-gray-200 flex items-center justify-center mx-auto mb-4 text-2xl font-bold text-gray-600">
+            {userInitial}
+          </div>
+          <h1 className="text-xl font-bold text-gray-900">{user.name || "User"}</h1>
+          <p className="text-sm text-gray-500 mt-0.5">{user.email}</p>
         </div>
 
-        <div className="max-w-4xl mx-auto">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center space-x-4">
-                <Avatar className="h-24 w-24">
-                  <AvatarFallback className="text-2xl">
-                    {user?.name?.charAt(0)?.toUpperCase() || user?.email?.charAt(0)?.toUpperCase() || "U"}
-                  </AvatarFallback>
-                </Avatar>
-                <div>
-                  <CardTitle className="text-2xl">{user?.name || "User"}</CardTitle>
-                  <CardDescription className="text-lg">{user?.email}</CardDescription>
-                </div>
+        {/* Profile details */}
+        <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-gray-200/60 shadow-sm overflow-hidden">
+          <div className="p-5 space-y-4">
+            <div>
+              <Label className="text-xs text-gray-400 uppercase tracking-wider">Name</Label>
+              <div className="flex items-center gap-2 mt-1.5">
+                <User className="w-4 h-4 text-gray-400" />
+                <span className="text-sm text-gray-800">{user.name || "Not set"}</span>
               </div>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold">Account Information</h3>
-                  
-                  <div className="flex items-start space-x-3">
-                    <User className="h-5 w-5 text-muted-foreground mt-0.5" />
-                    <div>
-                      <p className="font-medium">User ID</p>
-                      <p className="text-sm text-muted-foreground font-mono">{user?.id}</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start space-x-3">
-                    <Mail className="h-5 w-5 text-muted-foreground mt-0.5" />
-                    <div>
-                      <p className="font-medium">Email Address</p>
-                      <p className="text-sm text-muted-foreground">{user?.email}</p>
-                      <span className="inline-flex items-center text-xs text-green-600 mt-1">
-                        <Shield className="h-3 w-3 mr-1" />
-                        Verified
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold">Security</h3>
-                  
-                  <Card>
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-base">Password</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-sm text-muted-foreground mb-3">
-                        Last modified: Never
-                      </p>
-                      <Button variant="outline" size="sm" disabled>
-                        Change Password
-                      </Button>
-                    </CardContent>
-                  </Card>
-                </div>
+            </div>
+            <div className="border-t border-gray-100 pt-4">
+              <Label className="text-xs text-gray-400 uppercase tracking-wider">Email</Label>
+              <div className="flex items-center gap-2 mt-1.5">
+                <Mail className="w-4 h-4 text-gray-400" />
+                <span className="text-sm text-gray-800">{user.email}</span>
               </div>
-
-              <div className="pt-6 border-t">
-                <h3 className="text-lg font-semibold mb-4">Actions</h3>
-                <div className="flex flex-wrap gap-3">
-                  <Button onClick={handleLogout} variant="destructive">
-                    Sign Out
-                  </Button>
-                </div>
+            </div>
+            <div className="border-t border-gray-100 pt-4">
+              <Label className="text-xs text-gray-400 uppercase tracking-wider">Account Status</Label>
+              <div className="flex items-center gap-2 mt-1.5">
+                <Shield className="w-4 h-4 text-emerald-500" />
+                <span className="text-sm text-gray-800">Active</span>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+            <div className="border-t border-gray-100 pt-4">
+              <Label className="text-xs text-gray-400 uppercase tracking-wider">Member Since</Label>
+              <div className="flex items-center gap-2 mt-1.5">
+                <span className="text-sm text-gray-800">
+                  {user.createdAt ? new Date(user.createdAt).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }) : "Unknown"}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="mt-6 space-y-3">
+          <Link href="/forgot-password">
+            <button className="w-full text-left px-5 py-3 bg-white/80 backdrop-blur-sm rounded-xl border border-gray-200/60 text-sm text-gray-700 hover:bg-white transition-colors">
+              Change password
+            </button>
+          </Link>
+          <button
+            onClick={handleLogout}
+            disabled={loggingOut}
+            className="w-full flex items-center gap-2 px-5 py-3 bg-white/80 backdrop-blur-sm rounded-xl border border-gray-200/60 text-sm text-red-600 hover:bg-red-50/50 transition-colors"
+          >
+            {loggingOut ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogOut className="w-4 h-4" />}
+            Sign out
+          </button>
         </div>
       </div>
     </div>

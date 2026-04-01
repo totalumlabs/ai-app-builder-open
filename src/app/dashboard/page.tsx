@@ -5,14 +5,14 @@ import { useRouter } from "next/navigation";
 import { useSession, signOut } from "@/lib/auth-client";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Sparkles, Plus, LogOut, Loader2, Trash2, Send, Paperclip, X, ArrowRight } from "lucide-react";
+import { Sparkles, Plus, LogOut, Loader2, Trash2, Send, Paperclip, X, ArrowRight, User } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
+import type { VcaasProject } from "@/lib/vcaas-types";
 
 interface UserProjectRecord { _id: string; user_id: string; project_id: string; description: string; createdAt: string; }
 
@@ -20,6 +20,7 @@ export default function DashboardPage() {
   const { data: session } = useSession();
   const router = useRouter();
   const [userProjects, setUserProjects] = useState<UserProjectRecord[]>([]);
+  const [projectDetails, setProjectDetails] = useState<Record<string, VcaasProject>>({});
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -33,7 +34,17 @@ export default function DashboardPage() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     const res = await api.get<UserProjectRecord[]>("/api/user-projects");
-    if (res.ok && res.data) setUserProjects(Array.isArray(res.data) ? res.data : []);
+    if (res.ok && res.data) {
+      const projects = Array.isArray(res.data) ? res.data : [];
+      setUserProjects(projects);
+      // Fetch project details for thumbnails
+      const details: Record<string, VcaasProject> = {};
+      await Promise.all(projects.slice(0, 12).map(async (p) => {
+        const r = await api.get<VcaasProject>(`/api/vcaas/projects/${p.project_id}`);
+        if (r.ok && r.data) details[p.project_id] = r.data;
+      }));
+      setProjectDetails(details);
+    }
     setLoading(false);
   }, []);
 
@@ -81,30 +92,43 @@ export default function DashboardPage() {
     toast.success("Project deleted"); fetchData();
   };
 
+  const getPreviewUrl = (pid: string) => {
+    const d = projectDetails[pid];
+    if (!d) return null;
+    const field = d.developmentUrlFieldToUse || "temporalDevelopmentProjectUrl";
+    return (d as unknown as Record<string, unknown>)[field] as string || d.temporalDevelopmentProjectUrl || d.cachedDevelopmentUrl || null;
+  };
+
   const hasProjects = userProjects.length > 0;
+  const userName = session?.user?.name || session?.user?.email?.split("@")[0] || "";
+  const userInitial = userName.charAt(0).toUpperCase();
 
   return (
     <div className="min-h-screen relative overflow-hidden">
-      {/* Beautiful gradient background */}
+      {/* Gradient background */}
       <div className="fixed inset-0 -z-10">
         <div className="absolute inset-0" style={{ background: "linear-gradient(135deg, #faf9f7 0%, #f5f0eb 25%, #ede4db 50%, #e8dfd6 75%, #f2ece6 100%)" }} />
         <div className="absolute top-0 right-0 w-[600px] h-[600px] rounded-full opacity-30" style={{ background: "radial-gradient(circle, #e8d5c4 0%, transparent 70%)" }} />
         <div className="absolute bottom-0 left-0 w-[500px] h-[500px] rounded-full opacity-20" style={{ background: "radial-gradient(circle, #d4c4b0 0%, transparent 70%)" }} />
-        <div className="absolute top-1/3 left-1/3 w-[400px] h-[400px] rounded-full opacity-10" style={{ background: "radial-gradient(circle, #c8b8a4 0%, transparent 70%)" }} />
       </div>
 
-      {/* Header */}
-      <header className="sticky top-0 z-50 backdrop-blur-xl bg-white/60 border-b border-gray-200/40">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
-          <Link href="/dashboard" className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-gray-900 flex items-center justify-center">
-              <Sparkles className="w-4 h-4 text-white" />
+      {/* Header - matches builder: no bg, no border, transparent */}
+      <header className="sticky top-0 z-50">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 h-12 flex items-center justify-between">
+          <Link href="/dashboard" className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-gray-900 flex items-center justify-center">
+              <Sparkles className="w-3.5 h-3.5 text-white" />
             </div>
-            <span className="font-semibold tracking-tight text-gray-900">VibeBuild</span>
+            <span className="font-semibold tracking-tight text-gray-900 text-sm">VibeBuild</span>
           </Link>
-          <div className="flex items-center gap-3">
-            <span className="text-sm text-gray-400 hidden md:block">{session?.user?.name || session?.user?.email}</span>
-            <button className="p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100/50 transition-colors"
+          <div className="flex items-center gap-2">
+            <Link href="/profile">
+              <button className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-black/5 transition-colors">
+                <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-[10px] font-semibold text-gray-600">{userInitial}</div>
+                <span className="text-xs hidden sm:block">{userName}</span>
+              </button>
+            </Link>
+            <button className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-black/5 transition-colors"
               onClick={() => signOut({ fetchOptions: { onSuccess: () => router.push("/") } })}>
               <LogOut className="w-4 h-4" />
             </button>
@@ -112,17 +136,15 @@ export default function DashboardPage() {
         </div>
       </header>
 
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-10">
-        {/* Hero prompt area */}
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
+        {/* Hero prompt */}
         {!loading && (
-          <div className={hasProjects ? "mb-12" : "flex flex-col items-center justify-center min-h-[50vh]"}>
+          <div className={hasProjects ? "mb-10" : "flex flex-col items-center justify-center min-h-[50vh]"}>
             <div className="w-full max-w-2xl mx-auto">
               <div className="text-center mb-6">
                 {!hasProjects && (
-                  <div className="mb-5">
-                    <div className="w-14 h-14 rounded-2xl bg-gray-900 flex items-center justify-center mx-auto mb-4 shadow-lg">
-                      <Sparkles className="w-7 h-7 text-white" />
-                    </div>
+                  <div className="w-12 h-12 rounded-2xl bg-gray-900 flex items-center justify-center mx-auto mb-4">
+                    <Sparkles className="w-6 h-6 text-white" />
                   </div>
                 )}
                 <h1 className={`font-bold tracking-tight text-gray-900 ${hasProjects ? "text-xl" : "text-3xl sm:text-4xl"}`}>
@@ -130,8 +152,6 @@ export default function DashboardPage() {
                 </h1>
                 {!hasProjects && <p className="text-gray-500 max-w-md mx-auto mt-2 text-sm">Describe your app and AI will build it in minutes.</p>}
               </div>
-
-              {/* Prompt card */}
               <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg shadow-gray-200/50 border border-gray-200/60 overflow-hidden">
                 <textarea
                   value={firstPrompt}
@@ -156,11 +176,8 @@ export default function DashboardPage() {
                     {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Paperclip className="w-4 h-4" />}
                     <span className="hidden sm:inline">Attach</span>
                   </label>
-                  <button
-                    onClick={handleFirstPrompt}
-                    disabled={(!firstPrompt.trim() && attachedFiles.length === 0) || sendingFirst}
-                    className="flex items-center gap-1.5 bg-gray-900 hover:bg-gray-800 disabled:bg-gray-300 text-white text-xs font-medium px-4 h-8 rounded-xl transition-colors"
-                  >
+                  <button onClick={handleFirstPrompt} disabled={(!firstPrompt.trim() && attachedFiles.length === 0) || sendingFirst}
+                    className="flex items-center gap-1.5 bg-gray-900 hover:bg-gray-800 disabled:bg-gray-300 text-white text-xs font-medium px-4 h-8 rounded-xl transition-colors">
                     {sendingFirst ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <><Send className="w-3.5 h-3.5" /><span>Build</span></>}
                   </button>
                 </div>
@@ -200,35 +217,55 @@ export default function DashboardPage() {
               </Dialog>
             </div>
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {userProjects.map((up) => (
-                <Link key={up._id} href={`/project/${up.project_id}`}>
-                  <div className="bg-white/70 backdrop-blur-sm border border-gray-200/50 rounded-xl p-5 hover:shadow-lg hover:bg-white/90 transition-all cursor-pointer group h-full">
-                    <div className="flex items-start justify-between mb-2">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center group-hover:bg-gray-200 transition-colors">
-                          <Sparkles className="w-4 h-4 text-gray-500" />
-                        </div>
-                        <h3 className="font-medium text-sm text-gray-800 group-hover:text-gray-900">{up.project_id}</h3>
+              {userProjects.map((up) => {
+                const thumbUrl = getPreviewUrl(up.project_id);
+                return (
+                  <Link key={up._id} href={`/project/${up.project_id}`}>
+                    <div className="bg-white/70 backdrop-blur-sm border border-gray-200/50 rounded-xl overflow-hidden hover:shadow-lg hover:bg-white/90 transition-all cursor-pointer group h-full">
+                      {/* Project thumbnail */}
+                      <div className="h-32 bg-gray-100 relative overflow-hidden">
+                        {thumbUrl ? (
+                          <iframe
+                            src={thumbUrl}
+                            className="w-[200%] h-[200%] border-0 pointer-events-none origin-top-left"
+                            style={{ transform: "scale(0.5)" }}
+                            title={up.project_id}
+                            sandbox="allow-scripts allow-same-origin"
+                            tabIndex={-1}
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <Sparkles className="w-8 h-8 text-gray-200" />
+                          </div>
+                        )}
+                        {/* Overlay on hover */}
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors" />
                       </div>
-                      <button className="w-7 h-7 rounded-md flex items-center justify-center opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 hover:bg-gray-50 transition-all" onClick={(e) => handleDeleteProject(up.project_id, e)}>
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                      {/* Info */}
+                      <div className="p-4">
+                        <div className="flex items-start justify-between mb-1">
+                          <h3 className="font-medium text-sm text-gray-800 group-hover:text-gray-900 truncate flex-1">{up.project_id}</h3>
+                          <button className="w-6 h-6 rounded-md flex items-center justify-center opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 hover:bg-gray-50 transition-all shrink-0 ml-2" onClick={(e) => handleDeleteProject(up.project_id, e)}>
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                        <p className="text-[11px] text-gray-500 line-clamp-1">{up.description || "No description"}</p>
+                        <div className="flex items-center justify-between mt-2">
+                          <span className="text-[10px] text-gray-400">{new Date(up.createdAt).toLocaleDateString()}</span>
+                          <ArrowRight className="w-3 h-3 text-gray-300 group-hover:text-gray-500 transition-colors" />
+                        </div>
+                      </div>
                     </div>
-                    <p className="text-xs text-gray-500 line-clamp-2">{up.description || "No description"}</p>
-                    <div className="flex items-center justify-between mt-3">
-                      <span className="text-[10px] text-gray-400">{new Date(up.createdAt).toLocaleDateString()}</span>
-                      <ArrowRight className="w-3.5 h-3.5 text-gray-300 group-hover:text-gray-500 transition-colors" />
-                    </div>
-                  </div>
-                </Link>
-              ))}
+                  </Link>
+                );
+              })}
             </div>
           </>
         )}
 
         {loading && (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-6">
-            {[1, 2, 3].map((i) => <Skeleton key={i} className="h-36 rounded-xl bg-white/40" />)}
+            {[1, 2, 3].map((i) => <Skeleton key={i} className="h-48 rounded-xl bg-white/40" />)}
           </div>
         )}
       </div>
