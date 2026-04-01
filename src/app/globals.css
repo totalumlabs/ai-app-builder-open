@@ -124,3 +124,13 @@
 button {
   cursor: pointer;
 }
+
+/* Chat panel custom properties */
+:root {
+  --user-bubble: #eeecea;
+  --textarea-bg: #f3f1ee;
+}
+.dark {
+  --user-bubble: #333;
+  --textarea-bg: #2a2a2a;
+}

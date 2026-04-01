@@ -7,6 +7,7 @@ import { ScriptExecutor } from "@/components/ScriptExecutor";
 import { DevToolsHandler } from "@/components/DevToolsHandler";
 import { GlobalErrorCatcher } from "@/components/GlobalErrorCatcher";
 import { Toaster } from "@/components/ui/sonner";
+import { I18nProvider } from "@/lib/i18n";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
@@ -22,15 +23,17 @@ export const revalidate = 0;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <GlobalErrorCatcher />
-        <ScriptExecutor />
-        <DevToolsHandler />
-        <Toaster position="top-right" richColors />
-        <div className="min-h-screen flex flex-col">
-          <main className="flex-1">{children}</main>
-        </div>
+        <I18nProvider>
+          <GlobalErrorCatcher />
+          <ScriptExecutor />
+          <DevToolsHandler />
+          <Toaster position="top-right" richColors />
+          <div className="min-h-screen flex flex-col">
+            <main className="flex-1">{children}</main>
+          </div>
+        </I18nProvider>
       </body>
     </html>
   );
