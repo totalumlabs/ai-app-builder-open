@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import {
   Rocket, Loader2, Eye, Database, GitBranch, Key, Globe, Terminal,
   RefreshCw, Server, PanelLeftClose, PanelLeft, Monitor, Smartphone,
-  ExternalLink, Sparkles, ChevronDown, Sun, Moon, FolderOpen, Plus, Languages,
+  ExternalLink, Sparkles, ChevronDown, FolderOpen, Plus, Languages,
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -217,11 +217,6 @@ export default function WorkspacePage() {
                   </button>
                 </div>
                 <div className="border-t py-1" style={{ borderColor: darkMode ? "#444" : "#eee" }}>
-                  <button onClick={() => { setDarkMode(!darkMode); setMenuOpen(false); }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-black/5 dark:hover:bg-white/10 transition-colors text-gray-700 dark:text-gray-200">
-                    {darkMode ? <Sun className="w-4 h-4 text-gray-400" /> : <Moon className="w-4 h-4 text-gray-400" />}
-                    {darkMode ? t("lightMode") : t("darkMode")}
-                  </button>
                   <button onClick={() => { setLang(lang === "en" ? "es" : "en"); setMenuOpen(false); }}
                     className="w-full flex items-center justify-between px-3 py-2 text-sm hover:bg-black/5 dark:hover:bg-white/10 transition-colors text-gray-700 dark:text-gray-200">
                     <span className="flex items-center gap-2.5"><Languages className="w-4 h-4 text-gray-400" /> {t("language")}</span>
