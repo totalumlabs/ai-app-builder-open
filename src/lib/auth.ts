@@ -25,7 +25,7 @@ export const auth = betterAuth({
     autoSignIn: true,
     minPasswordLength: 6,
     maxPasswordLength: 128,
-    requireEmailVerification: true,
+    // requireEmailVerification: true, // Disabled: blocks existing users who haven't verified
     // PASSWORD RECOVERY
     sendResetPassword: async ({ user, url }) => {
       console.log("[Auth] Sending password reset email to:", user.email);
