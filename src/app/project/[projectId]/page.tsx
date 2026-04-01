@@ -6,9 +6,10 @@ import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  Rocket, Loader2, Eye, Database, GitBranch, Key, Globe, Terminal,
+  Rocket, Loader2, Eye, Database, Key, Globe, Terminal,
   RefreshCw, Server, PanelLeftClose, PanelLeft, Monitor, Smartphone,
   ExternalLink, Sparkles, ChevronDown, FolderOpen, Plus, Languages,
+  Clock, X,
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -37,7 +38,13 @@ export default function WorkspacePage() {
   const TABS = [
     { id: "preview", label: t("preview"), icon: Eye },
     { id: "database", label: t("database"), icon: Database },
-    { id: "versions", label: t("versions"), icon: GitBranch },
+  ];
+
+  // All tabs for mobile menu (includes versions/secrets/domain/logs)
+  const ALL_TABS = [
+    { id: "preview", label: t("preview"), icon: Eye },
+    { id: "database", label: t("database"), icon: Database },
+    { id: "versions", label: t("versions"), icon: Clock },
     { id: "secrets", label: t("secrets"), icon: Key },
     { id: "domain", label: t("domain"), icon: Globe },
     { id: "logs", label: t("logs"), icon: Terminal },
@@ -60,6 +67,8 @@ export default function WorkspacePage() {
   const [iframePath, setIframePath] = useState("/");
   const [darkMode, setDarkMode] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [deployMenuOpen, setDeployMenuOpen] = useState(false);
+  const deployMenuRef = useRef<HTMLDivElement>(null);
 
   const mountedRef = useRef(true);
   const pollingRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -92,6 +101,20 @@ export default function WorkspacePage() {
     window.addEventListener("blur", handleBlur);
     return () => { window.removeEventListener("mousedown", handleClick); window.removeEventListener("blur", handleBlur); };
   }, [menuOpen]);
+
+  // Close deploy menu on outside click
+  useEffect(() => {
+    if (!deployMenuOpen) return;
+    const handleClick = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (deployMenuRef.current && deployMenuRef.current.contains(target)) return;
+      const popup = document.querySelector("[data-deploy-menu]");
+      if (popup && popup.contains(target)) return;
+      setDeployMenuOpen(false);
+    };
+    window.addEventListener("mousedown", handleClick);
+    return () => { window.removeEventListener("mousedown", handleClick); };
+  }, [deployMenuOpen]);
 
   const handleResizeStart = useCallback((e: React.MouseEvent) => {
     e.preventDefault(); resizeRef.current = { startX: e.clientX, startWidth: chatWidth }; setIsResizing(true);
@@ -206,9 +229,16 @@ export default function WorkspacePage() {
           <Plus className="w-4 h-4 text-gray-400" /> {t("newProject")}
         </button>
       </div>
+      {/* Secrets option */}
+      <div className="border-t py-1" style={{ borderColor: darkMode ? "#444" : "#eee" }}>
+        <button onClick={() => { setActiveTab("secrets"); setMobileTab("panel"); setMenuOpen(false); }}
+          className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-black/5 dark:hover:bg-white/10 transition-colors ${activeTab === "secrets" ? "text-gray-900 dark:text-white font-medium" : "text-gray-700 dark:text-gray-200"}`}>
+          <Key className="w-4 h-4 text-gray-400" /> {t("secrets")}
+        </button>
+      </div>
       {/* Tabs - visible on mobile only */}
       <div className="sm:hidden border-t py-1" style={{ borderColor: darkMode ? "#444" : "#eee" }}>
-        {TABS.map((tab) => (
+        {ALL_TABS.map((tab) => (
           <button key={tab.id} onClick={() => { setActiveTab(tab.id); setMobileTab("panel"); setMenuOpen(false); }}
             className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-black/5 dark:hover:bg-white/10 transition-colors ${activeTab === tab.id ? "text-gray-900 dark:text-white font-medium" : "text-gray-700 dark:text-gray-200"}`}>
             <tab.icon className="w-4 h-4 text-gray-400" /> {tab.label}
@@ -254,6 +284,9 @@ export default function WorkspacePage() {
               </button>
               {popupMenu}
             </div>
+            <button onClick={() => setActiveTab("versions")} className={`h-7 w-7 flex items-center justify-center rounded-lg transition-colors shrink-0 border ${btnBorder} ${activeTab === "versions" ? "bg-gray-900 dark:bg-white text-white dark:text-gray-900" : "text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-black/5 dark:hover:bg-white/10"}`} title={t("versions")}>
+              <Clock className="w-3.5 h-3.5" />
+            </button>
             <button onClick={() => setChatCollapsed(!chatCollapsed)} className={`h-7 w-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-black/5 dark:hover:bg-white/10 border ${btnBorder} transition-colors shrink-0`}>
               {chatCollapsed ? <PanelLeft className="w-3.5 h-3.5" /> : <PanelLeftClose className="w-3.5 h-3.5" />}
             </button>
@@ -270,15 +303,45 @@ export default function WorkspacePage() {
             </div>
             <div className="flex-1 flex items-center justify-center min-w-0">
               <div className={`flex items-center h-7 w-[320px] rounded-full border ${btnBorder} px-1.5 gap-1`}>
+                <button onClick={() => setActiveTab("logs")} className={`p-1 rounded shrink-0 ${activeTab === "logs" ? "text-gray-900 dark:text-white" : "text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"}`} title={t("logs")}><Terminal className="w-3.5 h-3.5" /></button>
+                <div className="w-px h-3.5 bg-gray-200 dark:bg-gray-600 shrink-0" />
                 <button onClick={() => setMobilePreview(!mobilePreview)} className="p-1 rounded text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 shrink-0">{mobilePreview ? <Smartphone className="w-3.5 h-3.5" /> : <Monitor className="w-3.5 h-3.5" />}</button>
                 <input value={iframePath} onChange={(e) => setIframePath(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") setPreviewKey((k) => k + 1); }} className="flex-1 min-w-0 bg-transparent border-0 outline-none text-sm font-mono text-gray-600 dark:text-gray-300 placeholder:text-gray-400 px-1" placeholder="/" />
                 <button className="p-1 rounded text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 shrink-0" onClick={() => { fetchProject(); setPreviewKey((k) => k + 1); }}><RefreshCw className="w-3.5 h-3.5" /></button>
                 {previewUrl && <a href={previewUrl} target="_blank" rel="noopener noreferrer" className="p-1 rounded text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 shrink-0"><ExternalLink className="w-3.5 h-3.5" /></a>}
               </div>
             </div>
-            <Button size="sm" onClick={handleDeploy} disabled={deploying || isBuilding} className={`bg-gray-900 dark:bg-white hover:bg-gray-800 dark:hover:bg-gray-100 text-white dark:text-gray-900 h-7 text-sm rounded-lg px-3 border ${btnBorder}`}>
-              {deploying ? <><Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />{t("deploying")}</> : <><Rocket className="w-3.5 h-3.5 mr-1" />{t("publish")}</>}
-            </Button>
+            <div className="relative shrink-0" ref={deployMenuRef}>
+              <Button size="sm" onClick={() => setDeployMenuOpen(!deployMenuOpen)} disabled={deploying || isBuilding} className={`bg-gray-900 dark:bg-white hover:bg-gray-800 dark:hover:bg-gray-100 text-white dark:text-gray-900 h-7 text-sm rounded-lg px-3 border ${btnBorder}`}>
+                {deploying ? <><Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />{t("deploying")}</> : <><Rocket className="w-3.5 h-3.5 mr-1" />{t("publish")}</>}
+              </Button>
+              {deployMenuOpen && (
+                <div data-deploy-menu className="absolute top-full right-0 mt-1.5 w-72 rounded-xl shadow-xl z-[60] overflow-hidden" style={{ background: darkMode ? "#2a2a2a" : "#fff", border: `1px solid ${darkMode ? "#444" : "#e5e5e5"}` }}>
+                  <div className="px-3 py-2 border-b flex items-center justify-between" style={{ borderColor: darkMode ? "#444" : "#eee" }}>
+                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{t("publish")}</p>
+                    <button onClick={() => setDeployMenuOpen(false)} className="text-gray-400 hover:text-gray-600"><X className="w-3.5 h-3.5" /></button>
+                  </div>
+                  <div className="p-3 space-y-2">
+                    <button onClick={() => { handleDeploy(); setDeployMenuOpen(false); }} disabled={deploying || isBuilding}
+                      className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition-colors text-gray-700 dark:text-gray-200 border border-gray-100 dark:border-gray-700">
+                      <Rocket className="w-4 h-4 text-gray-400" />
+                      <div className="text-left">
+                        <p className="font-medium">{lang === "en" ? "Deploy now" : "Desplegar ahora"}</p>
+                        <p className="text-xs text-gray-400">{project?.productionProjectUrl || `${projectId}.totalum-project.com`}</p>
+                      </div>
+                    </button>
+                    <button onClick={() => { setActiveTab("domain"); setDeployMenuOpen(false); }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition-colors text-gray-700 dark:text-gray-200 border border-gray-100 dark:border-gray-700">
+                      <Globe className="w-4 h-4 text-gray-400" />
+                      <div className="text-left">
+                        <p className="font-medium">{lang === "en" ? "Custom domain" : "Dominio personalizado"}</p>
+                        <p className="text-xs text-gray-400">{project?.customDomain?.hostname || (lang === "en" ? "Configure your domain" : "Configura tu dominio")}</p>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </header>
         {/* Desktop main */}

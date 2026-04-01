@@ -39,7 +39,6 @@ export default function LandingPage() {
             <span className="font-semibold text-gray-900 text-sm">VibeBuild</span>
           </div>
           <div className="flex items-center gap-3">
-            <a href="#competitors" className="text-sm text-gray-500 hover:text-gray-800 hidden sm:block">{en ? "Why Us" : "Por que"}</a>
             <a href="#features" className="text-sm text-gray-500 hover:text-gray-800 hidden sm:block">{en ? "Features" : "Funciones"}</a>
             <a href="#use-cases" className="text-sm text-gray-500 hover:text-gray-800 hidden sm:block">{en ? "Use Cases" : "Casos de uso"}</a>
             <a href="#contact" className="text-sm text-gray-500 hover:text-gray-800 hidden sm:block">{en ? "Contact" : "Contacto"}</a>
@@ -79,33 +78,6 @@ export default function LandingPage() {
                 {en ? "Contact Us" : "Contactanos"} <Mail className="w-4 h-4" />
               </button>
             </a>
-          </div>
-        </div>
-      </section>
-
-      {/* ── Competitors: Don't use theirs, build yours ── */}
-      <section id="competitors" className="py-16 px-5 bg-white">
-        <div className="max-w-4xl mx-auto text-center">
-          <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-3">
-            {en ? "Stop using their builders. Own yours." : "Deja de usar sus constructores. Ten el tuyo."}
-          </h2>
-          <p className="text-gray-500 mb-10 max-w-xl mx-auto">
-            {en
-              ? "Instead of recommending Replit, Base44, Bolt or others — launch your own AI app builder, as powerful as theirs, under your brand."
-              : "En vez de recomendar Replit, Base44, Bolt u otros — lanza tu propio constructor de apps IA, tan potente como los suyos, bajo tu marca."}
-          </p>
-          {/* Competitor logos as text badges */}
-          <div className="flex flex-wrap items-center justify-center gap-3 mb-10">
-            {["Replit", "Base44", "Bolt.new", "v0.dev", "Cursor"].map((name) => (
-              <div key={name} className="px-4 py-2 rounded-full bg-gray-100 text-sm text-gray-500 font-medium">{name}</div>
-            ))}
-          </div>
-          <div className="bg-gray-50 rounded-2xl p-6 sm:p-8 max-w-2xl mx-auto">
-            <p className="text-gray-600 leading-relaxed">
-              {en
-                ? <>These platforms are great — but they're <strong>their</strong> brand, <strong>their</strong> pricing, <strong>their</strong> audience. With VibeBuild, you get the <strong>same AI capabilities</strong> packaged as <strong>your own product</strong>. Your logo, your domain, your prices, your users.</>
-                : <>Estas plataformas son geniales — pero son <strong>su</strong> marca, <strong>sus</strong> precios, <strong>su</strong> audiencia. Con VibeBuild, obtienes las <strong>mismas capacidades de IA</strong> empaquetadas como <strong>tu propio producto</strong>. Tu logo, tu dominio, tus precios, tus usuarios.</>}
-            </p>
           </div>
         </div>
       </section>
