@@ -52,10 +52,10 @@ export default function WorkspacePage() {
   const [deploying, setDeploying] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewKey, setPreviewKey] = useState(0);
-  const [chatWidth, setChatWidth] = useState(380);
+  const [chatWidth, setChatWidth] = useState(440);
   const [isResizing, setIsResizing] = useState(false);
   const [chatCollapsed, setChatCollapsed] = useState(false);
-  const [mobileTab, setMobileTab] = useState<"chat" | "panel">("chat");
+  const [mobileTab, setMobileTab] = useState<"chat" | "panel">("panel");
   const [mobilePreview, setMobilePreview] = useState(false);
   const [iframePath, setIframePath] = useState("/");
   const [darkMode, setDarkMode] = useState(false);
@@ -182,134 +182,158 @@ export default function WorkspacePage() {
   if (loading) return <div className="h-screen flex flex-col items-center justify-center gap-3 dark:text-gray-200" style={{ background: pageBg }}><Loader2 className="w-7 h-7 animate-spin" /><p className="text-sm text-gray-400">{t("loading")}</p></div>;
   if (!project) return <div className="h-screen flex flex-col items-center justify-center gap-4 dark:text-gray-200" style={{ background: pageBg }}><p className="text-gray-500">Project not found</p><Link href="/dashboard"><Button variant="outline">{t("back")}</Button></Link></div>;
 
+  // Popup menu content (shared between desktop and mobile)
+  const popupMenu = menuOpen && (
+    <div className="absolute top-full left-0 mt-1.5 w-56 rounded-xl shadow-xl z-[60] overflow-hidden" style={{ background: darkMode ? "#2a2a2a" : "#fff", border: `1px solid ${darkMode ? "#444" : "#e5e5e5"}` }}>
+      <div className="px-3 py-2 border-b" style={{ borderColor: darkMode ? "#444" : "#eee" }}>
+        <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wider">{projectId}</p>
+      </div>
+      <div className="py-1">
+        <button onClick={() => { setMenuOpen(false); router.push("/dashboard"); }}
+          className="w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-black/5 dark:hover:bg-white/10 transition-colors text-gray-700 dark:text-gray-200">
+          <FolderOpen className="w-4 h-4 text-gray-400" /> {t("myProjects")}
+        </button>
+        <button onClick={() => { setMenuOpen(false); router.push("/dashboard"); }}
+          className="w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-black/5 dark:hover:bg-white/10 transition-colors text-gray-700 dark:text-gray-200">
+          <Plus className="w-4 h-4 text-gray-400" /> {t("newProject")}
+        </button>
+      </div>
+      {/* Tabs - visible on mobile only */}
+      <div className="sm:hidden border-t py-1" style={{ borderColor: darkMode ? "#444" : "#eee" }}>
+        {TABS.map((tab) => (
+          <button key={tab.id} onClick={() => { setActiveTab(tab.id); setMobileTab("panel"); setMenuOpen(false); }}
+            className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-black/5 dark:hover:bg-white/10 transition-colors ${activeTab === tab.id ? "text-gray-900 dark:text-white font-medium" : "text-gray-700 dark:text-gray-200"}`}>
+            <tab.icon className="w-4 h-4 text-gray-400" /> {tab.label}
+          </button>
+        ))}
+      </div>
+      <div className="border-t py-1" style={{ borderColor: darkMode ? "#444" : "#eee" }}>
+        {/* Publish on mobile */}
+        <button onClick={() => { handleDeploy(); setMenuOpen(false); }} disabled={deploying || isBuilding}
+          className="w-full sm:hidden flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-black/5 dark:hover:bg-white/10 transition-colors text-gray-700 dark:text-gray-200">
+          <Rocket className="w-4 h-4 text-gray-400" /> {deploying ? t("deploying") : t("publish")}
+        </button>
+        <button onClick={() => { setLang(lang === "en" ? "es" : "en"); setMenuOpen(false); }}
+          className="w-full flex items-center justify-between px-3 py-2 text-sm hover:bg-black/5 dark:hover:bg-white/10 transition-colors text-gray-700 dark:text-gray-200">
+          <span className="flex items-center gap-2.5"><Languages className="w-4 h-4 text-gray-400" /> {t("language")}</span>
+          <span className="text-xs text-gray-400">{lang === "en" ? "EN" : "ES"}</span>
+        </button>
+      </div>
+      <div className="border-t py-1" style={{ borderColor: darkMode ? "#444" : "#eee" }}>
+        <button onClick={() => { handleRestartServer(); setMenuOpen(false); }}
+          className="w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-black/5 dark:hover:bg-white/10 transition-colors text-gray-700 dark:text-gray-200">
+          <Server className="w-4 h-4 text-gray-400" /> {t("restartServer")}
+        </button>
+      </div>
+    </div>
+  );
+
   return (
     <div className="h-screen flex flex-col overflow-hidden dark:text-gray-200" style={{ background: pageBg }}>
       {isResizing && <div className="fixed inset-0 z-50 cursor-col-resize" />}
 
-      {/* ═══ HEADER 48px ═══ */}
-      <header className="flex items-stretch shrink-0 z-10" style={{ height: 48 }}>
-        {/* ── LEFT: aside width ── */}
-        <div className="hidden sm:flex items-center gap-1.5 px-3 shrink-0" style={{ width: typeof leftHeaderWidth === "number" ? leftHeaderWidth : undefined }}>
-          {/* Logo + project name = clickable popup trigger */}
-          <div className="relative flex-1 min-w-0" ref={menuRef}>
-            <button onClick={() => setMenuOpen(!menuOpen)} className="flex items-center gap-1.5 max-w-full rounded-lg px-1.5 py-1 hover:bg-black/5 dark:hover:bg-white/10 transition-colors">
-              <div className="w-5 h-5 rounded bg-gray-900 dark:bg-white flex items-center justify-center shrink-0">
-                <Sparkles className="w-2.5 h-2.5 text-white dark:text-gray-900" />
-              </div>
-              <span className="text-sm font-medium text-gray-700 dark:text-gray-200 truncate">{projectId}</span>
-              <ChevronDown className="w-3 h-3 text-gray-400 shrink-0" />
+      {/* ═══ DESKTOP LAYOUT ═══ */}
+      <div className="hidden sm:flex flex-col h-full">
+        {/* Desktop header 48px */}
+        <header className="flex items-stretch shrink-0 z-10" style={{ height: 48 }}>
+          {/* LEFT: aside width */}
+          <div className="flex items-center gap-1.5 px-3 shrink-0" style={{ width: typeof leftHeaderWidth === "number" ? leftHeaderWidth : undefined }}>
+            <div className="relative flex-1 min-w-0" ref={menuRef}>
+              <button onClick={() => setMenuOpen(!menuOpen)} className="flex items-center gap-1.5 max-w-full rounded-lg px-1.5 py-1 hover:bg-black/5 dark:hover:bg-white/10 transition-colors">
+                <div className="w-5 h-5 rounded bg-gray-900 dark:bg-white flex items-center justify-center shrink-0"><Sparkles className="w-2.5 h-2.5 text-white dark:text-gray-900" /></div>
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-200 truncate">{projectId}</span>
+                <ChevronDown className="w-3 h-3 text-gray-400 shrink-0" />
+              </button>
+              {popupMenu}
+            </div>
+            <button onClick={() => setChatCollapsed(!chatCollapsed)} className={`h-7 w-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-black/5 dark:hover:bg-white/10 border ${btnBorder} transition-colors shrink-0`}>
+              {chatCollapsed ? <PanelLeft className="w-3.5 h-3.5" /> : <PanelLeftClose className="w-3.5 h-3.5" />}
             </button>
-
-            {/* ── Custom popup menu ── */}
-            {menuOpen && (
-              <div className="absolute top-full left-0 mt-1.5 w-56 rounded-xl shadow-xl z-50 overflow-hidden" style={{ background: darkMode ? "#2a2a2a" : "#fff", border: `1px solid ${darkMode ? "#444" : "#e5e5e5"}` }}>
-                <div className="px-3 py-2 border-b" style={{ borderColor: darkMode ? "#444" : "#eee" }}>
-                  <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wider">{projectId}</p>
-                </div>
-                <div className="py-1">
-                  <button onClick={() => { setMenuOpen(false); router.push("/dashboard"); }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-black/5 dark:hover:bg-white/10 transition-colors text-gray-700 dark:text-gray-200">
-                    <FolderOpen className="w-4 h-4 text-gray-400" /> {t("myProjects")}
-                  </button>
-                  <button onClick={() => { setMenuOpen(false); router.push("/dashboard"); }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-black/5 dark:hover:bg-white/10 transition-colors text-gray-700 dark:text-gray-200">
-                    <Plus className="w-4 h-4 text-gray-400" /> {t("newProject")}
-                  </button>
-                </div>
-                <div className="border-t py-1" style={{ borderColor: darkMode ? "#444" : "#eee" }}>
-                  <button onClick={() => { setLang(lang === "en" ? "es" : "en"); setMenuOpen(false); }}
-                    className="w-full flex items-center justify-between px-3 py-2 text-sm hover:bg-black/5 dark:hover:bg-white/10 transition-colors text-gray-700 dark:text-gray-200">
-                    <span className="flex items-center gap-2.5"><Languages className="w-4 h-4 text-gray-400" /> {t("language")}</span>
-                    <span className="text-xs text-gray-400">{lang === "en" ? "EN" : "ES"}</span>
-                  </button>
-                </div>
-                <div className="border-t py-1" style={{ borderColor: darkMode ? "#444" : "#eee" }}>
-                  <button onClick={() => { handleRestartServer(); setMenuOpen(false); }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-black/5 dark:hover:bg-white/10 transition-colors text-gray-700 dark:text-gray-200">
-                    <Server className="w-4 h-4 text-gray-400" /> {t("restartServer")}
-                  </button>
-                </div>
+          </div>
+          {/* RIGHT: preview width */}
+          <div className="flex items-center flex-1 min-w-0 gap-1.5 px-3">
+            <div className="flex items-center gap-1 shrink-0">
+              {TABS.map((tab) => (
+                <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+                  className={`flex items-center gap-1 h-7 px-2.5 rounded-lg text-sm font-medium transition-all border ${btnBorder} ${activeTab === tab.id ? "bg-gray-900 dark:bg-white text-white dark:text-gray-900" : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 bg-transparent"}`}>
+                  <tab.icon className="w-3.5 h-3.5" /><span className="hidden lg:inline">{tab.label}</span>
+                </button>
+              ))}
+            </div>
+            <div className="flex-1 flex items-center justify-center min-w-0">
+              <div className={`flex items-center h-7 w-[320px] rounded-full border ${btnBorder} px-1.5 gap-1`}>
+                <button onClick={() => setMobilePreview(!mobilePreview)} className="p-1 rounded text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 shrink-0">{mobilePreview ? <Smartphone className="w-3.5 h-3.5" /> : <Monitor className="w-3.5 h-3.5" />}</button>
+                <input value={iframePath} onChange={(e) => setIframePath(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") setPreviewKey((k) => k + 1); }} className="flex-1 min-w-0 bg-transparent border-0 outline-none text-sm font-mono text-gray-600 dark:text-gray-300 placeholder:text-gray-400 px-1" placeholder="/" />
+                <button className="p-1 rounded text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 shrink-0" onClick={() => { fetchProject(); setPreviewKey((k) => k + 1); }}><RefreshCw className="w-3.5 h-3.5" /></button>
+                {previewUrl && <a href={previewUrl} target="_blank" rel="noopener noreferrer" className="p-1 rounded text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 shrink-0"><ExternalLink className="w-3.5 h-3.5" /></a>}
               </div>
-            )}
+            </div>
+            <Button size="sm" onClick={handleDeploy} disabled={deploying || isBuilding} className={`bg-gray-900 dark:bg-white hover:bg-gray-800 dark:hover:bg-gray-100 text-white dark:text-gray-900 h-7 text-sm rounded-lg px-3 border ${btnBorder}`}>
+              {deploying ? <><Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />{t("deploying")}</> : <><Rocket className="w-3.5 h-3.5 mr-1" />{t("publish")}</>}
+            </Button>
           </div>
-
-          <button onClick={() => setChatCollapsed(!chatCollapsed)}
-            className={`h-7 w-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-black/5 dark:hover:bg-white/10 border ${btnBorder} transition-colors shrink-0`}>
-            {chatCollapsed ? <PanelLeft className="w-3.5 h-3.5" /> : <PanelLeftClose className="w-3.5 h-3.5" />}
-          </button>
-        </div>
-
-        {/* Mobile header */}
-        <div className="flex sm:hidden items-center gap-1 px-2 flex-1">
-          <button onClick={() => setMenuOpen(!menuOpen)} className="flex items-center gap-1 px-1.5 py-0.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10">
-            <div className="w-5 h-5 rounded bg-gray-900 dark:bg-white flex items-center justify-center"><Sparkles className="w-2.5 h-2.5 text-white dark:text-gray-900" /></div>
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-200 truncate">{projectId}</span>
-            <ChevronDown className="w-3 h-3 text-gray-400" />
-          </button>
-          <div className="flex-1" />
-          <div className="flex bg-gray-100 dark:bg-gray-800 rounded-md p-0.5">
-            <button onClick={() => setMobileTab("chat")} className={`px-2 py-0.5 rounded text-[10px] font-medium ${mobileTab === "chat" ? "bg-white dark:bg-gray-700 shadow text-gray-900 dark:text-white" : "text-gray-500"}`}>{t("chat")}</button>
-            <button onClick={() => setMobileTab("panel")} className={`px-2 py-0.5 rounded text-[10px] font-medium ${mobileTab === "panel" ? "bg-white dark:bg-gray-700 shadow text-gray-900 dark:text-white" : "text-gray-500"}`}>{t("view")}</button>
+        </header>
+        {/* Desktop main */}
+        <div className="flex-1 flex overflow-hidden">
+          <div className={`flex flex-col shrink-0 transition-all ${chatCollapsed ? "w-0 overflow-hidden" : ""}`} style={chatCollapsed ? {} : { width: chatWidth, background: cardBg }}>
+            <ChatPanel messages={messages} isBuilding={isBuilding} prompt={prompt} setPrompt={setPrompt} onSend={handleSendPrompt} onStop={handleStopAgent} sending={sending} projectId={projectId} />
           </div>
-        </div>
-
-        {/* ── RIGHT: preview width ── */}
-        <div className="hidden sm:flex items-center flex-1 min-w-0 gap-1.5 px-3">
-          {/* Tab buttons */}
-          <div className="flex items-center gap-1 shrink-0">
-            {TABS.map((tab) => (
-              <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-1 h-7 px-2.5 rounded-lg text-sm font-medium transition-all border ${btnBorder} ${
-                  activeTab === tab.id ? "bg-gray-900 dark:bg-white text-white dark:text-gray-900" : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 bg-transparent"
-                }`}>
-                <tab.icon className="w-3.5 h-3.5" />
-                <span className="hidden lg:inline">{tab.label}</span>
-              </button>
-            ))}
-          </div>
-
-          {/* URL bar: fixed width centered, rounded, no bg */}
-          <div className="flex-1 flex items-center justify-center min-w-0">
-            <div className={`flex items-center h-7 w-[320px] rounded-full border ${btnBorder} px-1.5 gap-1`}>
-              <button onClick={() => setMobilePreview(!mobilePreview)} className="p-1 rounded text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 shrink-0">
-                {mobilePreview ? <Smartphone className="w-3.5 h-3.5" /> : <Monitor className="w-3.5 h-3.5" />}
-              </button>
-              <input value={iframePath} onChange={(e) => setIframePath(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") setPreviewKey((k) => k + 1); }}
-                className="flex-1 min-w-0 bg-transparent border-0 outline-none text-sm font-mono text-gray-600 dark:text-gray-300 placeholder:text-gray-400 px-1" placeholder="/" />
-              <button className="p-1 rounded text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 shrink-0" onClick={() => { fetchProject(); setPreviewKey((k) => k + 1); }}><RefreshCw className="w-3.5 h-3.5" /></button>
-              {previewUrl && <a href={previewUrl} target="_blank" rel="noopener noreferrer" className="p-1 rounded text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 shrink-0"><ExternalLink className="w-3.5 h-3.5" /></a>}
+          {!chatCollapsed && (
+            <div className="flex w-1 hover:w-1.5 bg-transparent hover:bg-gray-200 dark:hover:bg-gray-700 cursor-col-resize transition-all items-center justify-center shrink-0" onMouseDown={handleResizeStart}>
+              <div className="w-0.5 h-8 bg-gray-200 dark:bg-gray-600 rounded-full" />
+            </div>
+          )}
+          <div className="flex-1 flex flex-col min-w-0">
+            <div className={`flex-1 overflow-hidden ${activeTab === "preview" ? "rounded-none" : "m-2 sm:m-3 rounded-xl shadow-sm"}`} style={{ background: cardBg }}>
+              {activeTab === "preview" && <PreviewPanel key={previewKey} previewUrl={previewUrl} onRefresh={() => { fetchProject(); setPreviewKey((k) => k + 1); }} loading={isBuilding} mobilePreview={mobilePreview} iframePath={iframePath} />}
+              {activeTab === "database" && <DatabasePanel projectId={projectId} />}
+              {activeTab === "versions" && <VersionsPanel projectId={projectId} onVersionRestored={() => fetchProject()} />}
+              {activeTab === "secrets" && <SecretsPanel projectId={projectId} secrets={project.secrets || []} onSecretsChanged={() => fetchProject()} />}
+              {activeTab === "domain" && <DomainPanel projectId={projectId} domain={project.customDomain} productionUrl={project.productionProjectUrl} onDomainChanged={() => fetchProject()} />}
+              {activeTab === "logs" && <LogsPanel projectId={projectId} />}
             </div>
           </div>
-
-          {/* Publish only */}
-          <Button size="sm" onClick={handleDeploy} disabled={deploying || isBuilding}
-            className={`bg-gray-900 dark:bg-white hover:bg-gray-800 dark:hover:bg-gray-100 text-white dark:text-gray-900 h-7 text-sm rounded-lg px-3 border ${btnBorder}`}>
-            {deploying ? <><Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />{t("deploying")}</> : <><Rocket className="w-3.5 h-3.5 mr-1" />{t("publish")}</>}
-          </Button>
         </div>
-      </header>
+      </div>
 
-      {/* ═══ MAIN ═══ */}
-      <div className="flex-1 flex overflow-hidden">
-        <div className={`hidden sm:flex flex-col shrink-0 transition-all ${chatCollapsed ? "w-0 overflow-hidden" : ""}`} style={chatCollapsed ? {} : { width: chatWidth, background: cardBg }}>
-          <ChatPanel messages={messages} isBuilding={isBuilding} prompt={prompt} setPrompt={setPrompt} onSend={handleSendPrompt} onStop={handleStopAgent} sending={sending} projectId={projectId} />
-        </div>
-        {!chatCollapsed && (
-          <div className="hidden sm:flex w-1 hover:w-1.5 bg-transparent hover:bg-gray-200 dark:hover:bg-gray-700 cursor-col-resize transition-all items-center justify-center shrink-0" onMouseDown={handleResizeStart}>
-            <div className="w-0.5 h-8 bg-gray-200 dark:bg-gray-600 rounded-full" />
+      {/* ═══ MOBILE LAYOUT: header → content → fixed switch → fixed textarea ═══ */}
+      <div className="flex sm:hidden flex-col h-full">
+        {/* Mobile header */}
+        <header className="flex items-center gap-1 px-2 shrink-0 z-10" style={{ height: 44 }}>
+          <div className="relative" ref={menuRef}>
+            <button onClick={() => setMenuOpen(!menuOpen)} className="flex items-center gap-1.5 px-1.5 py-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition-colors">
+              <div className="w-5 h-5 rounded bg-gray-900 dark:bg-white flex items-center justify-center shrink-0"><Sparkles className="w-2.5 h-2.5 text-white dark:text-gray-900" /></div>
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-200 truncate max-w-[160px]">{projectId}</span>
+              <ChevronDown className="w-3 h-3 text-gray-400 shrink-0" />
+            </button>
+            {popupMenu}
           </div>
-        )}
-        <div className={`sm:hidden flex flex-col flex-1 ${mobileTab !== "chat" ? "hidden" : ""}`} style={{ background: cardBg }}>
-          <ChatPanel messages={messages} isBuilding={isBuilding} prompt={prompt} setPrompt={setPrompt} onSend={handleSendPrompt} onStop={handleStopAgent} sending={sending} projectId={projectId} />
+        </header>
+
+        {/* Mobile content area */}
+        <div className="flex-1 overflow-hidden" style={{ background: cardBg }}>
+          {mobileTab === "chat" ? (
+            <div className="flex flex-col h-full">
+              {/* Chat messages only - no input here */}
+              <ChatPanel messages={messages} isBuilding={isBuilding} prompt={prompt} setPrompt={setPrompt} onSend={handleSendPrompt} onStop={handleStopAgent} sending={sending} projectId={projectId} />
+            </div>
+          ) : (
+            <div className="h-full overflow-hidden">
+              {activeTab === "preview" && <PreviewPanel key={previewKey} previewUrl={previewUrl} onRefresh={() => { fetchProject(); setPreviewKey((k) => k + 1); }} loading={isBuilding} mobilePreview={false} iframePath={iframePath} />}
+              {activeTab === "database" && <DatabasePanel projectId={projectId} />}
+              {activeTab === "versions" && <VersionsPanel projectId={projectId} onVersionRestored={() => fetchProject()} />}
+              {activeTab === "secrets" && <SecretsPanel projectId={projectId} secrets={project.secrets || []} onSecretsChanged={() => fetchProject()} />}
+              {activeTab === "domain" && <DomainPanel projectId={projectId} domain={project.customDomain} productionUrl={project.productionProjectUrl} onDomainChanged={() => fetchProject()} />}
+              {activeTab === "logs" && <LogsPanel projectId={projectId} />}
+            </div>
+          )}
         </div>
-        <div className={`flex-1 flex flex-col min-w-0 ${mobileTab !== "panel" ? "hidden sm:flex" : ""}`}>
-          <div className={`flex-1 overflow-hidden ${activeTab === "preview" ? "rounded-none" : "m-2 sm:m-3 rounded-xl shadow-sm"}`} style={{ background: cardBg }}>
-            {activeTab === "preview" && <PreviewPanel key={previewKey} previewUrl={previewUrl} onRefresh={() => { fetchProject(); setPreviewKey((k) => k + 1); }} loading={isBuilding} mobilePreview={mobilePreview} iframePath={iframePath} />}
-            {activeTab === "database" && <DatabasePanel projectId={projectId} />}
-            {activeTab === "versions" && <VersionsPanel projectId={projectId} onVersionRestored={() => fetchProject()} />}
-            {activeTab === "secrets" && <SecretsPanel projectId={projectId} secrets={project.secrets || []} onSecretsChanged={() => fetchProject()} />}
-            {activeTab === "domain" && <DomainPanel projectId={projectId} domain={project.customDomain} productionUrl={project.productionProjectUrl} onDomainChanged={() => fetchProject()} />}
-            {activeTab === "logs" && <LogsPanel projectId={projectId} />}
+
+        {/* Fixed switch: Preview / Chat */}
+        <div className="shrink-0 flex items-center justify-center py-1.5 px-3" style={{ background: pageBg }}>
+          <div className="flex bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5 w-full max-w-xs">
+            <button onClick={() => setMobileTab("panel")} className={`flex-1 py-1.5 rounded-md text-xs font-medium text-center transition-colors ${mobileTab === "panel" ? "bg-white dark:bg-gray-700 shadow text-gray-900 dark:text-white" : "text-gray-500"}`}>{t("preview")}</button>
+            <button onClick={() => setMobileTab("chat")} className={`flex-1 py-1.5 rounded-md text-xs font-medium text-center transition-colors ${mobileTab === "chat" ? "bg-white dark:bg-gray-700 shadow text-gray-900 dark:text-white" : "text-gray-500"}`}>{t("chat")}</button>
           </div>
         </div>
       </div>
