@@ -22,11 +22,9 @@ export const {
   signOut,
   useSession,
   $Infer,
-  // ===========================================================================
-  // PASSWORD RECOVERY - Uncomment when sendResetPassword is enabled in auth.ts
-  // ===========================================================================
-  // forgetPassword,  // Call: forgetPassword({ email, redirectTo: "/reset-password" })
-  // resetPassword,   // Call: resetPassword({ token, newPassword })
+  // PASSWORD RECOVERY
+  forgetPassword,
+  resetPassword,
 
   // ===========================================================================
   // EMAIL VERIFICATION - Uncomment when emailVerification is enabled in auth.ts
