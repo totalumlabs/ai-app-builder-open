@@ -4,12 +4,13 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
   ArrowLeft, Rocket, Loader2, Eye, Database, GitBranch, Key, Globe, Terminal,
-  RefreshCw, MoreVertical, Server, PanelLeftClose, PanelLeft,
+  RefreshCw, MoreVertical, Server, PanelLeftClose, PanelLeft, Monitor, Smartphone, ExternalLink, Sparkles,
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -54,6 +55,8 @@ export default function WorkspacePage() {
   const [isResizing, setIsResizing] = useState(false);
   const [chatCollapsed, setChatCollapsed] = useState(false);
   const [mobileTab, setMobileTab] = useState<"chat" | "panel">("chat");
+  const [mobilePreview, setMobilePreview] = useState(false);
+  const [iframePath, setIframePath] = useState("/");
 
   const mountedRef = useRef(true);
   const pollingRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -61,7 +64,6 @@ export default function WorkspacePage() {
 
   useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; }; }, []);
 
-  // ── Resize with iframe overlay fix ──
   const handleResizeStart = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     resizeRef.current = { startX: e.clientX, startWidth: chatWidth };
@@ -80,22 +82,17 @@ export default function WorkspacePage() {
     return () => { window.removeEventListener("mousemove", handleMove); window.removeEventListener("mouseup", handleUp); };
   }, [isResizing]);
 
-  // ── Data fetching ──
   async function fetchProject(): Promise<VcaasProject | null> {
     const res = await api.get<VcaasProject>(`/api/vcaas/projects/${projectId}`);
     if (res.ok && res.data && mountedRef.current) { setProject(res.data); setPreviewUrl(getPreviewUrlFromProject(res.data)); return res.data; }
     return null;
   }
-
   async function fetchConversation(): Promise<void> {
     const res = await api.get<{ conversation: ConversationMessage[] }>(`/api/vcaas/projects/${projectId}/agent/full-conversation`);
     if (res.ok && res.data && mountedRef.current) setMessages(res.data.conversation || []);
   }
-
-  // ── Agent polling ──
   function startAgentPolling() { stopAgentPolling(); pollAgentOnce(); }
   function stopAgentPolling() { if (pollingRef.current) { clearTimeout(pollingRef.current); pollingRef.current = null; } }
-
   async function pollAgentOnce() {
     if (!mountedRef.current) return;
     const res = await api.get<AgentStatus>(`/api/vcaas/projects/${projectId}/agent/status`);
@@ -103,8 +100,6 @@ export default function WorkspacePage() {
     if (res.ok && res.data) {
       const rt = res.data.realtimeConversation || [];
       if (rt.length > 0) {
-        // Replace messages with full conversation from polling to avoid duplicates
-        // Only add genuinely new agent messages, skip user messages (already added optimistically)
         setMessages((prev) => {
           const agentMsgs = rt.filter((m) => m.author === "agent");
           const existingAgentKeys = new Set(prev.filter((m) => m.author === "agent").map((m) => `${m.createdAt}|${m.message?.slice(0, 60)}`));
@@ -120,7 +115,6 @@ export default function WorkspacePage() {
     }
     pollingRef.current = setTimeout(pollAgentOnce, 10000);
   }
-
   async function pollDeployOnce() {
     if (!mountedRef.current) return;
     const res = await api.get<{ status: string }>(`/api/vcaas/projects/${projectId}/deployments/status`);
@@ -131,7 +125,6 @@ export default function WorkspacePage() {
     }
     setTimeout(pollDeployOnce, 10000);
   }
-
   useEffect(() => {
     let cancelled = false;
     async function init() {
@@ -146,20 +139,16 @@ export default function WorkspacePage() {
     return () => { cancelled = true; stopAgentPolling(); };
   }, [projectId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Actions ──
   const handleSendPrompt = async (files?: { name: string; url: string; imageDescription: string }[]) => {
     if ((!prompt.trim() && (!files || files.length === 0)) || sending || project?.agentProcessStatus === "init") return;
     setSending(true);
-    // Add user message optimistically - use a special marker so we don't duplicate
-    const userMsg: ConversationMessage = { author: "user", message: prompt, messageType: "regular", createdAt: new Date().toISOString() };
-    setMessages((prev) => [...prev, userMsg]);
+    setMessages((prev) => [...prev, { author: "user", message: prompt, messageType: "regular", createdAt: new Date().toISOString() }]);
     const currentPrompt = prompt; setPrompt("");
     const res = await api.post(`/api/vcaas/projects/${projectId}/agent/start`, { prompt: currentPrompt, inputFiles: files || [] });
     if (res.ok) { setProject((prev) => prev ? { ...prev, agentProcessStatus: "init" } : prev); startAgentPolling(); }
     else toast.error(res.error || "Failed to start agent");
     setSending(false);
   };
-
   const handleStopAgent = async () => { await api.post(`/api/vcaas/projects/${projectId}/agent/stop`, {}); toast.info("Stop signal sent"); };
   const handleDeploy = async () => {
     if (deploying) return; setDeploying(true);
@@ -181,12 +170,14 @@ export default function WorkspacePage() {
     }
   };
 
+  // Compute the left header width to match the aside
+  const leftHeaderWidth = chatCollapsed ? "auto" : chatWidth + 5; // +5 for resize handle
+
   if (loading) return (
     <div className="h-screen flex flex-col items-center justify-center gap-3" style={{ background: "#fcfbf8" }}>
       <Loader2 className="w-7 h-7 animate-spin text-gray-800" /><p className="text-sm text-gray-400">Loading...</p>
     </div>
   );
-
   if (!project) return (
     <div className="h-screen flex flex-col items-center justify-center gap-4" style={{ background: "#fcfbf8" }}>
       <p className="text-gray-500">Project not found</p>
@@ -196,78 +187,110 @@ export default function WorkspacePage() {
 
   return (
     <div className="h-screen flex flex-col overflow-hidden" style={{ background: "#fcfbf8" }}>
-      {/* Invisible overlay when resizing to prevent iframe from stealing mouse events */}
       {isResizing && <div className="fixed inset-0 z-50 cursor-col-resize" />}
 
-      {/* ── Header ── no background, no border, same as page */}
-      <header className="h-11 flex items-center px-2 shrink-0 z-10">
-        <div className="flex items-center gap-1">
+      {/* ═══ HEADER - split into two blocks ═══ */}
+      <header className="h-11 flex items-stretch shrink-0 z-10">
+        {/* ── LEFT BLOCK: matches aside width ── */}
+        <div className="hidden sm:flex items-center gap-1.5 px-2 shrink-0" style={{ width: typeof leftHeaderWidth === "number" ? leftHeaderWidth : undefined }}>
           <Link href="/dashboard">
-            <button className="p-1.5 rounded-md text-gray-400 hover:text-gray-700 hover:bg-black/5 transition-colors">
+            <button className="p-1 rounded-md text-gray-400 hover:text-gray-700 hover:bg-black/5 transition-colors">
               <ArrowLeft className="w-4 h-4" />
             </button>
           </Link>
-          <button onClick={() => setChatCollapsed(!chatCollapsed)} className="hidden sm:flex p-1.5 rounded-md text-gray-400 hover:text-gray-700 hover:bg-black/5 transition-colors">
-            {chatCollapsed ? <PanelLeft className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
+          <div className="w-5 h-5 rounded bg-gray-900 flex items-center justify-center shrink-0">
+            <Sparkles className="w-2.5 h-2.5 text-white" />
+          </div>
+          <h1 className="text-xs font-medium text-gray-700 truncate flex-1 min-w-0">{projectId}</h1>
+          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${getServerStatusColor()}`} />
+          <button onClick={() => setChatCollapsed(!chatCollapsed)} className="p-1 rounded-md text-gray-400 hover:text-gray-700 hover:bg-black/5 transition-colors shrink-0">
+            {chatCollapsed ? <PanelLeft className="w-3.5 h-3.5" /> : <PanelLeftClose className="w-3.5 h-3.5" />}
           </button>
-          <div className="w-px h-5 bg-gray-200/50 mx-1 hidden sm:block" />
-          <h1 className="text-sm font-medium text-gray-700 max-w-[200px] sm:max-w-[300px] truncate">{projectId}</h1>
-          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ml-1 ${getServerStatusColor()}`} />
         </div>
 
-        <div className="flex-1 flex items-center justify-center gap-0.5 overflow-x-auto px-2">
-          {TABS.map((tab) => (
-            <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-all whitespace-nowrap ${
-                activeTab === tab.id ? "bg-gray-900 text-white" : "text-gray-500 hover:text-gray-700 hover:bg-gray-100"
-              }`}>
-              <tab.icon className="w-3 h-3" />
-              <span className="hidden md:inline">{tab.label}</span>
-            </button>
-          ))}
-        </div>
-
-        <div className="flex items-center gap-1">
-          <div className="flex sm:hidden bg-gray-100 rounded-md p-0.5">
+        {/* Mobile header */}
+        <div className="flex sm:hidden items-center gap-1 px-2 flex-1">
+          <Link href="/dashboard"><button className="p-1 rounded-md text-gray-400 hover:text-gray-700"><ArrowLeft className="w-4 h-4" /></button></Link>
+          <span className="text-xs font-medium text-gray-700 truncate flex-1">{projectId}</span>
+          <div className="flex bg-gray-100 rounded-md p-0.5">
             <button onClick={() => setMobileTab("chat")} className={`px-2 py-0.5 rounded text-[10px] font-medium ${mobileTab === "chat" ? "bg-white shadow text-gray-900" : "text-gray-500"}`}>Chat</button>
             <button onClick={() => setMobileTab("panel")} className={`px-2 py-0.5 rounded text-[10px] font-medium ${mobileTab === "panel" ? "bg-white shadow text-gray-900" : "text-gray-500"}`}>View</button>
           </div>
-          <Button size="sm" onClick={handleDeploy} disabled={deploying || isBuilding} className="bg-gray-900 hover:bg-gray-800 text-white h-7 text-xs rounded-md hidden sm:flex">
-            {deploying ? <><Loader2 className="w-3 h-3 mr-1 animate-spin" />Deploying</> : <><Rocket className="w-3 h-3 mr-1" />Publish</>}
-          </Button>
           <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button className="p-1.5 rounded-md text-gray-400 hover:text-gray-700 hover:bg-black/5"><MoreVertical className="w-4 h-4" /></button>
-            </DropdownMenuTrigger>
+            <DropdownMenuTrigger asChild><button className="p-1 rounded-md text-gray-400"><MoreVertical className="w-4 h-4" /></button></DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={handleDeploy} disabled={deploying || isBuilding} className="sm:hidden"><Rocket className="w-4 h-4 mr-2" />Publish</DropdownMenuItem>
-              <DropdownMenuItem onClick={handleRestartServer}><Server className="w-4 h-4 mr-2" />Restart Server</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => { fetchProject(); setPreviewKey((k) => k + 1); }}><RefreshCw className="w-4 h-4 mr-2" />Refresh</DropdownMenuItem>
+              <DropdownMenuItem onClick={handleDeploy} disabled={deploying || isBuilding}><Rocket className="w-4 h-4 mr-2" />Publish</DropdownMenuItem>
+              <DropdownMenuItem onClick={handleRestartServer}><Server className="w-4 h-4 mr-2" />Restart</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
+
+        {/* ── RIGHT BLOCK: matches preview width ── */}
+        <div className="hidden sm:flex items-center flex-1 min-w-0 gap-1 px-2">
+          {/* Left: Tab buttons */}
+          <div className="flex items-center gap-0.5 shrink-0">
+            {TABS.map((tab) => (
+              <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+                className={`flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium transition-all whitespace-nowrap ${
+                  activeTab === tab.id ? "bg-gray-900 text-white" : "text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+                }`}>
+                <tab.icon className="w-3 h-3" />
+                <span className="hidden lg:inline">{tab.label}</span>
+              </button>
+            ))}
+          </div>
+
+          {/* Center: URL bar with compacted icon buttons inside */}
+          <div className="flex-1 flex items-center min-w-0 mx-2">
+            <div className="flex items-center gap-1 flex-1 min-w-0 bg-gray-100/80 rounded-lg px-2 h-7">
+              <Input
+                value={iframePath}
+                onChange={(e) => setIframePath(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") setPreviewKey((k) => k + 1); }}
+                className="flex-1 min-w-0 h-5 text-[11px] font-mono bg-transparent border-0 shadow-none focus-visible:ring-0 px-0"
+                placeholder="/"
+              />
+              <button onClick={() => setMobilePreview(false)} className={`p-0.5 rounded ${!mobilePreview ? "text-gray-700" : "text-gray-400"}`}><Monitor className="w-3 h-3" /></button>
+              <button onClick={() => setMobilePreview(true)} className={`p-0.5 rounded ${mobilePreview ? "text-gray-700" : "text-gray-400"}`}><Smartphone className="w-3 h-3" /></button>
+              <button className="p-0.5 rounded text-gray-400 hover:text-gray-600" onClick={() => { fetchProject(); setPreviewKey((k) => k + 1); }}><RefreshCw className="w-3 h-3" /></button>
+              {previewUrl && (
+                <a href={previewUrl} target="_blank" rel="noopener noreferrer" className="p-0.5 rounded text-gray-400 hover:text-gray-600"><ExternalLink className="w-3 h-3" /></a>
+              )}
+            </div>
+          </div>
+
+          {/* Right: Publish + menu */}
+          <div className="flex items-center gap-1 shrink-0">
+            <Button size="sm" onClick={handleDeploy} disabled={deploying || isBuilding} className="bg-gray-900 hover:bg-gray-800 text-white h-7 text-[11px] rounded-md px-3">
+              {deploying ? <><Loader2 className="w-3 h-3 mr-1 animate-spin" />Deploying</> : <><Rocket className="w-3 h-3 mr-1" />Publish</>}
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild><button className="p-1 rounded-md text-gray-400 hover:text-gray-700 hover:bg-black/5"><MoreVertical className="w-3.5 h-3.5" /></button></DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={handleRestartServer}><Server className="w-4 h-4 mr-2" />Restart Server</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => { fetchProject(); setPreviewKey((k) => k + 1); }}><RefreshCw className="w-4 h-4 mr-2" />Refresh</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
       </header>
 
-      {/* ── Main ── */}
+      {/* ═══ MAIN ═══ */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Chat - desktop */}
         <div className={`hidden sm:flex flex-col shrink-0 bg-white transition-all ${chatCollapsed ? "w-0 overflow-hidden" : ""}`} style={chatCollapsed ? {} : { width: chatWidth }}>
           <ChatPanel messages={messages} isBuilding={isBuilding} prompt={prompt} setPrompt={setPrompt} onSend={handleSendPrompt} onStop={handleStopAgent} sending={sending} projectId={projectId} />
         </div>
-        {/* Resize handle */}
         {!chatCollapsed && (
           <div className="hidden sm:flex w-1 hover:w-1.5 bg-transparent hover:bg-gray-200 cursor-col-resize transition-all items-center justify-center shrink-0" onMouseDown={handleResizeStart}>
             <div className="w-0.5 h-8 bg-gray-200 rounded-full" />
           </div>
         )}
-        {/* Chat - mobile */}
         <div className={`sm:hidden flex flex-col flex-1 bg-white ${mobileTab !== "chat" ? "hidden" : ""}`}>
           <ChatPanel messages={messages} isBuilding={isBuilding} prompt={prompt} setPrompt={setPrompt} onSend={handleSendPrompt} onStop={handleStopAgent} sending={sending} projectId={projectId} />
         </div>
-        {/* Right panel - no top/left margin for preview, slight padding for other tabs */}
         <div className={`flex-1 flex flex-col min-w-0 ${mobileTab !== "panel" ? "hidden sm:flex" : ""}`}>
           <div className={`flex-1 overflow-hidden bg-white ${activeTab === "preview" ? "rounded-none" : "m-2 sm:m-3 rounded-xl shadow-sm"}`}>
-            {activeTab === "preview" && <PreviewPanel key={previewKey} previewUrl={previewUrl} onRefresh={() => { fetchProject(); setPreviewKey((k) => k + 1); }} loading={isBuilding} />}
+            {activeTab === "preview" && <PreviewPanel key={previewKey} previewUrl={previewUrl} onRefresh={() => { fetchProject(); setPreviewKey((k) => k + 1); }} loading={isBuilding} mobilePreview={mobilePreview} iframePath={iframePath} />}
             {activeTab === "database" && <DatabasePanel projectId={projectId} />}
             {activeTab === "versions" && <VersionsPanel projectId={projectId} onVersionRestored={() => fetchProject()} />}
             {activeTab === "secrets" && <SecretsPanel projectId={projectId} secrets={project.secrets || []} onSecretsChanged={() => fetchProject()} />}

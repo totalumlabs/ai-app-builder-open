@@ -26,10 +26,8 @@ export const {
   forgetPassword,
   resetPassword,
 
-  // ===========================================================================
-  // EMAIL VERIFICATION - Uncomment when emailVerification is enabled in auth.ts
-  // ===========================================================================
-  // sendVerificationEmail,  // Call: sendVerificationEmail({ email, callbackURL: "/verify-email" })
+  // EMAIL VERIFICATION
+  sendVerificationEmail,
 } = authClient;
 
 // ===========================================================================

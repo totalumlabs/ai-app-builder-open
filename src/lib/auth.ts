@@ -25,6 +25,7 @@ export const auth = betterAuth({
     autoSignIn: true,
     minPasswordLength: 6,
     maxPasswordLength: 128,
+    requireEmailVerification: true,
     // PASSWORD RECOVERY
     sendResetPassword: async ({ user, url }) => {
       console.log("[Auth] Sending password reset email to:", user.email);
@@ -58,31 +59,39 @@ export const auth = betterAuth({
     resetPasswordTokenExpiresIn: 3600,
   },
 
-  // ===========================================================================
-  // EMAIL VERIFICATION - Uncomment to enable email verification
-  // ===========================================================================
-  // sendOnSignUp: sends verification email automatically after registration
-  // autoSignInAfterVerification: logs user in after clicking verification link
-  // Required: Create /verify-email page to handle the callback
-  // To require verification before login, set requireEmailVerification: true
-  // in emailAndPassword config above
-  // ---------------------------------------------------------------------------
-  // emailVerification: {
-  //   sendOnSignUp: true,
-  //   autoSignInAfterVerification: true,
-  //   sendVerificationEmail: async ({ user, url }) => {
-  //     await totalumSdk.email.sendEmail({
-  //       to: [user.email],
-  //       subject: "Verify your email",
-  //       html: `
-  //         <h2>Email Verification</h2>
-  //         <p>Click the link below to verify your email:</p>
-  //         <p><a href="${url}">Verify Email</a></p>
-  //         <p>If you didn't create an account, ignore this email.</p>
-  //       `,
-  //     });
-  //   },
-  // },
+  // EMAIL VERIFICATION
+  emailVerification: {
+    sendOnSignUp: true,
+    autoSignInAfterVerification: true,
+    sendVerificationEmail: async ({ user, url }) => {
+      console.log("[Auth] Sending verification email to:", user.email);
+      await totalumSdk.email.sendEmail({
+        to: [user.email],
+        subject: "Verify your email - VibeBuild",
+        html: `
+          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px;">
+            <div style="text-align: center; margin-bottom: 32px;">
+              <div style="display: inline-block; width: 48px; height: 48px; background: #111; border-radius: 12px; line-height: 48px; text-align: center;">
+                <span style="color: white; font-size: 20px;">V</span>
+              </div>
+            </div>
+            <h2 style="color: #111; font-size: 22px; margin-bottom: 12px; text-align: center;">Verify your email</h2>
+            <p style="color: #666; font-size: 15px; line-height: 1.6; text-align: center; margin-bottom: 28px;">
+              Click the button below to verify your email address and activate your account.
+            </p>
+            <div style="text-align: center; margin-bottom: 28px;">
+              <a href="${url}" style="display: inline-block; background: #111; color: white; padding: 12px 32px; border-radius: 8px; text-decoration: none; font-size: 15px; font-weight: 600;">
+                Verify Email
+              </a>
+            </div>
+            <p style="color: #999; font-size: 13px; text-align: center; line-height: 1.5;">
+              If you didn't create an account, you can safely ignore this email.
+            </p>
+          </div>
+        `,
+      });
+    },
+  },
 
   // ===========================================================================
   // SOCIAL PROVIDERS - Uncomment to enable Google/GitHub/etc sign-in

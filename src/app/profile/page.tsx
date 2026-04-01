@@ -22,7 +22,7 @@ export default function ProfilePage() {
 
   if (isPending) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: "linear-gradient(135deg, #faf9f7 0%, #f5f0eb 25%, #ede4db 50%, #e8dfd6 75%, #f2ece6 100%)" }}>
+      <div className="min-h-screen flex items-center justify-center" style={{ background: "#fcfbf8" }}>
         <Loader2 className="w-6 h-6 animate-spin text-gray-500" />
       </div>
     );
@@ -38,12 +38,8 @@ export default function ProfilePage() {
 
   return (
     <div className="min-h-screen relative overflow-hidden">
-      {/* Same gradient background as dashboard */}
-      <div className="fixed inset-0 -z-10">
-        <div className="absolute inset-0" style={{ background: "linear-gradient(135deg, #faf9f7 0%, #f5f0eb 25%, #ede4db 50%, #e8dfd6 75%, #f2ece6 100%)" }} />
-        <div className="absolute top-0 right-0 w-[600px] h-[600px] rounded-full opacity-30" style={{ background: "radial-gradient(circle, #e8d5c4 0%, transparent 70%)" }} />
-        <div className="absolute bottom-0 left-0 w-[500px] h-[500px] rounded-full opacity-20" style={{ background: "radial-gradient(circle, #d4c4b0 0%, transparent 70%)" }} />
-      </div>
+      {/* Background matching builder */}
+      <div className="fixed inset-0 -z-10" style={{ background: "#fcfbf8" }} />
 
       {/* Header - same as dashboard */}
       <header className="sticky top-0 z-50">

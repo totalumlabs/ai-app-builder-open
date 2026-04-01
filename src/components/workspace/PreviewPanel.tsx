@@ -1,51 +1,23 @@
 "use client";
 
 import { useState } from "react";
-import { Input } from "@/components/ui/input";
-import { ExternalLink, RefreshCw, Monitor, Smartphone, Loader2 } from "lucide-react";
+import { Monitor, Loader2 } from "lucide-react";
 
 interface PreviewPanelProps {
   previewUrl: string | null;
   onRefresh: () => void;
   loading?: boolean;
+  mobilePreview?: boolean;
+  iframePath?: string;
 }
 
-export function PreviewPanel({ previewUrl, onRefresh, loading }: PreviewPanelProps) {
-  const [mobilePreview, setMobilePreview] = useState(false);
-  const [iframePath, setIframePath] = useState("/");
+export function PreviewPanel({ previewUrl, onRefresh, loading, mobilePreview = false, iframePath = "/" }: PreviewPanelProps) {
   const [iframeLoading, setIframeLoading] = useState(true);
-
   const fullIframeUrl = previewUrl ? `${previewUrl}${iframePath === "/" ? "" : iframePath}` : null;
 
   return (
-    <div className="h-full flex flex-col rounded-xl overflow-hidden">
-      {/* URL bar */}
-      <div className="flex items-center gap-2 px-3 py-1.5 bg-[#f5f4f1]">
-        <div className="flex gap-1 shrink-0">
-          <span className="w-2 h-2 rounded-full bg-[#e8e5df]" />
-          <span className="w-2 h-2 rounded-full bg-[#e8e5df]" />
-          <span className="w-2 h-2 rounded-full bg-[#e8e5df]" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <Input
-            value={iframePath}
-            onChange={(e) => setIframePath(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter") setIframeLoading(true); }}
-            className="h-6 text-[11px] font-mono bg-white/80 border-0 rounded-md shadow-none focus-visible:ring-0"
-            placeholder="/"
-          />
-        </div>
-        <div className="flex items-center gap-0.5 shrink-0">
-          <button onClick={() => setMobilePreview(false)} className={`p-1 rounded transition-colors ${!mobilePreview ? "text-gray-800" : "text-gray-400 hover:text-gray-600"}`}><Monitor className="w-3.5 h-3.5" /></button>
-          <button onClick={() => setMobilePreview(true)} className={`p-1 rounded transition-colors ${mobilePreview ? "text-gray-800" : "text-gray-400 hover:text-gray-600"}`}><Smartphone className="w-3.5 h-3.5" /></button>
-          <button className="p-1 rounded text-gray-400 hover:text-gray-600" onClick={() => { onRefresh(); setIframeLoading(true); }}><RefreshCw className="w-3.5 h-3.5" /></button>
-          {previewUrl && (
-            <a href={previewUrl} target="_blank" rel="noopener noreferrer" className="p-1 rounded text-gray-400 hover:text-gray-600"><ExternalLink className="w-3.5 h-3.5" /></a>
-          )}
-        </div>
-      </div>
-
-      {/* iframe */}
+    <div className="h-full flex flex-col overflow-hidden">
+      {/* iframe - no URL bar here, it's in the header now */}
       <div className="flex-1 flex items-center justify-center overflow-hidden relative" style={{ background: "#fcfbf8" }}>
         {!previewUrl ? (
           <div className="flex flex-col items-center justify-center text-center px-8">

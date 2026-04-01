@@ -31,9 +31,10 @@ const publicRoutes = [
   "/privacy-policy",
   "/terms-of-service",
 
-  // Password recovery
+  // Password recovery & email verification
   "/forgot-password",
   "/reset-password",
+  "/verify-email",
 
   //stripe routes here
   "/stripe/demo",

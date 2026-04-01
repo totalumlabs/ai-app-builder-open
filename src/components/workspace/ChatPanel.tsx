@@ -59,7 +59,7 @@ function groupMessages(messages: ConversationMessage[]): MessageGroup[] {
 function FormattedText({ text }: { text: string }) {
   const parts = text.split(/(```[\s\S]*?```)/g);
   return (
-    <div className="text-[13px] text-gray-700 leading-relaxed space-y-1">
+    <div className="text-sm text-gray-700 leading-relaxed space-y-1">
       {parts.map((part, i) => {
         if (part.startsWith("```") && part.endsWith("```")) {
           const code = part.slice(3, -3).replace(/^\w+\n/, "");
@@ -186,7 +186,7 @@ export function ChatPanel({ messages, isBuilding, prompt, setPrompt, onSend, onS
               <div key={gi} className="flex justify-end">
                 {/* Lighter user bubble - warm beige like textarea but lighter */}
                 <div className="max-w-[88%] rounded-2xl rounded-br-sm px-4 py-2.5" style={{ background: "#eeecea" }}>
-                  <p className="text-[13px] leading-relaxed whitespace-pre-wrap text-gray-800">{msg.message}</p>
+                  <p className="text-sm leading-relaxed whitespace-pre-wrap text-gray-800">{msg.message}</p>
                 </div>
               </div>
             );
