@@ -10,7 +10,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import {
   ArrowLeft, Rocket, Loader2, Eye, Database, GitBranch, Key, Globe, Terminal,
-  RefreshCw, MoreVertical, Server, PanelLeftClose, PanelLeft, Monitor, Smartphone, ExternalLink, Sparkles,
+  RefreshCw, MoreVertical, Server, PanelLeftClose, PanelLeft, Monitor, Smartphone,
+  ExternalLink, Sparkles, ChevronDown, Sun, Moon,
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -31,6 +32,11 @@ const TABS = [
   { id: "domain", label: "Domain", icon: Globe },
   { id: "logs", label: "Logs", icon: Terminal },
 ] as const;
+
+// Shared button style: 28px height, super light border, 14px text
+const btnCls = "h-7 px-2.5 rounded-lg text-sm font-medium transition-all border border-gray-200/60 dark:border-gray-700/60";
+const btnActive = `${btnCls} bg-gray-900 dark:bg-white text-white dark:text-gray-900`;
+const btnInactive = `${btnCls} text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 bg-transparent`;
 
 function getPreviewUrlFromProject(proj: VcaasProject): string | null {
   const field = proj.developmentUrlFieldToUse || "temporalDevelopmentProjectUrl";
@@ -57,12 +63,34 @@ export default function WorkspacePage() {
   const [mobileTab, setMobileTab] = useState<"chat" | "panel">("chat");
   const [mobilePreview, setMobilePreview] = useState(false);
   const [iframePath, setIframePath] = useState("/");
+  const [darkMode, setDarkMode] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const mountedRef = useRef(true);
   const pollingRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const resizeRef = useRef<{ startX: number; startWidth: number } | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; }; }, []);
+
+  // Dark mode toggle
+  useEffect(() => {
+    if (darkMode) document.documentElement.classList.add("dark");
+    else document.documentElement.classList.remove("dark");
+    return () => { document.documentElement.classList.remove("dark"); };
+  }, [darkMode]);
+
+  // Close menu on click outside (including iframe via window blur)
+  useEffect(() => {
+    if (!menuOpen) return;
+    const handleClick = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
+    };
+    const handleBlur = () => setMenuOpen(false); // iframe steals focus
+    window.addEventListener("mousedown", handleClick);
+    window.addEventListener("blur", handleBlur);
+    return () => { window.removeEventListener("mousedown", handleClick); window.removeEventListener("blur", handleBlur); };
+  }, [menuOpen]);
 
   const handleResizeStart = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -72,10 +100,7 @@ export default function WorkspacePage() {
 
   useEffect(() => {
     if (!isResizing) return;
-    const handleMove = (e: MouseEvent) => {
-      if (!resizeRef.current) return;
-      setChatWidth(Math.max(280, Math.min(600, resizeRef.current.startWidth + (e.clientX - resizeRef.current.startX))));
-    };
+    const handleMove = (e: MouseEvent) => { if (resizeRef.current) setChatWidth(Math.max(280, Math.min(600, resizeRef.current.startWidth + (e.clientX - resizeRef.current.startX)))); };
     const handleUp = () => setIsResizing(false);
     window.addEventListener("mousemove", handleMove);
     window.addEventListener("mouseup", handleUp);
@@ -166,106 +191,156 @@ export default function WorkspacePage() {
     switch (project?.agentServerStatus) {
       case "Active": return "bg-emerald-500";
       case "Creating": case "Starting": case "Unarchiving": return "bg-amber-500 animate-pulse";
-      default: return "bg-gray-300";
+      default: return "bg-gray-300 dark:bg-gray-600";
     }
   };
 
-  // Compute the left header width to match the aside
-  const leftHeaderWidth = chatCollapsed ? "auto" : chatWidth + 5; // +5 for resize handle
+  const leftHeaderWidth = chatCollapsed ? "auto" : chatWidth + 5;
+  const pageBg = darkMode ? "#1a1a1a" : "#fcfbf8";
 
   if (loading) return (
-    <div className="h-screen flex flex-col items-center justify-center gap-3" style={{ background: "#fcfbf8" }}>
-      <Loader2 className="w-7 h-7 animate-spin text-gray-800" /><p className="text-sm text-gray-400">Loading...</p>
+    <div className="h-screen flex flex-col items-center justify-center gap-3" style={{ background: pageBg }}>
+      <Loader2 className="w-7 h-7 animate-spin text-gray-800 dark:text-gray-200" /><p className="text-sm text-gray-400">Loading...</p>
     </div>
   );
   if (!project) return (
-    <div className="h-screen flex flex-col items-center justify-center gap-4" style={{ background: "#fcfbf8" }}>
+    <div className="h-screen flex flex-col items-center justify-center gap-4" style={{ background: pageBg }}>
       <p className="text-gray-500">Project not found</p>
       <Link href="/dashboard"><Button variant="outline">Back</Button></Link>
     </div>
   );
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden" style={{ background: "#fcfbf8" }}>
+    <div className="h-screen flex flex-col overflow-hidden" style={{ background: pageBg }}>
       {isResizing && <div className="fixed inset-0 z-50 cursor-col-resize" />}
 
-      {/* ═══ HEADER - split into two blocks ═══ */}
-      <header className="h-11 flex items-stretch shrink-0 z-10">
-        {/* ── LEFT BLOCK: matches aside width ── */}
-        <div className="hidden sm:flex items-center gap-1.5 px-2 shrink-0" style={{ width: typeof leftHeaderWidth === "number" ? leftHeaderWidth : undefined }}>
+      {/* ═══ HEADER 48px ═══ */}
+      <header className="flex items-stretch shrink-0 z-10" style={{ height: 48 }}>
+        {/* ── LEFT: matches aside ── */}
+        <div className="hidden sm:flex items-center gap-1.5 px-3 shrink-0" style={{ width: typeof leftHeaderWidth === "number" ? leftHeaderWidth : undefined }}>
           <Link href="/dashboard">
-            <button className="p-1 rounded-md text-gray-400 hover:text-gray-700 hover:bg-black/5 transition-colors">
-              <ArrowLeft className="w-4 h-4" />
+            <button className="h-7 w-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-black/5 dark:hover:bg-white/10 border border-gray-200/60 dark:border-gray-700/60 transition-colors">
+              <ArrowLeft className="w-3.5 h-3.5" />
             </button>
           </Link>
-          <div className="w-5 h-5 rounded bg-gray-900 flex items-center justify-center shrink-0">
-            <Sparkles className="w-2.5 h-2.5 text-white" />
+          <div className="w-5 h-5 rounded bg-gray-900 dark:bg-white flex items-center justify-center shrink-0">
+            <Sparkles className="w-2.5 h-2.5 text-white dark:text-gray-900" />
           </div>
-          <h1 className="text-xs font-medium text-gray-700 truncate flex-1 min-w-0">{projectId}</h1>
-          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${getServerStatusColor()}`} />
-          <button onClick={() => setChatCollapsed(!chatCollapsed)} className="p-1 rounded-md text-gray-400 hover:text-gray-700 hover:bg-black/5 transition-colors shrink-0">
+
+          {/* Project name with dropdown menu */}
+          <div className="relative flex-1 min-w-0" ref={menuRef}>
+            <button
+              onClick={() => setMenuOpen(!menuOpen)}
+              className="flex items-center gap-1 max-w-full rounded-lg px-1.5 py-0.5 hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+            >
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-200 truncate">{projectId}</span>
+              <ChevronDown className="w-3 h-3 text-gray-400 shrink-0" />
+            </button>
+            <span className={`absolute -right-2 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full shrink-0 ${getServerStatusColor()}`} />
+
+            {/* Popup menu */}
+            {menuOpen && (
+              <div className="absolute top-full left-0 mt-1 w-48 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200/80 dark:border-gray-700 py-1 z-50">
+                <button
+                  onClick={() => { setDarkMode(!darkMode); setMenuOpen(false); }}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                >
+                  {darkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+                  {darkMode ? "Light mode" : "Dark mode"}
+                </button>
+                <button
+                  onClick={() => { handleRestartServer(); setMenuOpen(false); }}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                >
+                  <Server className="w-4 h-4" />
+                  Restart server
+                </button>
+              </div>
+            )}
+          </div>
+
+          <button onClick={() => setChatCollapsed(!chatCollapsed)}
+            className="h-7 w-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-black/5 dark:hover:bg-white/10 border border-gray-200/60 dark:border-gray-700/60 transition-colors shrink-0">
             {chatCollapsed ? <PanelLeft className="w-3.5 h-3.5" /> : <PanelLeftClose className="w-3.5 h-3.5" />}
           </button>
         </div>
 
         {/* Mobile header */}
         <div className="flex sm:hidden items-center gap-1 px-2 flex-1">
-          <Link href="/dashboard"><button className="p-1 rounded-md text-gray-400 hover:text-gray-700"><ArrowLeft className="w-4 h-4" /></button></Link>
-          <span className="text-xs font-medium text-gray-700 truncate flex-1">{projectId}</span>
-          <div className="flex bg-gray-100 rounded-md p-0.5">
-            <button onClick={() => setMobileTab("chat")} className={`px-2 py-0.5 rounded text-[10px] font-medium ${mobileTab === "chat" ? "bg-white shadow text-gray-900" : "text-gray-500"}`}>Chat</button>
-            <button onClick={() => setMobileTab("panel")} className={`px-2 py-0.5 rounded text-[10px] font-medium ${mobileTab === "panel" ? "bg-white shadow text-gray-900" : "text-gray-500"}`}>View</button>
+          <Link href="/dashboard"><button className="p-1 rounded-md text-gray-400"><ArrowLeft className="w-4 h-4" /></button></Link>
+          <span className="text-sm font-medium text-gray-700 dark:text-gray-200 truncate flex-1">{projectId}</span>
+          <div className="flex bg-gray-100 dark:bg-gray-800 rounded-md p-0.5">
+            <button onClick={() => setMobileTab("chat")} className={`px-2 py-0.5 rounded text-[10px] font-medium ${mobileTab === "chat" ? "bg-white dark:bg-gray-700 shadow text-gray-900 dark:text-white" : "text-gray-500"}`}>Chat</button>
+            <button onClick={() => setMobileTab("panel")} className={`px-2 py-0.5 rounded text-[10px] font-medium ${mobileTab === "panel" ? "bg-white dark:bg-gray-700 shadow text-gray-900 dark:text-white" : "text-gray-500"}`}>View</button>
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild><button className="p-1 rounded-md text-gray-400"><MoreVertical className="w-4 h-4" /></button></DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={handleDeploy} disabled={deploying || isBuilding}><Rocket className="w-4 h-4 mr-2" />Publish</DropdownMenuItem>
               <DropdownMenuItem onClick={handleRestartServer}><Server className="w-4 h-4 mr-2" />Restart</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setDarkMode(!darkMode)}>{darkMode ? <Sun className="w-4 h-4 mr-2" /> : <Moon className="w-4 h-4 mr-2" />}{darkMode ? "Light" : "Dark"} mode</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
 
-        {/* ── RIGHT BLOCK: matches preview width ── */}
-        <div className="hidden sm:flex items-center flex-1 min-w-0 gap-1 px-2">
-          {/* Left: Tab buttons */}
-          <div className="flex items-center gap-0.5 shrink-0">
+        {/* ── RIGHT: matches preview ── */}
+        <div className="hidden sm:flex items-center flex-1 min-w-0 gap-1.5 px-3">
+          {/* Tab buttons */}
+          <div className="flex items-center gap-1 shrink-0">
             {TABS.map((tab) => (
               <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium transition-all whitespace-nowrap ${
-                  activeTab === tab.id ? "bg-gray-900 text-white" : "text-gray-500 hover:text-gray-700 hover:bg-gray-100"
-                }`}>
-                <tab.icon className="w-3 h-3" />
+                className={`flex items-center gap-1 ${activeTab === tab.id ? btnActive : btnInactive}`}>
+                <tab.icon className="w-3.5 h-3.5" />
                 <span className="hidden lg:inline">{tab.label}</span>
               </button>
             ))}
           </div>
 
-          {/* Center: URL bar with compacted icon buttons inside */}
-          <div className="flex-1 flex items-center min-w-0 mx-2">
-            <div className="flex items-center gap-1 flex-1 min-w-0 bg-gray-100/80 rounded-lg px-2 h-7">
-              <Input
+          {/* URL bar: fixed width, centered, more rounded, no background */}
+          <div className="flex-1 flex items-center justify-center min-w-0">
+            <div className="flex items-center h-7 w-[320px] rounded-full border border-gray-200/60 dark:border-gray-700/60 px-1.5 gap-1">
+              {/* Device toggle (single button that switches) */}
+              <button
+                onClick={() => setMobilePreview(!mobilePreview)}
+                className="p-1 rounded text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 shrink-0"
+                title={mobilePreview ? "Desktop view" : "Mobile view"}
+              >
+                {mobilePreview ? <Smartphone className="w-3.5 h-3.5" /> : <Monitor className="w-3.5 h-3.5" />}
+              </button>
+              {/* Path input */}
+              <input
                 value={iframePath}
                 onChange={(e) => setIframePath(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") setPreviewKey((k) => k + 1); }}
-                className="flex-1 min-w-0 h-5 text-[11px] font-mono bg-transparent border-0 shadow-none focus-visible:ring-0 px-0"
+                className="flex-1 min-w-0 bg-transparent border-0 outline-none text-sm font-mono text-gray-600 dark:text-gray-300 placeholder:text-gray-400 px-1"
                 placeholder="/"
               />
-              <button onClick={() => setMobilePreview(false)} className={`p-0.5 rounded ${!mobilePreview ? "text-gray-700" : "text-gray-400"}`}><Monitor className="w-3 h-3" /></button>
-              <button onClick={() => setMobilePreview(true)} className={`p-0.5 rounded ${mobilePreview ? "text-gray-700" : "text-gray-400"}`}><Smartphone className="w-3 h-3" /></button>
-              <button className="p-0.5 rounded text-gray-400 hover:text-gray-600" onClick={() => { fetchProject(); setPreviewKey((k) => k + 1); }}><RefreshCw className="w-3 h-3" /></button>
+              {/* Refresh */}
+              <button className="p-1 rounded text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 shrink-0"
+                onClick={() => { fetchProject(); setPreviewKey((k) => k + 1); }}>
+                <RefreshCw className="w-3.5 h-3.5" />
+              </button>
+              {/* Open in new tab */}
               {previewUrl && (
-                <a href={previewUrl} target="_blank" rel="noopener noreferrer" className="p-0.5 rounded text-gray-400 hover:text-gray-600"><ExternalLink className="w-3 h-3" /></a>
+                <a href={previewUrl} target="_blank" rel="noopener noreferrer" className="p-1 rounded text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 shrink-0">
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </a>
               )}
             </div>
           </div>
 
-          {/* Right: Publish + menu */}
+          {/* Publish + menu */}
           <div className="flex items-center gap-1 shrink-0">
-            <Button size="sm" onClick={handleDeploy} disabled={deploying || isBuilding} className="bg-gray-900 hover:bg-gray-800 text-white h-7 text-[11px] rounded-md px-3">
-              {deploying ? <><Loader2 className="w-3 h-3 mr-1 animate-spin" />Deploying</> : <><Rocket className="w-3 h-3 mr-1" />Publish</>}
+            <Button size="sm" onClick={handleDeploy} disabled={deploying || isBuilding}
+              className="bg-gray-900 dark:bg-white hover:bg-gray-800 dark:hover:bg-gray-100 text-white dark:text-gray-900 h-7 text-sm rounded-lg px-3 border border-gray-200/60 dark:border-gray-700/60">
+              {deploying ? <><Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />Deploying</> : <><Rocket className="w-3.5 h-3.5 mr-1" />Publish</>}
             </Button>
             <DropdownMenu>
-              <DropdownMenuTrigger asChild><button className="p-1 rounded-md text-gray-400 hover:text-gray-700 hover:bg-black/5"><MoreVertical className="w-3.5 h-3.5" /></button></DropdownMenuTrigger>
+              <DropdownMenuTrigger asChild>
+                <button className="h-7 w-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-black/5 dark:hover:bg-white/10 border border-gray-200/60 dark:border-gray-700/60">
+                  <MoreVertical className="w-3.5 h-3.5" />
+                </button>
+              </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onClick={handleRestartServer}><Server className="w-4 h-4 mr-2" />Restart Server</DropdownMenuItem>
                 <DropdownMenuItem onClick={() => { fetchProject(); setPreviewKey((k) => k + 1); }}><RefreshCw className="w-4 h-4 mr-2" />Refresh</DropdownMenuItem>
@@ -277,19 +352,19 @@ export default function WorkspacePage() {
 
       {/* ═══ MAIN ═══ */}
       <div className="flex-1 flex overflow-hidden">
-        <div className={`hidden sm:flex flex-col shrink-0 bg-white transition-all ${chatCollapsed ? "w-0 overflow-hidden" : ""}`} style={chatCollapsed ? {} : { width: chatWidth }}>
+        <div className={`hidden sm:flex flex-col shrink-0 transition-all ${darkMode ? "bg-[#1e1e1e]" : "bg-white"} ${chatCollapsed ? "w-0 overflow-hidden" : ""}`} style={chatCollapsed ? {} : { width: chatWidth }}>
           <ChatPanel messages={messages} isBuilding={isBuilding} prompt={prompt} setPrompt={setPrompt} onSend={handleSendPrompt} onStop={handleStopAgent} sending={sending} projectId={projectId} />
         </div>
         {!chatCollapsed && (
-          <div className="hidden sm:flex w-1 hover:w-1.5 bg-transparent hover:bg-gray-200 cursor-col-resize transition-all items-center justify-center shrink-0" onMouseDown={handleResizeStart}>
-            <div className="w-0.5 h-8 bg-gray-200 rounded-full" />
+          <div className="hidden sm:flex w-1 hover:w-1.5 bg-transparent hover:bg-gray-200 dark:hover:bg-gray-700 cursor-col-resize transition-all items-center justify-center shrink-0" onMouseDown={handleResizeStart}>
+            <div className="w-0.5 h-8 bg-gray-200 dark:bg-gray-600 rounded-full" />
           </div>
         )}
-        <div className={`sm:hidden flex flex-col flex-1 bg-white ${mobileTab !== "chat" ? "hidden" : ""}`}>
+        <div className={`sm:hidden flex flex-col flex-1 ${darkMode ? "bg-[#1e1e1e]" : "bg-white"} ${mobileTab !== "chat" ? "hidden" : ""}`}>
           <ChatPanel messages={messages} isBuilding={isBuilding} prompt={prompt} setPrompt={setPrompt} onSend={handleSendPrompt} onStop={handleStopAgent} sending={sending} projectId={projectId} />
         </div>
         <div className={`flex-1 flex flex-col min-w-0 ${mobileTab !== "panel" ? "hidden sm:flex" : ""}`}>
-          <div className={`flex-1 overflow-hidden bg-white ${activeTab === "preview" ? "rounded-none" : "m-2 sm:m-3 rounded-xl shadow-sm"}`}>
+          <div className={`flex-1 overflow-hidden ${darkMode ? "bg-[#1e1e1e]" : "bg-white"} ${activeTab === "preview" ? "rounded-none" : "m-2 sm:m-3 rounded-xl shadow-sm"}`}>
             {activeTab === "preview" && <PreviewPanel key={previewKey} previewUrl={previewUrl} onRefresh={() => { fetchProject(); setPreviewKey((k) => k + 1); }} loading={isBuilding} mobilePreview={mobilePreview} iframePath={iframePath} />}
             {activeTab === "database" && <DatabasePanel projectId={projectId} />}
             {activeTab === "versions" && <VersionsPanel projectId={projectId} onVersionRestored={() => fetchProject()} />}
