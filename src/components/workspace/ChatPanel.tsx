@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { api } from "@/lib/api";
-import type { ConversationMessage } from "@/lib/vcaas-types";
+import type { ConversationMessage, VcaasSecret } from "@/lib/vcaas-types";
 
 interface ChatPanelProps {
   messages: ConversationMessage[];
@@ -20,6 +20,7 @@ interface ChatPanelProps {
   onStop: () => void;
   sending: boolean;
   projectId: string;
+  projectSecrets?: VcaasSecret[];
 }
 
 interface MessageGroup {
@@ -112,14 +113,23 @@ interface SecretEntry {
   entries: { value: string; environment: "both" | "development" | "production"; showValue: boolean }[];
 }
 
-function SecretKeysForm({ secretKeysNeeded, projectId, onTellAi }: {
+function SecretKeysForm({ secretKeysNeeded, projectId, onTellAi, projectSecrets }: {
   secretKeysNeeded: Record<string, { isProvided: boolean; description: string }>;
   projectId: string;
   onTellAi: (count: number) => void;
+  projectSecrets?: VcaasSecret[];
 }) {
   const { t } = useI18n();
-  const unprovided = Object.entries(secretKeysNeeded).filter(([, v]) => !v.isProvided);
-  const provided = Object.entries(secretKeysNeeded).filter(([, v]) => v.isProvided);
+
+  // Merge isProvided with current project secrets — if a secret exists in projectSecrets, treat it as provided
+  const existingSecretNames = new Set((projectSecrets || []).map((s) => s.secretName));
+  const mergedEntries = Object.entries(secretKeysNeeded).map(([key, val]) => {
+    const isActuallyProvided = val.isProvided || existingSecretNames.has(key);
+    return [key, { ...val, isProvided: isActuallyProvided }] as [string, { isProvided: boolean; description: string }];
+  });
+
+  const unprovided = mergedEntries.filter(([, v]) => !v.isProvided);
+  const provided = mergedEntries.filter(([, v]) => v.isProvided);
 
   const [secrets, setSecrets] = useState<SecretEntry[]>(() =>
     unprovided.map(([key, val]) => ({
@@ -325,7 +335,7 @@ function SecretKeysForm({ secretKeysNeeded, projectId, onTellAi }: {
 }
 
 // --- Build Group ---
-function BuildGroup({ group, projectId, onTellAi }: { group: MessageGroup; projectId: string; onTellAi: (count: number) => void }) {
+function BuildGroup({ group, projectId, onTellAi, projectSecrets }: { group: MessageGroup; projectId: string; onTellAi: (count: number) => void; projectSecrets?: VcaasSecret[] }) {
   const [expanded, setExpanded] = useState(false);
   const hasBuildMsgs = (group.buildMsgs?.length || 0) > 0;
   const isComplete = !!group.finishMsg;
@@ -368,6 +378,7 @@ function BuildGroup({ group, projectId, onTellAi }: { group: MessageGroup; proje
               secretKeysNeeded={group.finishMsg.secretKeysNeeded}
               projectId={projectId}
               onTellAi={onTellAi}
+              projectSecrets={projectSecrets}
             />
           )}
           {group.finishMsg.gitDiffUrl && (
@@ -382,7 +393,7 @@ function BuildGroup({ group, projectId, onTellAi }: { group: MessageGroup; proje
   );
 }
 
-export function ChatPanel({ messages, isBuilding, prompt, setPrompt, onSend, onStop, sending, projectId }: ChatPanelProps) {
+export function ChatPanel({ messages, isBuilding, prompt, setPrompt, onSend, onStop, sending, projectId, projectSecrets }: ChatPanelProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [attachedFiles, setAttachedFiles] = useState<{ name: string; url: string; imageDescription: string }[]>([]);
@@ -428,7 +439,7 @@ export function ChatPanel({ messages, isBuilding, prompt, setPrompt, onSend, onS
         )}
 
         {messageGroups.map((group, gi) => {
-          if (group.type === "build-group") return <BuildGroup key={gi} group={group} projectId={projectId} onTellAi={handleTellAiSecretsReady} />;
+          if (group.type === "build-group") return <BuildGroup key={gi} group={group} projectId={projectId} onTellAi={handleTellAiSecretsReady} projectSecrets={projectSecrets} />;
           const msg = group.messages[0];
           if (msg.author === "user") {
             return (
