@@ -56,6 +56,28 @@ function groupMessages(messages: ConversationMessage[]): MessageGroup[] {
   return groups;
 }
 
+function renderInline(text: string, keyPrefix: string = "0"): React.ReactNode[] {
+  // Split by: bold, links, inline code
+  const tokens = text.split(/(\*\*[^*]+\*\*|\[[^\]]+\]\([^)]+\)|`[^`]+`)/g);
+  return tokens.map((token, ti) => {
+    const key = `${keyPrefix}-${ti}`;
+    // Bold
+    if (token.startsWith("**") && token.endsWith("**")) {
+      return <strong key={key} className="font-semibold">{token.slice(2, -2)}</strong>;
+    }
+    // Link [text](url)
+    const linkMatch = token.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
+    if (linkMatch) {
+      return <a key={key} href={linkMatch[2]} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">{linkMatch[1]}</a>;
+    }
+    // Inline code
+    if (token.startsWith("`") && token.endsWith("`")) {
+      return <code key={key} className="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded text-xs font-mono">{token.slice(1, -1)}</code>;
+    }
+    return <span key={key}>{token}</span>;
+  });
+}
+
 function FormattedText({ text }: { text: string }) {
   const parts = text.split(/(```[\s\S]*?```)/g);
   return (
@@ -66,23 +88,15 @@ function FormattedText({ text }: { text: string }) {
           return <pre key={i} className="bg-gray-900 text-gray-200 rounded-lg p-3 text-xs font-mono overflow-x-auto my-2">{code}</pre>;
         }
         return part.split("\n").map((line, li) => {
-          if (line.startsWith("# ")) return <h3 key={`${i}-${li}`} className="font-semibold text-base mt-2">{line.slice(2)}</h3>;
-          if (line.startsWith("## ")) return <h4 key={`${i}-${li}`} className="font-semibold text-[15px] mt-1.5">{line.slice(3)}</h4>;
-          if (line.startsWith("- ") || line.startsWith("* ")) return <div key={`${i}-${li}`} className="flex gap-1.5"><span className="text-gray-400 shrink-0">-</span><span>{line.slice(2)}</span></div>;
-          if (line.trim() === "") return <div key={`${i}-${li}`} className="h-1" />;
-          const boldParts = line.split(/(\*\*[^*]+\*\*)/g);
-          return (
-            <p key={`${i}-${li}`}>
-              {boldParts.map((bp, bpi) => {
-                if (bp.startsWith("**") && bp.endsWith("**")) return <strong key={bpi} className="font-semibold">{bp.slice(2, -2)}</strong>;
-                const codeParts = bp.split(/(`[^`]+`)/g);
-                return codeParts.map((cp, cpi) => {
-                  if (cp.startsWith("`") && cp.endsWith("`")) return <code key={`${bpi}-${cpi}`} className="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded text-xs font-mono">{cp.slice(1, -1)}</code>;
-                  return <span key={`${bpi}-${cpi}`}>{cp}</span>;
-                });
-              })}
-            </p>
-          );
+          const lineKey = `${i}-${li}`;
+          if (line.startsWith("# ")) return <h3 key={lineKey} className="font-semibold text-base mt-2">{renderInline(line.slice(2), lineKey)}</h3>;
+          if (line.startsWith("## ")) return <h4 key={lineKey} className="font-semibold text-[15px] mt-1.5">{renderInline(line.slice(3), lineKey)}</h4>;
+          if (line.startsWith("### ")) return <h5 key={lineKey} className="font-semibold text-sm mt-1">{renderInline(line.slice(4), lineKey)}</h5>;
+          if (line.startsWith("- ") || line.startsWith("* ")) return <div key={lineKey} className="flex gap-1.5"><span className="text-gray-400 shrink-0">•</span><span>{renderInline(line.slice(2), lineKey)}</span></div>;
+          const numberedMatch = line.match(/^(\d+)\.\s+(.*)$/);
+          if (numberedMatch) return <div key={lineKey} className="flex gap-1.5"><span className="text-gray-400 shrink-0 min-w-[1.2em] text-right">{numberedMatch[1]}.</span><span>{renderInline(numberedMatch[2], lineKey)}</span></div>;
+          if (line.trim() === "") return <div key={lineKey} className="h-1" />;
+          return <p key={lineKey}>{renderInline(line, lineKey)}</p>;
         });
       })}
     </div>
