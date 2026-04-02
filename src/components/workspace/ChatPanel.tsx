@@ -1,12 +1,14 @@
 "use client";
 
-import { useRef, useEffect, useState } from "react";
+import { useRef, useEffect, useState, useCallback } from "react";
 import { Badge } from "@/components/ui/badge";
 import {
   Send, Square, Loader2, Bot, AlertCircle, CheckCircle2,
   Key, ExternalLink, ChevronDown, ChevronRight, Paperclip, X, Check,
+  Plus, Eye, EyeOff, CheckCircle, ArrowRight,
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
+import { api } from "@/lib/api";
 import type { ConversationMessage } from "@/lib/vcaas-types";
 
 interface ChatPanelProps {
@@ -103,7 +105,227 @@ function FormattedText({ text }: { text: string }) {
   );
 }
 
-function BuildGroup({ group }: { group: MessageGroup }) {
+// --- Interactive Secret Keys Form ---
+interface SecretEntry {
+  secretName: string;
+  description: string;
+  entries: { value: string; environment: "both" | "development" | "production"; showValue: boolean }[];
+}
+
+function SecretKeysForm({ secretKeysNeeded, projectId, onTellAi }: {
+  secretKeysNeeded: Record<string, { isProvided: boolean; description: string }>;
+  projectId: string;
+  onTellAi: (count: number) => void;
+}) {
+  const { t } = useI18n();
+  const unprovided = Object.entries(secretKeysNeeded).filter(([, v]) => !v.isProvided);
+  const provided = Object.entries(secretKeysNeeded).filter(([, v]) => v.isProvided);
+
+  const [secrets, setSecrets] = useState<SecretEntry[]>(() =>
+    unprovided.map(([key, val]) => ({
+      secretName: key,
+      description: val.description,
+      entries: [{ value: "", environment: "both", showValue: false }],
+    }))
+  );
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+
+  // No unprovided secrets → nothing to render (all set)
+  if (unprovided.length === 0 && provided.length > 0) {
+    return (
+      <div className="mt-3 p-3 rounded-xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-900/10">
+        <div className="flex items-center gap-2 mb-2">
+          <CheckCircle className="w-4 h-4 text-emerald-500" />
+          <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">{t("requiredSecrets")}</span>
+        </div>
+        {provided.map(([key]) => (
+          <div key={key} className="flex items-center gap-2 text-xs mt-1.5">
+            <code className="bg-emerald-100 dark:bg-emerald-900/30 px-1.5 py-0.5 rounded font-mono text-[10px] text-emerald-800 dark:text-emerald-300">{key}</code>
+            <Badge className="text-[9px] h-3.5 border-0 bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400">{t("alreadyProvided")}</Badge>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (unprovided.length === 0) return null;
+
+  const updateEntry = (si: number, ei: number, field: string, val: string | boolean) => {
+    setSecrets(prev => prev.map((s, i) => i !== si ? s : {
+      ...s, entries: s.entries.map((e, j) => j !== ei ? e : { ...e, [field]: val })
+    }));
+  };
+
+  const addEntry = (si: number) => {
+    setSecrets(prev => prev.map((s, i) => {
+      if (i !== si || s.entries.length >= 2) return s;
+      // Pick a different environment than the first
+      const firstEnv = s.entries[0].environment;
+      let newEnv: "development" | "production" = "production";
+      if (firstEnv === "production") newEnv = "development";
+      else if (firstEnv === "both") newEnv = "production";
+      return { ...s, entries: [...s.entries, { value: "", environment: newEnv, showValue: false }] };
+    }));
+  };
+
+  const removeEntry = (si: number, ei: number) => {
+    setSecrets(prev => prev.map((s, i) => {
+      if (i !== si || s.entries.length <= 1) return s;
+      return { ...s, entries: s.entries.filter((_, j) => j !== ei) };
+    }));
+  };
+
+  const allFilled = secrets.every(s => s.entries.every(e => e.value.trim().length > 0));
+
+  const handleSubmit = async () => {
+    if (!allFilled) return;
+    setSubmitting(true);
+    let successCount = 0;
+    for (const secret of secrets) {
+      for (const entry of secret.entries) {
+        const res = await api.post(`/api/vcaas/projects/${projectId}/secrets`, {
+          secretName: secret.secretName,
+          secretValue: entry.value.trim(),
+          environment: entry.environment,
+        });
+        if (res.ok) successCount++;
+        else console.error(`[SecretKeysForm] Failed to create secret ${secret.secretName}:`, res.error);
+      }
+    }
+    console.log(`[SecretKeysForm] Saved ${successCount} secrets`);
+    setSubmitting(false);
+    setSubmitted(true);
+  };
+
+  const envLabel = (env: string) => {
+    if (env === "development") return "Dev";
+    if (env === "production") return "Prod";
+    return "Dev + Prod";
+  };
+
+  if (submitted) {
+    const totalKeys = secrets.length;
+    return (
+      <div className="mt-3 p-3 rounded-xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-900/10">
+        <div className="flex items-center gap-2 mb-2">
+          <CheckCircle className="w-4 h-4 text-emerald-500" />
+          <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">{t("secretsSaved")}</span>
+        </div>
+        {secrets.map((s) => (
+          <div key={s.secretName} className="flex items-center gap-2 text-xs mt-1">
+            <code className="bg-emerald-100 dark:bg-emerald-900/30 px-1.5 py-0.5 rounded font-mono text-[10px] text-emerald-800 dark:text-emerald-300">{s.secretName}</code>
+            <span className="text-emerald-500 text-[10px]">{s.entries.map(e => envLabel(e.environment)).join(", ")}</span>
+          </div>
+        ))}
+        <button
+          onClick={() => onTellAi(totalKeys)}
+          className="mt-3 w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-xs font-medium hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors"
+        >
+          <ArrowRight className="w-3.5 h-3.5" />
+          {t("tellAiSecretsReady")}
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-3 rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50/30 dark:bg-amber-900/10 overflow-hidden">
+      <div className="flex items-center gap-2 px-3 pt-3 pb-1">
+        <Key className="w-4 h-4 text-amber-500" />
+        <span className="text-xs font-semibold text-amber-700 dark:text-amber-400">{t("requiredSecrets")}</span>
+        <Badge className="text-[9px] h-3.5 border-0 bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400 ml-auto">{unprovided.length} {t("missing").toLowerCase()}</Badge>
+      </div>
+
+      {/* Already provided keys */}
+      {provided.length > 0 && (
+        <div className="px-3 pt-1">
+          {provided.map(([key]) => (
+            <div key={key} className="flex items-center gap-2 text-xs mt-1">
+              <code className="bg-emerald-100 dark:bg-emerald-900/30 px-1.5 py-0.5 rounded font-mono text-[10px] text-emerald-800 dark:text-emerald-300">{key}</code>
+              <Badge className="text-[9px] h-3.5 border-0 bg-emerald-100 text-emerald-700">{t("alreadyProvided")}</Badge>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Secret inputs */}
+      <div className="p-3 space-y-3">
+        {secrets.map((secret, si) => (
+          <div key={secret.secretName} className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 p-3">
+            <div className="mb-2">
+              <code className="text-xs font-mono font-semibold text-gray-800 dark:text-gray-200">{secret.secretName}</code>
+              <p className="text-[11px] text-gray-400 mt-0.5 leading-snug">{secret.description}</p>
+            </div>
+
+            {secret.entries.map((entry, ei) => (
+              <div key={ei} className="mt-2">
+                {secret.entries.length > 1 && (
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[10px] text-gray-400 font-medium">Environment {ei + 1}</span>
+                    <button onClick={() => removeEntry(si, ei)} className="text-[10px] text-red-400 hover:text-red-600 transition-colors">
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                )}
+                <div className="flex gap-2">
+                  <div className="flex-1 relative">
+                    <input
+                      type={entry.showValue ? "text" : "password"}
+                      value={entry.value}
+                      onChange={(e) => updateEntry(si, ei, "value", e.target.value)}
+                      placeholder={t("secretValue")}
+                      className="w-full h-8 px-2.5 pr-8 text-xs rounded-md border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-800 dark:text-gray-200 outline-none focus:ring-1 focus:ring-amber-300 font-mono"
+                    />
+                    <button
+                      onClick={() => updateEntry(si, ei, "showValue", !entry.showValue)}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
+                      {entry.showValue ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                    </button>
+                  </div>
+                  <select
+                    value={entry.environment}
+                    onChange={(e) => updateEntry(si, ei, "environment", e.target.value)}
+                    className="h-8 px-2 text-[11px] rounded-md border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 outline-none focus:ring-1 focus:ring-amber-300 min-w-[90px]"
+                  >
+                    <option value="both">Dev + Prod</option>
+                    <option value="development">Dev only</option>
+                    <option value="production">Prod only</option>
+                  </select>
+                </div>
+              </div>
+            ))}
+
+            {secret.entries.length < 2 && (
+              <button
+                onClick={() => addEntry(si)}
+                className="flex items-center gap-1 mt-2 text-[10px] text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 transition-colors"
+              >
+                <Plus className="w-3 h-3" />
+                {t("addEnvironment")}
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <div className="px-3 pb-3">
+        <button
+          onClick={handleSubmit}
+          disabled={!allFilled || submitting}
+          className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 disabled:bg-gray-300 dark:disabled:bg-gray-700 text-white text-xs font-medium transition-colors disabled:cursor-not-allowed"
+        >
+          {submitting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Key className="w-3.5 h-3.5" />}
+          {submitting ? t("submittingSecrets") : t("submitSecrets")}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// --- Build Group ---
+function BuildGroup({ group, projectId, onTellAi }: { group: MessageGroup; projectId: string; onTellAi: (count: number) => void }) {
   const [expanded, setExpanded] = useState(false);
   const hasBuildMsgs = (group.buildMsgs?.length || 0) > 0;
   const isComplete = !!group.finishMsg;
@@ -140,18 +362,13 @@ function BuildGroup({ group }: { group: MessageGroup }) {
               </div>
             </div>
           )}
-          {/* Secret keys */}
+          {/* Interactive Secret Keys Form */}
           {group.finishMsg.secretKeysNeeded && Object.keys(group.finishMsg.secretKeysNeeded).length > 0 && (
-            <div className="mt-3 p-2.5 rounded-lg border border-amber-200 dark:border-amber-800">
-              <div className="flex items-center gap-1.5 mb-1.5"><Key className="w-3 h-3 text-amber-500" /><span className="text-xs font-semibold text-amber-700 dark:text-amber-400">{t("requiredSecrets")}</span></div>
-              {Object.entries(group.finishMsg.secretKeysNeeded).map(([key, val]) => (
-                <div key={key} className="flex items-center gap-1.5 text-xs mt-1">
-                  <code className="bg-amber-50 dark:bg-amber-900/30 px-1.5 py-0.5 rounded font-mono text-[10px]">{key}</code>
-                  <span className="text-gray-400 flex-1 truncate">{val.description}</span>
-                  <Badge className={`text-[9px] h-3.5 border-0 ${val.isProvided ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"}`}>{val.isProvided ? t("set") : t("missing")}</Badge>
-                </div>
-              ))}
-            </div>
+            <SecretKeysForm
+              secretKeysNeeded={group.finishMsg.secretKeysNeeded}
+              projectId={projectId}
+              onTellAi={onTellAi}
+            />
           )}
           {group.finishMsg.gitDiffUrl && (
             <a href={group.finishMsg.gitDiffUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 mt-2 text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"><ExternalLink className="w-2.5 h-2.5" /> {t("viewChanges")}</a>
@@ -177,6 +394,13 @@ export function ChatPanel({ messages, isBuilding, prompt, setPrompt, onSend, onS
 
   const handleKeyDown = (e: React.KeyboardEvent) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } };
   const handleSend = () => { if (!prompt.trim() && attachedFiles.length === 0) return; onSend(attachedFiles.length > 0 ? attachedFiles : undefined); setAttachedFiles([]); };
+
+  const handleTellAiSecretsReady = useCallback((count: number) => {
+    const msg = `I have already filled and saved ${count} secret key${count > 1 ? "s" : ""}. Please continue.`;
+    setPrompt(msg);
+    // Auto-send after a tiny delay so the prompt is set
+    setTimeout(() => { onSend(); }, 100);
+  }, [setPrompt, onSend]);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]; if (!file) return;
@@ -204,7 +428,7 @@ export function ChatPanel({ messages, isBuilding, prompt, setPrompt, onSend, onS
         )}
 
         {messageGroups.map((group, gi) => {
-          if (group.type === "build-group") return <BuildGroup key={gi} group={group} />;
+          if (group.type === "build-group") return <BuildGroup key={gi} group={group} projectId={projectId} onTellAi={handleTellAiSecretsReady} />;
           const msg = group.messages[0];
           if (msg.author === "user") {
             return (
