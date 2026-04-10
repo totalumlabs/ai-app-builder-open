@@ -13,6 +13,7 @@ import {
   Loader2, Zap, TrendingUp, TrendingDown, Server, Code2,
   Calendar, Filter, BarChart3, PieChart as PieChartIcon,
   ArrowUpRight, ArrowDownRight, Minus, RefreshCw,
+  Wallet, Plus, ExternalLink,
 } from "lucide-react";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -113,6 +114,8 @@ export default function AdminDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [accessDenied, setAccessDenied] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [creditsBalance, setCreditsBalance] = useState<number | null>(null);
+  const [balanceLoading, setBalanceLoading] = useState(true);
 
   // Filters
   const defaultRange = getDefaultRange();
@@ -121,7 +124,7 @@ export default function AdminDashboardPage() {
   const [selectedProject, setSelectedProject] = useState<string>("");
   const [activePreset, setActivePreset] = useState<string>("30d");
 
-  // Check admin access first
+  // Check admin access and fetch credits balance
   useEffect(() => {
     async function checkAccess() {
       const res = await api.get("/api/admin/stats");
@@ -129,10 +132,31 @@ export default function AdminDashboardPage() {
         console.log("[Admin Dashboard] Access denied");
         setAccessDenied(true);
         router.push("/dashboard");
+        return;
       }
+      // Fetch credits balance
+      fetchBalance();
     }
     if (!isPending) checkAccess();
   }, [isPending, router]);
+
+  const fetchBalance = async () => {
+    setBalanceLoading(true);
+    try {
+      const res = await api.get<{ balance: number }>("/api/admin/credits-balance");
+      if (res.ok && res.data) {
+        setCreditsBalance(res.data.balance);
+        console.log("[Admin Dashboard] Credits balance:", res.data.balance);
+      } else {
+        console.log("[Admin Dashboard] Could not fetch balance:", res.error);
+        setCreditsBalance(null);
+      }
+    } catch (err) {
+      console.error("[Admin Dashboard] Balance fetch error:", err);
+      setCreditsBalance(null);
+    }
+    setBalanceLoading(false);
+  };
 
   const fetchAnalytics = useCallback(async (showRefresh = false) => {
     if (showRefresh) setRefreshing(true);
@@ -321,7 +345,38 @@ export default function AdminDashboardPage() {
           </div>
         </div>
 
-        {/* ── Summary Stats ── */}
+        {/* ── Credits Balance Card ── */}
+        <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-xl p-5 mb-6 text-white relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2" />
+          <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2" />
+          <div className="relative flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <Wallet className="w-4 h-4 text-gray-400" />
+                <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">Current Balance</span>
+              </div>
+              {balanceLoading ? (
+                <div className="h-9 w-32 bg-white/10 rounded-lg animate-pulse mt-1" />
+              ) : creditsBalance !== null ? (
+                <p className="text-3xl font-bold tracking-tight">{creditsBalance.toFixed(1)} <span className="text-base font-normal text-gray-400">credits</span></p>
+              ) : (
+                <p className="text-lg font-medium text-gray-400">Unable to load balance</p>
+              )}
+            </div>
+            <a
+              href="https://accounts.totalum.app"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 bg-white text-gray-900 hover:bg-gray-100 px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors shrink-0"
+            >
+              <Plus className="w-4 h-4" />
+              Add Balance
+              <ExternalLink className="w-3 h-3 text-gray-400" />
+            </a>
+          </div>
+        </div>
+
+        {/* ── Spending Summary Stats ── */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
           {!totals ? (
             Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-xl bg-white/40" />)
@@ -330,21 +385,21 @@ export default function AdminDashboardPage() {
               <StatCard
                 icon={Zap}
                 value={totals.total.toFixed(1)}
-                label="Total Credits"
+                label="Total Credits Spent"
                 accentColor="text-amber-500"
                 accentBg="bg-amber-50"
               />
               <StatCard
                 icon={Code2}
                 value={totals.development.toFixed(1)}
-                label="Development"
+                label="Development Spent"
                 accentColor="text-indigo-500"
                 accentBg="bg-indigo-50"
               />
               <StatCard
                 icon={Server}
                 value={totals.infrastructure.toFixed(1)}
-                label="Infrastructure"
+                label="Infrastructure Spent"
                 accentColor="text-emerald-500"
                 accentBg="bg-emerald-50"
               />
@@ -483,7 +538,7 @@ export default function AdminDashboardPage() {
 
           {/* Detailed Breakdown Table */}
           <div className="bg-white/80 backdrop-blur-sm border border-gray-200/60 rounded-xl p-5">
-            <h3 className="text-sm font-semibold text-gray-800 mb-4">Detailed Breakdown</h3>
+            <h3 className="text-sm font-semibold text-gray-800 mb-4">Spending Breakdown by Type</h3>
             {!totals?.byType || Object.keys(totals.byType).length === 0 ? (
               <div className="h-[240px] flex items-center justify-center text-sm text-gray-300">No data</div>
             ) : (

@@ -36,10 +36,10 @@ export function AdminHeader({ activeTab = "dashboard" }: AdminHeaderProps) {
               </div>
               <span className="font-semibold tracking-tight text-gray-900 text-sm">VibeBuild</span>
             </Link>
-            <div className="hidden sm:flex items-center gap-1.5 ml-2">
+            <Link href="/admin/dashboard" className="hidden sm:flex items-center gap-1.5 ml-2 hover:opacity-80 transition-opacity">
               <Shield className="w-3.5 h-3.5 text-red-500" />
               <span className="text-sm font-medium text-gray-700">{t("adminPanel")}</span>
-            </div>
+            </Link>
           </div>
           <div className="flex items-center gap-2">
             <Link href="/dashboard">
