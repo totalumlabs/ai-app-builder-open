@@ -16,21 +16,22 @@ export async function GET() {
     });
 
     const json = (await response.json()) as {
-      errors: unknown;
-      data: { balance: number };
+      success: boolean;
+      data?: { credits: number };
+      errors?: unknown;
     };
 
-    if (json.errors) {
-      console.error("[Admin Credits] API error:", json.errors);
+    if (!json.success || !json.data) {
+      console.error("[Admin Credits] API error:", json.errors || "No data returned");
       return NextResponse.json(
         { ok: false, error: "Failed to fetch credits balance" },
         { status: 500 }
       );
     }
 
-    console.log("[Admin Credits] Balance:", json.data?.balance);
+    console.log("[Admin Credits] Balance:", json.data.credits);
 
-    return NextResponse.json({ ok: true, data: json.data });
+    return NextResponse.json({ ok: true, data: { balance: json.data.credits } });
   } catch (error) {
     console.error("[Admin Credits] Error:", error);
     return NextResponse.json(
