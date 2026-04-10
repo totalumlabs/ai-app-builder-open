@@ -19,7 +19,7 @@ export function AdminHeader({ activeTab = "dashboard" }: AdminHeaderProps) {
   const userInitial = userName.charAt(0).toUpperCase();
 
   const tabs = [
-    { id: "dashboard" as const, label: t("adminDashboard"), icon: LayoutDashboard, href: "/admin" },
+    { id: "dashboard" as const, label: t("adminDashboard"), icon: LayoutDashboard, href: "/admin/dashboard" },
     { id: "users" as const, label: t("adminUsers"), icon: Users, href: "/admin" },
     { id: "projects" as const, label: t("adminProjects"), icon: FolderOpen, href: "/admin/projects" },
   ];
