@@ -13,7 +13,7 @@ import {
   Loader2, Zap, TrendingUp, TrendingDown, Server, Code2,
   Calendar, Filter, BarChart3, PieChart as PieChartIcon,
   ArrowUpRight, ArrowDownRight, Minus, RefreshCw,
-  Wallet, Plus, ExternalLink,
+  Wallet, Plus,
 } from "lucide-react";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -74,6 +74,10 @@ const PRESET_RANGES = [
   { label: "60d", days: 60 },
   { label: "90d", days: 90 },
 ];
+
+function formatNumber(n: number): string {
+  return n.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 1 });
+}
 
 function formatDate(d: Date): string {
   return d.toISOString().split("T")[0];
@@ -268,6 +272,36 @@ export default function AdminDashboardPage() {
       <AdminHeader activeTab="dashboard" />
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
+        {/* ── Credits Balance Card ── */}
+        <div className="bg-gradient-to-br from-indigo-600 to-violet-600 rounded-xl p-5 mb-8 text-white relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2" />
+          <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full translate-y-1/2 -translate-x-1/2" />
+          <div className="relative flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <Wallet className="w-4 h-4 text-indigo-200" />
+                <span className="text-xs font-medium text-indigo-200 uppercase tracking-wider">Current Balance</span>
+              </div>
+              {balanceLoading ? (
+                <div className="h-9 w-32 bg-white/10 rounded-lg animate-pulse mt-1" />
+              ) : creditsBalance !== null ? (
+                <p className="text-3xl font-bold tracking-tight">{formatNumber(creditsBalance)} <span className="text-base font-normal text-indigo-200">credits</span></p>
+              ) : (
+                <p className="text-lg font-medium text-indigo-200">Unable to load balance</p>
+              )}
+            </div>
+            <a
+              href="https://accounts.totalum.app"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 bg-white text-indigo-700 hover:bg-indigo-50 px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors shrink-0"
+            >
+              <Plus className="w-4 h-4" />
+              Add Balance
+            </a>
+          </div>
+        </div>
+
         {/* ── Title + Refresh ── */}
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -345,37 +379,6 @@ export default function AdminDashboardPage() {
           </div>
         </div>
 
-        {/* ── Credits Balance Card ── */}
-        <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-xl p-5 mb-6 text-white relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2" />
-          <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2" />
-          <div className="relative flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <Wallet className="w-4 h-4 text-gray-400" />
-                <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">Current Balance</span>
-              </div>
-              {balanceLoading ? (
-                <div className="h-9 w-32 bg-white/10 rounded-lg animate-pulse mt-1" />
-              ) : creditsBalance !== null ? (
-                <p className="text-3xl font-bold tracking-tight">{creditsBalance.toFixed(1)} <span className="text-base font-normal text-gray-400">credits</span></p>
-              ) : (
-                <p className="text-lg font-medium text-gray-400">Unable to load balance</p>
-              )}
-            </div>
-            <a
-              href="https://accounts.totalum.app"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 bg-white text-gray-900 hover:bg-gray-100 px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors shrink-0"
-            >
-              <Plus className="w-4 h-4" />
-              Add Balance
-              <ExternalLink className="w-3 h-3 text-gray-400" />
-            </a>
-          </div>
-        </div>
-
         {/* ── Spending Summary Stats ── */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
           {!totals ? (
@@ -384,21 +387,21 @@ export default function AdminDashboardPage() {
             <>
               <StatCard
                 icon={Zap}
-                value={totals.total.toFixed(1)}
+                value={formatNumber(totals.total)}
                 label="Total Credits Spent"
                 accentColor="text-amber-500"
                 accentBg="bg-amber-50"
               />
               <StatCard
                 icon={Code2}
-                value={totals.development.toFixed(1)}
+                value={formatNumber(totals.development)}
                 label="Development Spent"
                 accentColor="text-indigo-500"
                 accentBg="bg-indigo-50"
               />
               <StatCard
                 icon={Server}
-                value={totals.infrastructure.toFixed(1)}
+                value={formatNumber(totals.infrastructure)}
                 label="Infrastructure Spent"
                 accentColor="text-emerald-500"
                 accentBg="bg-emerald-50"
