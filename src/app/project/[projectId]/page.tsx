@@ -9,7 +9,7 @@ import {
   Rocket, Loader2, Eye, Database, Key, Globe, Terminal,
   RefreshCw, Server, PanelLeftClose, PanelLeft, Monitor, Smartphone,
   ExternalLink, Sparkles, ChevronDown, FolderOpen, Plus, Languages,
-  Clock, X,
+  Clock, X, Github,
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -21,12 +21,21 @@ import { VersionsPanel } from "@/components/workspace/VersionsPanel";
 import { SecretsPanel } from "@/components/workspace/SecretsPanel";
 import { DomainPanel } from "@/components/workspace/DomainPanel";
 import { LogsPanel } from "@/components/workspace/LogsPanel";
+import { GithubPanel } from "@/components/workspace/GithubPanel";
 import type { VcaasProject, AgentStatus, ConversationMessage } from "@/lib/vcaas-types";
 
+// Pick the correct development preview URL following the VCaaS docs:
+// use `developmentUrlFieldToUse` to decide between the live server URL and the
+// cached static snapshot; default to `temporalDevelopmentProjectUrl` if null/undefined.
 function getPreviewUrlFromProject(proj: VcaasProject): string | null {
   const field = proj.developmentUrlFieldToUse || "temporalDevelopmentProjectUrl";
   const url = (proj as unknown as Record<string, unknown>)[field] || proj.temporalDevelopmentProjectUrl;
   return (url as string) || null;
+}
+
+// True when the preview being shown is the cached snapshot (dev server not active).
+function isCachedPreview(proj: VcaasProject): boolean {
+  return proj.developmentUrlFieldToUse === "cachedDevelopmentUrl";
 }
 
 export default function WorkspacePage() {
@@ -40,13 +49,14 @@ export default function WorkspacePage() {
     { id: "database", label: t("database"), icon: Database },
   ];
 
-  // All tabs for mobile menu (includes versions/secrets/domain/logs)
+  // All tabs for mobile menu (includes versions/secrets/domain/github/logs)
   const ALL_TABS = [
     { id: "preview", label: t("preview"), icon: Eye },
     { id: "database", label: t("database"), icon: Database },
     { id: "versions", label: t("versions"), icon: Clock },
     { id: "secrets", label: t("secrets"), icon: Key },
     { id: "domain", label: t("domain"), icon: Globe },
+    { id: "github", label: t("github"), icon: Github },
     { id: "logs", label: t("logs"), icon: Terminal },
   ];
 
@@ -58,6 +68,7 @@ export default function WorkspacePage() {
   const [sending, setSending] = useState(false);
   const [deploying, setDeploying] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewCached, setPreviewCached] = useState(false);
   const [previewKey, setPreviewKey] = useState(0);
   const [chatWidth, setChatWidth] = useState(440);
   const [isResizing, setIsResizing] = useState(false);
@@ -130,7 +141,7 @@ export default function WorkspacePage() {
 
   async function fetchProject(): Promise<VcaasProject | null> {
     const res = await api.get<VcaasProject>(`/api/vcaas/projects/${projectId}`);
-    if (res.ok && res.data && mountedRef.current) { setProject(res.data); setPreviewUrl(getPreviewUrlFromProject(res.data)); return res.data; } return null;
+    if (res.ok && res.data && mountedRef.current) { setProject(res.data); setPreviewUrl(getPreviewUrlFromProject(res.data)); setPreviewCached(isCachedPreview(res.data)); return res.data; } return null;
   }
   async function fetchConversation(): Promise<void> {
     const res = await api.get<{ conversation: ConversationMessage[] }>(`/api/vcaas/projects/${projectId}/agent/full-conversation`);
@@ -229,11 +240,15 @@ export default function WorkspacePage() {
           <Plus className="w-4 h-4 text-gray-400" /> {t("newProject")}
         </button>
       </div>
-      {/* Secrets option */}
+      {/* Secrets + GitHub options */}
       <div className="border-t py-1" style={{ borderColor: darkMode ? "#444" : "#eee" }}>
         <button onClick={() => { setActiveTab("secrets"); setMobileTab("panel"); setMenuOpen(false); }}
           className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-black/5 dark:hover:bg-white/10 transition-colors ${activeTab === "secrets" ? "text-gray-900 dark:text-white font-medium" : "text-gray-700 dark:text-gray-200"}`}>
           <Key className="w-4 h-4 text-gray-400" /> {t("secrets")}
+        </button>
+        <button onClick={() => { setActiveTab("github"); setMobileTab("panel"); setMenuOpen(false); }}
+          className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-black/5 dark:hover:bg-white/10 transition-colors ${activeTab === "github" ? "text-gray-900 dark:text-white font-medium" : "text-gray-700 dark:text-gray-200"}`}>
+          <Github className="w-4 h-4 text-gray-400" /> {t("github")}
         </button>
       </div>
       {/* Tabs - visible on mobile only */}
@@ -356,11 +371,12 @@ export default function WorkspacePage() {
           )}
           <div className="flex-1 flex flex-col min-w-0">
             <div className={`flex-1 overflow-hidden ${activeTab === "preview" ? "rounded-none" : "m-2 sm:m-3 rounded-xl shadow-sm"}`} style={{ background: cardBg }}>
-              {activeTab === "preview" && <PreviewPanel key={previewKey} previewUrl={previewUrl} onRefresh={() => { fetchProject(); setPreviewKey((k) => k + 1); }} loading={isBuilding} mobilePreview={mobilePreview} iframePath={iframePath} />}
+              {activeTab === "preview" && <PreviewPanel key={previewKey} previewUrl={previewUrl} cached={previewCached} onRefresh={() => { fetchProject(); setPreviewKey((k) => k + 1); }} loading={isBuilding} mobilePreview={mobilePreview} iframePath={iframePath} />}
               {activeTab === "database" && <DatabasePanel projectId={projectId} />}
               {activeTab === "versions" && <VersionsPanel projectId={projectId} onVersionRestored={() => fetchProject()} />}
               {activeTab === "secrets" && <SecretsPanel projectId={projectId} secrets={project.secrets || []} onSecretsChanged={() => fetchProject()} />}
               {activeTab === "domain" && <DomainPanel projectId={projectId} domain={project.customDomain} productionUrl={project.productionProjectUrl} onDomainChanged={() => fetchProject()} />}
+              {activeTab === "github" && <GithubPanel projectId={projectId} />}
               {activeTab === "logs" && <LogsPanel projectId={projectId} />}
             </div>
           </div>
@@ -390,11 +406,12 @@ export default function WorkspacePage() {
             </div>
           ) : (
             <div className="h-full overflow-hidden">
-              {activeTab === "preview" && <PreviewPanel key={previewKey} previewUrl={previewUrl} onRefresh={() => { fetchProject(); setPreviewKey((k) => k + 1); }} loading={isBuilding} mobilePreview={false} iframePath={iframePath} />}
+              {activeTab === "preview" && <PreviewPanel key={previewKey} previewUrl={previewUrl} cached={previewCached} onRefresh={() => { fetchProject(); setPreviewKey((k) => k + 1); }} loading={isBuilding} mobilePreview={false} iframePath={iframePath} />}
               {activeTab === "database" && <DatabasePanel projectId={projectId} />}
               {activeTab === "versions" && <VersionsPanel projectId={projectId} onVersionRestored={() => fetchProject()} />}
               {activeTab === "secrets" && <SecretsPanel projectId={projectId} secrets={project.secrets || []} onSecretsChanged={() => fetchProject()} />}
               {activeTab === "domain" && <DomainPanel projectId={projectId} domain={project.customDomain} productionUrl={project.productionProjectUrl} onDomainChanged={() => fetchProject()} />}
+              {activeTab === "github" && <GithubPanel projectId={projectId} />}
               {activeTab === "logs" && <LogsPanel projectId={projectId} />}
             </div>
           )}

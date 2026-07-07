@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Monitor, Loader2 } from "lucide-react";
+import { Monitor, Loader2, Archive } from "lucide-react";
 
 interface PreviewPanelProps {
   previewUrl: string | null;
@@ -9,9 +9,10 @@ interface PreviewPanelProps {
   loading?: boolean;
   mobilePreview?: boolean;
   iframePath?: string;
+  cached?: boolean;
 }
 
-export function PreviewPanel({ previewUrl, onRefresh, loading, mobilePreview = false, iframePath = "/" }: PreviewPanelProps) {
+export function PreviewPanel({ previewUrl, onRefresh, loading, mobilePreview = false, iframePath = "/", cached = false }: PreviewPanelProps) {
   const [iframeLoading, setIframeLoading] = useState(true);
   const fullIframeUrl = previewUrl ? `${previewUrl}${iframePath === "/" ? "" : iframePath}` : null;
 
@@ -19,6 +20,14 @@ export function PreviewPanel({ previewUrl, onRefresh, loading, mobilePreview = f
     <div className="h-full flex flex-col overflow-hidden">
       {/* iframe - no URL bar here, it's in the header now */}
       <div className="flex-1 flex items-center justify-center overflow-hidden relative" style={{ background: "#fcfbf8" }}>
+        {/* Cached snapshot indicator: shown when the dev server is not active and
+            we're displaying the cachedDevelopmentUrl static snapshot */}
+        {previewUrl && cached && (
+          <div className="absolute top-2 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5 bg-amber-50 border border-amber-200 text-amber-700 text-[11px] font-medium px-2.5 py-1 rounded-full shadow-sm">
+            <Archive className="w-3 h-3" />
+            <span>Cached snapshot · server sleeping</span>
+          </div>
+        )}
         {!previewUrl ? (
           <div className="flex flex-col items-center justify-center text-center px-8">
             {loading ? (

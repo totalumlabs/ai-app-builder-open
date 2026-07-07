@@ -82,3 +82,39 @@ export interface DbProperty {
   objectReference?: { tableTo?: string; type?: string };
   typeExtras?: Record<string, unknown>;
 }
+
+// ─── GitHub integration ───
+export interface GithubStatus {
+  connected: boolean;
+  tokenValid: boolean;
+  tokenExpired: boolean;
+  repositoryFullName?: string;
+  developBranch?: string;
+  productionBranch?: string;
+}
+
+export type GithubSyncDirection = "totalum_to_github" | "github_to_totalum";
+
+export interface GithubConnectResult {
+  connected: boolean;
+  repositoryFullName: string;
+  syncAction: "push_new" | "push" | "pull" | "merge_and_push" | "already_synced";
+  repoHasContent: boolean;
+  requiresRebuild: boolean;
+}
+
+export interface GithubPullResult {
+  status: "pulling" | "no_changes";
+  message: string;
+  filesUpdated: number;
+}
+
+export interface GithubPullStatus {
+  status: "pulling" | "success" | "error" | null;
+  createdAt?: string;
+}
+
+export interface GithubEnv {
+  envDev: string;
+  envProd: string;
+}
