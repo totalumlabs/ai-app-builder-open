@@ -2,24 +2,26 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { useSession, signOut } from "@/lib/auth-client";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Sparkles, Plus, LogOut, Loader2, Trash2, Send, Paperclip, X, ArrowRight, User, Shield } from "lucide-react";
+import { Sparkles, Plus, Loader2, Trash2, Send, Paperclip, X, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
+import { LanguageSelect } from "@/components/LanguageSelect";
 import type { VcaasProject } from "@/lib/vcaas-types";
 
-interface UserProjectRecord { _id: string; user_id: string; project_id: string; description: string; createdAt: string; }
+// Shape returned by the VCaaS "List Projects" endpoint (GET /vcaas/projects).
+// The platform is fully open — this lists every project in the account, no user
+// account or database association is involved.
+interface VcaasProjectSummary { projectId: string; description: string; plan: string; createdAt: string; }
 
 export default function DashboardPage() {
-  const { data: session } = useSession();
   const router = useRouter();
-  const [userProjects, setUserProjects] = useState<UserProjectRecord[]>([]);
+  const [projects, setProjects] = useState<VcaasProjectSummary[]>([]);
   const [projectDetails, setProjectDetails] = useState<Record<string, VcaasProject>>({});
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
@@ -30,31 +32,30 @@ export default function DashboardPage() {
   const [sendingFirst, setSendingFirst] = useState(false);
   const [attachedFiles, setAttachedFiles] = useState<{ name: string; url: string; imageDescription: string }[]>([]);
   const [uploading, setUploading] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
-    const res = await api.get<UserProjectRecord[]>("/api/user-projects");
+    // List all projects directly from the VCaaS API (no database needed).
+    const res = await api.get<VcaasProjectSummary[]>("/api/vcaas/projects");
     if (res.ok && res.data) {
-      const projects = Array.isArray(res.data) ? res.data : [];
-      setUserProjects(projects);
-      // Fetch project details for thumbnails
+      const list = Array.isArray(res.data) ? res.data : [];
+      // Newest first.
+      list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      setProjects(list);
+      // Fetch project details for thumbnails (first 12).
       const details: Record<string, VcaasProject> = {};
-      await Promise.all(projects.slice(0, 12).map(async (p) => {
-        const r = await api.get<VcaasProject>(`/api/vcaas/projects/${p.project_id}`);
-        if (r.ok && r.data) details[p.project_id] = r.data;
+      await Promise.all(list.slice(0, 12).map(async (p) => {
+        const r = await api.get<VcaasProject>(`/api/vcaas/projects/${p.projectId}`);
+        if (r.ok && r.data) details[p.projectId] = r.data;
       }));
       setProjectDetails(details);
+    } else {
+      console.error("[Dashboard] Failed to list projects:", res.error);
     }
     setLoading(false);
   }, []);
 
   useEffect(() => { fetchData(); }, [fetchData]);
-
-  // Check admin role (lightweight — just hit stats endpoint)
-  useEffect(() => {
-    api.get("/api/admin/stats").then((res) => { if (res.ok) setIsAdmin(true); });
-  }, []);
 
   const handleCreateProject = async () => {
     const id = newProjectId.trim().toLowerCase().replace(/\s+/g, "-");
@@ -62,7 +63,6 @@ export default function DashboardPage() {
     setCreating(true);
     const res = await api.post("/api/vcaas/projects", { projectId: id, description: newProjectDesc.trim() });
     if (res.ok) {
-      await api.post("/api/user-projects", { project_id: id, description: newProjectDesc.trim() });
       toast.success("Project created!"); setDialogOpen(false); setNewProjectId(""); setNewProjectDesc("");
       router.push(`/project/${id}`);
     } else toast.error(res.error || "Failed to create project");
@@ -77,7 +77,6 @@ export default function DashboardPage() {
     const safeId = projectId.replace(/^[^a-z]+/, "a-");
     const createRes = await api.post("/api/vcaas/projects", { projectId: safeId, description: firstPrompt.trim().slice(0, 200) });
     if (!createRes.ok) { toast.error(createRes.error || "Failed to create project"); setSendingFirst(false); return; }
-    await api.post("/api/user-projects", { project_id: safeId, description: firstPrompt.trim().slice(0, 200) });
     await api.post(`/api/vcaas/projects/${safeId}/agent/start`, { prompt: firstPrompt.trim(), inputFiles: attachedFiles });
     router.push(`/project/${safeId}`);
   };
@@ -93,9 +92,10 @@ export default function DashboardPage() {
   const handleDeleteProject = async (projectId: string, e: React.MouseEvent) => {
     e.preventDefault(); e.stopPropagation();
     if (!confirm(`Delete "${projectId}"?`)) return;
-    await api.delete(`/api/vcaas/projects/${projectId}`);
-    await api.delete(`/api/user-projects/${projectId}`);
-    toast.success("Project deleted"); fetchData();
+    const res = await api.delete(`/api/vcaas/projects/${projectId}`);
+    if (res.ok) toast.success("Project deleted");
+    else toast.error(res.error || "Failed to delete project");
+    fetchData();
   };
 
   const getPreviewUrl = (pid: string) => {
@@ -105,9 +105,7 @@ export default function DashboardPage() {
     return (d as unknown as Record<string, unknown>)[field] as string || d.temporalDevelopmentProjectUrl || d.cachedDevelopmentUrl || null;
   };
 
-  const hasProjects = userProjects.length > 0;
-  const userName = session?.user?.name || session?.user?.email?.split("@")[0] || "";
-  const userInitial = userName.charAt(0).toUpperCase();
+  const hasProjects = projects.length > 0;
 
   return (
     <div className="min-h-screen relative overflow-hidden">
@@ -117,30 +115,17 @@ export default function DashboardPage() {
       {/* Header - matches builder: no bg, no border, transparent */}
       <header className="sticky top-0 z-50">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 h-12 flex items-center justify-between">
-          <Link href="/dashboard" className="flex items-center gap-2">
+          <Link href="/" className="flex items-center gap-2">
             <div className="w-7 h-7 rounded-lg bg-gray-900 flex items-center justify-center">
               <Sparkles className="w-3.5 h-3.5 text-white" />
             </div>
             <span className="font-semibold tracking-tight text-gray-900 text-sm">VibeBuild</span>
           </Link>
           <div className="flex items-center gap-2">
-            {isAdmin && (
-              <Link href="/admin">
-                <button className="p-1.5 rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 transition-colors" title="Admin Panel">
-                  <Shield className="w-4 h-4" />
-                </button>
-              </Link>
-            )}
-            <Link href="/profile">
-              <button className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-black/5 transition-colors">
-                <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-[10px] font-semibold text-gray-600">{userInitial}</div>
-                <span className="text-xs hidden sm:block">{userName}</span>
-              </button>
+            <LanguageSelect />
+            <Link href="/">
+              <button className="text-xs text-gray-500 hover:text-gray-700 px-2.5 py-1.5 rounded-lg hover:bg-black/5 transition-colors">Home</button>
             </Link>
-            <button className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-black/5 transition-colors"
-              onClick={() => signOut({ fetchOptions: { onSuccess: () => router.push("/") } })}>
-              <LogOut className="w-4 h-4" />
-            </button>
           </div>
         </div>
       </header>
@@ -199,7 +184,7 @@ export default function DashboardPage() {
         {hasProjects && (
           <>
             <div className="flex items-center justify-between mb-5">
-              <h2 className="text-base font-semibold text-gray-700">Your Projects</h2>
+              <h2 className="text-base font-semibold text-gray-700">Projects</h2>
               <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
                 <DialogTrigger asChild>
                   <button className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 px-2.5 py-1.5 rounded-lg hover:bg-white/60 transition-colors">
@@ -226,10 +211,10 @@ export default function DashboardPage() {
               </Dialog>
             </div>
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {userProjects.map((up) => {
-                const thumbUrl = getPreviewUrl(up.project_id);
+              {projects.map((p) => {
+                const thumbUrl = getPreviewUrl(p.projectId);
                 return (
-                  <Link key={up._id} href={`/project/${up.project_id}`}>
+                  <Link key={p.projectId} href={`/project/${p.projectId}`}>
                     <div className="bg-white/70 backdrop-blur-sm border border-gray-200/50 rounded-xl overflow-hidden hover:shadow-lg hover:bg-white/90 transition-all cursor-pointer group h-full">
                       {/* Project thumbnail */}
                       <div className="h-32 bg-gray-100 relative overflow-hidden">
@@ -238,7 +223,7 @@ export default function DashboardPage() {
                             src={thumbUrl}
                             className="w-[200%] h-[200%] border-0 pointer-events-none origin-top-left"
                             style={{ transform: "scale(0.5)" }}
-                            title={up.project_id}
+                            title={p.projectId}
                             sandbox="allow-scripts allow-same-origin"
                             tabIndex={-1}
                           />
@@ -253,14 +238,14 @@ export default function DashboardPage() {
                       {/* Info */}
                       <div className="p-4">
                         <div className="flex items-start justify-between mb-1">
-                          <h3 className="font-medium text-sm text-gray-800 group-hover:text-gray-900 truncate flex-1">{up.project_id}</h3>
-                          <button className="w-6 h-6 rounded-md flex items-center justify-center opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 hover:bg-gray-50 transition-all shrink-0 ml-2" onClick={(e) => handleDeleteProject(up.project_id, e)}>
+                          <h3 className="font-medium text-sm text-gray-800 group-hover:text-gray-900 truncate flex-1">{p.projectId}</h3>
+                          <button className="w-6 h-6 rounded-md flex items-center justify-center opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 hover:bg-gray-50 transition-all shrink-0 ml-2" onClick={(e) => handleDeleteProject(p.projectId, e)}>
                             <Trash2 className="w-3 h-3" />
                           </button>
                         </div>
-                        <p className="text-[11px] text-gray-500 line-clamp-1">{up.description || "No description"}</p>
+                        <p className="text-[11px] text-gray-500 line-clamp-1">{p.description || "No description"}</p>
                         <div className="flex items-center justify-between mt-2">
-                          <span className="text-[10px] text-gray-400">{new Date(up.createdAt).toLocaleDateString()}</span>
+                          <span className="text-[10px] text-gray-400">{new Date(p.createdAt).toLocaleDateString()}</span>
                           <ArrowRight className="w-3 h-3 text-gray-300 group-hover:text-gray-500 transition-colors" />
                         </div>
                       </div>

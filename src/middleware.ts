@@ -23,25 +23,6 @@ function isAllowedOrigin(origin: string, request: NextRequest): boolean {
   return false;
 }
 
-// Public routes that don't require authentication
-const publicRoutes = [
-  "/",
-  "/login",
-  "/register",
-  "/privacy-policy",
-  "/terms-of-service",
-
-  // Password recovery & email verification
-  "/forgot-password",
-  "/reset-password",
-  "/verify-email",
-
-  //stripe routes here
-  "/stripe/demo",
-  "/stripe/success",
-  "/stripe/cancel",
-];
-
 // Add CORS headers if the origin is allowed
 function addCorsHeaders(response: NextResponse, request: NextRequest) {
   const origin = request.headers.get("origin");
@@ -65,9 +46,10 @@ function addCspHeaders(response: NextResponse) {
   return response;
 }
 
+// NOTE: Authentication has been removed — the platform is fully open and every
+// route is public. No user account is required. This middleware now only handles
+// CORS and CSP headers (needed for the live preview iframe and custom domains).
 export async function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl;
-
   // Handle CORS preflight requests
   if (request.method === "OPTIONS") {
     const response = new NextResponse(null, { status: 204 });
@@ -76,45 +58,10 @@ export async function middleware(request: NextRequest) {
     return response;
   }
 
-  // Create response
+  // Every route is public — just attach CORS + CSP headers and continue.
   const response = NextResponse.next();
-
-  // Add CORS and CSP headers
   addCorsHeaders(response, request);
   addCspHeaders(response);
-
-  // Allow all API routes and static files
-  if (
-    pathname.startsWith("/api/") ||
-    pathname.startsWith("/_next/") ||
-    pathname.includes(".")
-  ) {
-    return response;
-  }
-
-  // Allow public routes
-  if (publicRoutes.some((route) => pathname === route || pathname.startsWith(route + "/"))) {
-    return response;
-  }
-
-  // Check session cookie for protected routes (lightweight Edge-compatible check)
-  // Better Auth uses "better-auth.session_token" or "__Secure-better-auth.session_token" (when secure)
-  const sessionCookie =
-    request.cookies.get("better-auth.session_token") ||
-    request.cookies.get("__Secure-better-auth.session_token");
-
-  if (!sessionCookie) {
-    // Redirect to login if no session cookie found
-    const loginUrl = new URL("/login", request.url);
-    loginUrl.searchParams.set("redirect", pathname);
-    const redirectResponse = NextResponse.redirect(loginUrl);
-    addCorsHeaders(redirectResponse, request);
-    addCspHeaders(redirectResponse);
-    return redirectResponse;
-  }
-
-  // Cookie exists - allow access
-  // Note: Full session validation happens in Server Components/API routes
   return response;
 }
 

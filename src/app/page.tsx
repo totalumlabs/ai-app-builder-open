@@ -1,31 +1,18 @@
 "use client";
 
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { useSession } from "@/lib/auth-client";
 import { useI18n } from "@/lib/i18n";
 import { files } from "@/assets/files";
 import Link from "next/link";
 import {
   Sparkles, ArrowRight, Palette, DollarSign, Users, Rocket,
   Globe, Shield, Code2, Zap, Mail, Building2, Megaphone,
-  Lock, Server, Loader2, ChevronRight, Trophy, Gauge,
+  Lock, Server, ChevronRight, Trophy, Gauge,
 } from "lucide-react";
 
+// The platform is fully open — no account/login required. Every CTA leads
+// straight into the builder dashboard at /dashboard.
 export default function LandingPage() {
-  const { data: session, isPending } = useSession();
-  const router = useRouter();
   const { lang } = useI18n();
-
-  useEffect(() => {
-    if (session && !isPending) router.push("/dashboard");
-  }, [session, isPending, router]);
-
-  if (isPending) return (
-    <div className="h-screen flex items-center justify-center" style={{ background: "#fcfbf8" }}>
-      <Loader2 className="w-6 h-6 animate-spin text-gray-500" />
-    </div>
-  );
 
   const en = lang === "en";
 
@@ -42,8 +29,7 @@ export default function LandingPage() {
             <a href="#features" className="text-sm text-gray-500 hover:text-gray-800 hidden sm:block">{en ? "Features" : "Funciones"}</a>
             <a href="#use-cases" className="text-sm text-gray-500 hover:text-gray-800 hidden sm:block">{en ? "Use Cases" : "Casos de uso"}</a>
             <a href="#contact" className="text-sm text-gray-500 hover:text-gray-800 hidden sm:block">{en ? "Contact" : "Contacto"}</a>
-            <Link href="/login"><button className="text-sm text-gray-600 hover:text-gray-900 px-3 py-1.5 rounded-lg hover:bg-black/5 transition-colors">{en ? "Sign In" : "Iniciar sesion"}</button></Link>
-            <Link href="/register"><button className="text-sm font-medium text-white bg-gray-900 hover:bg-gray-800 px-4 py-1.5 rounded-lg transition-colors">{en ? "Get Started" : "Comenzar"}</button></Link>
+            <Link href="/dashboard"><button className="flex items-center gap-1.5 text-sm font-medium text-white bg-gray-900 hover:bg-gray-800 px-4 py-1.5 rounded-lg transition-colors">{en ? "Open Builder" : "Abrir Constructor"} <ArrowRight className="w-3.5 h-3.5" /></button></Link>
           </div>
         </div>
       </nav>
@@ -68,9 +54,9 @@ export default function LandingPage() {
               : "El primer constructor de apps IA whitelabel del mundo. Totalmente personalizable, remarcable y revendible. Cambia el logo, pon tus precios, elige tu nicho — y lanza tu propio builder SaaS en minutos."}
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-            <Link href="/register">
+            <Link href="/dashboard">
               <button className="flex items-center gap-2 bg-gray-900 hover:bg-gray-800 text-white px-6 py-3 rounded-xl text-base font-medium transition-colors">
-                {en ? "Start Building" : "Empezar a crear"} <ArrowRight className="w-4 h-4" />
+                {en ? "Start Building — Free, No Sign Up" : "Empezar a crear — Gratis, sin registro"} <ArrowRight className="w-4 h-4" />
               </button>
             </Link>
             <a href="#contact">
@@ -248,7 +234,7 @@ export default function LandingPage() {
           </a>
           <p className="text-xs text-gray-400 mt-4">
             {en ? "Or try the builder right now:" : "O prueba el constructor ahora mismo:"}{" "}
-            <Link href="/register" className="text-gray-600 hover:text-gray-900 underline">{en ? "Create an account" : "Crea una cuenta"}</Link>
+            <Link href="/dashboard" className="text-gray-600 hover:text-gray-900 underline">{en ? "Open the builder" : "Abrir el constructor"}</Link>
           </p>
         </div>
       </section>
@@ -258,8 +244,7 @@ export default function LandingPage() {
         <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
           <img src={files.totalumLogo.url} alt="Totalum" className="h-5 object-contain" />
           <div className="flex items-center gap-4 text-xs text-gray-400">
-            <Link href="/login" className="hover:text-gray-600">{en ? "Sign In" : "Iniciar sesion"}</Link>
-            <Link href="/register" className="hover:text-gray-600">{en ? "Register" : "Registrarse"}</Link>
+            <Link href="/dashboard" className="hover:text-gray-600">{en ? "Open Builder" : "Abrir Constructor"}</Link>
             <a href="mailto:contacto@totalum.app" className="hover:text-gray-600">{en ? "Contact" : "Contacto"}</a>
             <Link href="/privacy-policy" className="hover:text-gray-600">{en ? "Privacy" : "Privacidad"}</Link>
           </div>
