@@ -9,7 +9,7 @@ import {
   Rocket, Loader2, Eye, Database, Key, Globe, Terminal,
   RefreshCw, Server, PanelLeftClose, PanelLeft, Monitor, Smartphone,
   ExternalLink, Sparkles, ChevronDown, FolderOpen, Plus, AlertTriangle,
-  Clock, X, Github, Code2,
+  Clock, X, Github, Code2, ArrowLeft,
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -98,6 +98,8 @@ export default function WorkspacePage() {
   const deployMenuRef = useRef<HTMLDivElement>(null);
 
   const mountedRef = useRef(true);
+  const sendingRef = useRef(false);
+  const autoSentRef = useRef(false);
   const pollingRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const resizeRef = useRef<{ startX: number; startWidth: number } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -228,16 +230,49 @@ export default function WorkspacePage() {
     init(); return () => { cancelled = true; stopAgentPolling(); };
   }, [projectId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleSendPrompt = async (files?: { name: string; url: string; imageDescription: string }[]) => {
-    if ((!prompt.trim() && (!files || files.length === 0)) || sending || project?.agentProcessStatus === "init") return;
+  // Core send routine — accepts an explicit prompt text so it can be driven both
+  // by the chat input and by the auto-submit flow (a project just created from the
+  // dashboard whose first prompt is carried over via sessionStorage).
+  const sendPromptText = useCallback(async (text: string, files?: { name: string; url: string; imageDescription: string }[]) => {
+    if ((!text.trim() && (!files || files.length === 0)) || sendingRef.current) return;
+    sendingRef.current = true;
     setSending(true);
-    setMessages((prev) => [...prev, { author: "user", message: prompt, messageType: "regular", createdAt: new Date().toISOString() }]);
-    const currentPrompt = prompt; setPrompt("");
-    const res = await api.post(`/api/vcaas/projects/${projectId}/agent/start`, { prompt: currentPrompt, inputFiles: files || [] });
+    setMessages((prev) => [...prev, { author: "user", message: text, messageType: "regular", createdAt: new Date().toISOString() }]);
+    setPrompt("");
+    const res = await api.post(`/api/vcaas/projects/${projectId}/agent/start`, { prompt: text, inputFiles: files || [] });
     if (res.ok) { setProject((prev) => prev ? { ...prev, agentProcessStatus: "init" } : prev); startAgentPolling(); }
-    else toast.error(res.error || "Failed to start agent");
+    else { toast.error(res.error || "Failed to start agent"); console.error("[Workspace] agent/start failed:", res.error); }
     setSending(false);
+    sendingRef.current = false;
+  }, [projectId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleSendPrompt = async (files?: { name: string; url: string; imageDescription: string }[]) => {
+    if (project?.agentProcessStatus === "init") return;
+    await sendPromptText(prompt, files);
   };
+
+  // Auto-submit the first prompt when arriving from the dashboard "Build" flow.
+  // The dashboard stashes the prompt (and any files) in sessionStorage keyed by
+  // projectId; once the project is loaded and idle, we send it automatically so
+  // the agent starts building right away.
+  useEffect(() => {
+    if (loading || !project || autoSentRef.current) return;
+    if (project.agentProcessStatus === "init") return;
+    const promptKey = `vibebuild:pendingPrompt:${projectId}`;
+    const pending = typeof window !== "undefined" ? sessionStorage.getItem(promptKey) : null;
+    if (!pending) return;
+    autoSentRef.current = true;
+    sessionStorage.removeItem(promptKey);
+    const filesKey = `vibebuild:pendingFiles:${projectId}`;
+    let files: { name: string; url: string; imageDescription: string }[] | undefined;
+    try {
+      const raw = sessionStorage.getItem(filesKey);
+      if (raw) files = JSON.parse(raw);
+    } catch (e) { console.error("[Workspace] Failed to parse pending files:", e); }
+    sessionStorage.removeItem(filesKey);
+    console.log("[Workspace] Auto-submitting first prompt for", projectId);
+    sendPromptText(pending, files);
+  }, [loading, project, projectId, sendPromptText]);
   const handleStopAgent = async () => { await api.post(`/api/vcaas/projects/${projectId}/agent/stop`, {}); toast.info("Stop signal sent"); };
   // Autofill the chat prompt with an edit instruction for the given file, then focus the chat.
   const handleAskAiEdit = useCallback((path: string) => {
@@ -344,6 +379,9 @@ export default function WorkspacePage() {
         <header className="flex items-stretch shrink-0 z-10" style={{ height: 48 }}>
           {/* LEFT: aside width */}
           <div className="flex items-center gap-1.5 px-3 shrink-0" style={{ width: typeof leftHeaderWidth === "number" ? leftHeaderWidth : undefined }}>
+            <Link href="/dashboard" title={t("back")} className="h-7 w-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-black/5 dark:hover:bg-white/10 transition-colors shrink-0">
+              <ArrowLeft className="w-4 h-4" />
+            </Link>
             <div className="relative flex-1 min-w-0" ref={menuRef}>
               <button onClick={() => setMenuOpen(!menuOpen)} className="flex items-center gap-1.5 max-w-full rounded-lg px-1.5 py-1 hover:bg-black/5 dark:hover:bg-white/10 transition-colors">
                 <div className="w-5 h-5 rounded bg-gray-900 dark:bg-white flex items-center justify-center shrink-0"><Sparkles className="w-2.5 h-2.5 text-white dark:text-gray-900" /></div>
@@ -489,6 +527,9 @@ export default function WorkspacePage() {
       <div className="flex sm:hidden flex-col h-full">
         {/* Mobile header */}
         <header className="flex items-center gap-1 px-2 shrink-0 z-10" style={{ height: 44 }}>
+          <Link href="/dashboard" title={t("back")} className="h-7 w-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-black/5 dark:hover:bg-white/10 transition-colors shrink-0">
+            <ArrowLeft className="w-4 h-4" />
+          </Link>
           <div className="relative" ref={menuRef}>
             <button onClick={() => setMenuOpen(!menuOpen)} className="flex items-center gap-1.5 px-1.5 py-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition-colors">
               <div className="w-5 h-5 rounded bg-gray-900 dark:bg-white flex items-center justify-center shrink-0"><Sparkles className="w-2.5 h-2.5 text-white dark:text-gray-900" /></div>
