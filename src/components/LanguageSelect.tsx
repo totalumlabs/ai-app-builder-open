@@ -4,9 +4,9 @@ import { useState, useRef, useEffect } from "react";
 import { Languages, Check, ChevronDown } from "lucide-react";
 import { useI18n, type Lang } from "@/lib/i18n";
 
-const LANGS: { code: Lang; label: string; flag: string; native: string }[] = [
-  { code: "en", label: "English", native: "English", flag: "🇬🇧" },
-  { code: "es", label: "Spanish", native: "Español", flag: "🇪🇸" },
+const LANGS: { code: Lang; label: string; native: string }[] = [
+  { code: "en", label: "English", native: "English" },
+  { code: "es", label: "Spanish", native: "Español" },
 ];
 
 interface LanguageSelectProps {
@@ -46,7 +46,6 @@ export function LanguageSelect({ variant = "button", dark = false }: LanguageSel
             l.code === lang ? "font-medium text-gray-900 dark:text-white" : "text-gray-600 dark:text-gray-300"
           }`}
         >
-          <span className="text-base leading-none">{l.flag}</span>
           <span className="flex-1 text-left">{l.native}</span>
           {l.code === lang && <Check className="w-4 h-4 text-violet-600 dark:text-violet-400" />}
         </button>
@@ -65,7 +64,6 @@ export function LanguageSelect({ variant = "button", dark = false }: LanguageSel
         >
           <span className="flex items-center gap-2.5"><Languages className="w-4 h-4 text-gray-400" /> {current.native}</span>
           <span className="flex items-center gap-1 text-xs text-gray-400">
-            <span className="text-sm">{current.flag}</span>
             <ChevronDown className={`w-3.5 h-3.5 transition-transform ${open ? "rotate-180" : ""}`} />
           </span>
         </button>
@@ -79,7 +77,6 @@ export function LanguageSelect({ variant = "button", dark = false }: LanguageSel
                   l.code === lang ? "font-medium text-gray-900 dark:text-white" : "text-gray-600 dark:text-gray-300"
                 }`}
               >
-                <span className="text-base leading-none">{l.flag}</span>
                 <span className="flex-1 text-left">{l.native}</span>
                 {l.code === lang && <Check className="w-4 h-4 text-violet-600 dark:text-violet-400" />}
               </button>
@@ -96,7 +93,6 @@ export function LanguageSelect({ variant = "button", dark = false }: LanguageSel
         onClick={() => setOpen(!open)}
         className="flex items-center gap-1.5 h-8 px-2.5 rounded-lg border border-gray-200 dark:border-gray-700 text-sm text-gray-600 dark:text-gray-300 hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
       >
-        <span className="text-sm">{current.flag}</span>
         <span className="hidden sm:inline">{current.native}</span>
         <ChevronDown className={`w-3.5 h-3.5 text-gray-400 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>

@@ -124,7 +124,7 @@ const translations = {
     darkMode: "Dark mode",
     lightMode: "Light mode",
     language: "Language",
-    restartServer: "Restart server",
+    restartServer: "Restart Agent Server",
     english: "English",
     spanish: "Spanish",
     // GitHub
@@ -393,7 +393,7 @@ const translations = {
     darkMode: "Modo oscuro",
     lightMode: "Modo claro",
     language: "Idioma",
-    restartServer: "Reiniciar servidor",
+    restartServer: "Reiniciar servidor del agente",
     english: "Ingls",
     spanish: "Espaol",
     // GitHub

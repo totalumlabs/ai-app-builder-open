@@ -354,6 +354,15 @@ function BuildGroup({ group, projectId, onTellAi, projectSecrets }: { group: Mes
         <div key={idx} className="text-xs text-gray-400 dark:text-gray-500 pl-4 py-0.5 border-l-2 border-gray-100 dark:border-gray-700">{msg.message}</div>
       ))}
 
+      {/* Live current build step — always visible while the run is in progress,
+          shows ONLY the latest step so the user sees progress without expanding. */}
+      {!isComplete && hasBuildMsgs && !expanded && (
+        <div className="flex items-start gap-1.5 text-xs text-gray-500 dark:text-gray-400 pl-4 py-0.5">
+          <Loader2 className="w-3 h-3 animate-spin text-gray-400 mt-0.5 shrink-0" />
+          <span className="min-w-0 break-words">{group.buildMsgs![group.buildMsgs!.length - 1].message}</span>
+        </div>
+      )}
+
       {/* Finish message - NO background at all */}
       {group.finishMsg && (
         <div className="py-1">
