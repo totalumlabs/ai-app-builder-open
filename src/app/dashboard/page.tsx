@@ -519,7 +519,7 @@ export default function DashboardPage() {
                                 <MoreVertical className="w-3.5 h-3.5" />
                               </button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-40">
+                            <DropdownMenuContent align="end" className="w-40" onClick={(e) => e.stopPropagation()}>
                               <DropdownMenuItem
                                 className="text-red-600 focus:text-red-600 focus:bg-red-50 cursor-pointer"
                                 onSelect={(e) => { e.preventDefault(); setDeleteTarget(p.projectId); }}
