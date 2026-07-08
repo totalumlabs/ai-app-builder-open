@@ -100,6 +100,12 @@ export default function WorkspacePage() {
   const mountedRef = useRef(true);
   const sendingRef = useRef(false);
   const autoSentRef = useRef(false);
+  // Guards the poll loop right after a new run is started: the server may still
+  // report the PREVIOUS run's "done"/"idle" for a moment, and concluding on that
+  // stale status would wipe the just-sent message and stop polling. We wait to
+  // actually observe "init" before allowing a "done"/"idle" to conclude the run.
+  const pendingRunRef = useRef(false);
+  const runWaitPollsRef = useRef(0);
   const pollingRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const resizeRef = useRef<{ startX: number; startWidth: number } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -186,7 +192,18 @@ export default function WorkspacePage() {
           return newAgentMsgs.length > 0 ? [...prev, ...newAgentMsgs] : prev;
         });
       }
-      if (res.data.status === "done" || res.data.status === "idle") {
+      // Once we actually observe the run running, clear the "just started" guard.
+      if (res.data.status === "init") { pendingRunRef.current = false; runWaitPollsRef.current = 0; }
+      const terminal = res.data.status === "done" || res.data.status === "idle";
+      // A run we just started may still show the previous run's terminal status.
+      // Keep polling (fast) until we see "init", so we don't prematurely conclude
+      // and wipe the freshly-sent user message via fetchConversation.
+      if (terminal && pendingRunRef.current) {
+        runWaitPollsRef.current += 1;
+        if (runWaitPollsRef.current < 4) { pollingRef.current = setTimeout(pollAgentOnce, 3000); return; }
+        pendingRunRef.current = false; // extremely fast/edge run — stop waiting and conclude
+      }
+      if (terminal) {
         const proj = await fetchProject(); await fetchConversation();
         if (proj && mountedRef.current) setPreviewKey((k) => k + 1); return;
       }
@@ -240,7 +257,11 @@ export default function WorkspacePage() {
     setMessages((prev) => [...prev, { author: "user", message: text, messageType: "regular", createdAt: new Date().toISOString() }]);
     setPrompt("");
     const res = await api.post(`/api/vcaas/projects/${projectId}/agent/start`, { prompt: text, inputFiles: files || [] });
-    if (res.ok) { setProject((prev) => prev ? { ...prev, agentProcessStatus: "init" } : prev); startAgentPolling(); }
+    if (res.ok) {
+      setProject((prev) => prev ? { ...prev, agentProcessStatus: "init" } : prev);
+      pendingRunRef.current = true; runWaitPollsRef.current = 0;
+      startAgentPolling();
+    }
     else { toast.error(res.error || "Failed to start agent"); console.error("[Workspace] agent/start failed:", res.error); }
     setSending(false);
     sendingRef.current = false;

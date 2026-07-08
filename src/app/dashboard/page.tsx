@@ -149,7 +149,7 @@ export default function DashboardPage() {
 
   // First-prompt "Build" flow
   const [firstPrompt, setFirstPrompt] = useState("");
-  const [attachedFiles, setAttachedFiles] = useState<{ name: string; url: string; imageDescription: string }[]>([]);
+  const [attachedFiles, setAttachedFiles] = useState<{ name: string; imageDescription: string; file: File }[]>([]);
   const [uploading, setUploading] = useState(false);
 
   // Name modal (opened after clicking Build)
@@ -294,20 +294,62 @@ export default function DashboardPage() {
       setBuildCreating(false);
       return;
     }
-    // Stash the first prompt (and files) so the workspace auto-submits it.
+    // Upload any attached files to the freshly-created project so the agent gets
+    // real, publicly-fetchable URLs (blob URLs from the browser can't be read by the
+    // agent and don't survive navigation). The upload endpoint needs the project to
+    // exist first, which is why this runs after creation.
+    let uploadedFiles: { name: string; url: string; imageDescription: string }[] = [];
+    if (attachedFiles.length > 0) {
+      setUploading(true);
+      uploadedFiles = await uploadFilesToProject(id, attachedFiles);
+      setUploading(false);
+      if (uploadedFiles.length < attachedFiles.length) {
+        console.error(`[Dashboard] Only ${uploadedFiles.length}/${attachedFiles.length} attachment(s) uploaded for`, id);
+      }
+    }
+    // Stash the first prompt (and uploaded files, with real URLs) so the workspace auto-submits it.
     try {
       sessionStorage.setItem(`vibebuild:pendingPrompt:${id}`, firstPrompt.trim());
-      if (attachedFiles.length > 0) sessionStorage.setItem(`vibebuild:pendingFiles:${id}`, JSON.stringify(attachedFiles));
+      if (uploadedFiles.length > 0) sessionStorage.setItem(`vibebuild:pendingFiles:${id}`, JSON.stringify(uploadedFiles));
     } catch (e) { console.error("[Dashboard] Failed to stash pending prompt:", e); }
     router.push(`/project/${id}`);
   };
 
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]; if (!file) return;
-    setUploading(true);
-    const tempUrl = URL.createObjectURL(file);
-    setAttachedFiles((prev) => [...prev, { name: file.name, url: tempUrl, imageDescription: file.name }]);
-    setUploading(false); e.target.value = "";
+  // Keep the raw File objects around — we can't upload here because the project
+  // doesn't exist yet, and blob URLs die on navigation. The real upload happens in
+  // confirmBuild once the project is created (see uploadFilesToProject).
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files ? Array.from(e.target.files) : [];
+    if (files.length === 0) return;
+    setAttachedFiles((prev) => [...prev, ...files.map((file) => ({ name: file.name, imageDescription: file.name, file }))]);
+    e.target.value = "";
+  };
+
+  // Upload picked files to a (now-existing) project, returning agent-ready
+  // { name, url, imageDescription } descriptors with real, publicly-fetchable URLs
+  // (only the ones that succeeded). Uses raw multipart fetch like the chat panel.
+  const uploadFilesToProject = async (
+    id: string,
+    files: { name: string; imageDescription: string; file: File }[],
+  ): Promise<{ name: string; url: string; imageDescription: string }[]> => {
+    const out: { name: string; url: string; imageDescription: string }[] = [];
+    for (const f of files) {
+      try {
+        const formData = new FormData();
+        formData.append("file", f.file);
+        const res = await fetch(`/api/vcaas/upload/${id}`, { method: "POST", body: formData });
+        const json = (await res.json()) as { ok: boolean; data?: { url: string; fileNameId: string }; error?: string };
+        if (json.ok && json.data?.url) {
+          out.push({ name: f.name, url: json.data.url, imageDescription: f.imageDescription });
+          console.log(`[Dashboard] Uploaded attachment "${f.name}" ->`, json.data.url);
+        } else {
+          console.error(`[Dashboard] Upload failed for "${f.name}":`, json.error);
+        }
+      } catch (err) {
+        console.error(`[Dashboard] Upload error for "${f.name}":`, err);
+      }
+    }
+    return out;
   };
 
   // Perform the actual deletion once the user confirms in the modal.
@@ -389,7 +431,7 @@ export default function DashboardPage() {
                 )}
                 <div className="flex items-center justify-between px-4 py-2.5 border-t border-gray-100/80">
                   <label className="cursor-pointer flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 transition-colors px-1.5 py-1 rounded-lg hover:bg-gray-50">
-                    <input type="file" className="hidden" onChange={handleFileSelect} accept="image/*,.pdf,.svg" />
+                    <input type="file" multiple className="hidden" onChange={handleFileSelect} accept="image/*,.pdf,.svg" />
                     {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Paperclip className="w-4 h-4" />}
                     <span className="hidden sm:inline">Attach</span>
                   </label>
