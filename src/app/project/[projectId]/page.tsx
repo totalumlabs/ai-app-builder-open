@@ -9,7 +9,7 @@ import {
   Rocket, Loader2, Eye, Database, Key, Globe, Terminal,
   RefreshCw, Server, PanelLeftClose, PanelLeft, Monitor, Smartphone,
   ExternalLink, Sparkles, ChevronDown, FolderOpen, Plus, AlertTriangle,
-  Clock, X, Github,
+  Clock, X, Github, Code2,
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -22,6 +22,7 @@ import { SecretsPanel } from "@/components/workspace/SecretsPanel";
 import { DomainPanel } from "@/components/workspace/DomainPanel";
 import { LogsPanel } from "@/components/workspace/LogsPanel";
 import { GithubPanel } from "@/components/workspace/GithubPanel";
+import { CodePanel } from "@/components/workspace/CodePanel";
 import { LanguageSelect } from "@/components/LanguageSelect";
 import type { VcaasProject, AgentStatus, ConversationMessage, GithubStatus } from "@/lib/vcaas-types";
 
@@ -58,12 +59,14 @@ export default function WorkspacePage() {
 
   const TABS = [
     { id: "preview", label: t("preview"), icon: Eye },
+    { id: "code", label: t("code"), icon: Code2 },
     { id: "database", label: t("database"), icon: Database },
   ];
 
   // All tabs for mobile menu (includes versions/secrets/domain/github/logs)
   const ALL_TABS = [
     { id: "preview", label: t("preview"), icon: Eye },
+    { id: "code", label: t("code"), icon: Code2 },
     { id: "database", label: t("database"), icon: Database },
     { id: "versions", label: t("versions"), icon: Clock },
     { id: "secrets", label: t("secrets"), icon: Key },
@@ -459,6 +462,7 @@ export default function WorkspacePage() {
           <div className="flex-1 flex flex-col min-w-0">
             <div className={`flex-1 overflow-hidden ${activeTab === "preview" ? "rounded-none" : "m-2 sm:m-3 rounded-xl shadow-sm"}`} style={{ background: cardBg }}>
               {activeTab === "preview" && <PreviewPanel key={previewKey} previewUrl={previewUrl} cached={previewCached} onRefresh={() => { fetchProject(); setPreviewKey((k) => k + 1); }} loading={isBuilding} mobilePreview={mobilePreview} iframePath={iframePath} />}
+              {activeTab === "code" && <CodePanel projectId={projectId} darkMode={darkMode} />}
               {activeTab === "database" && <DatabasePanel projectId={projectId} />}
               {activeTab === "versions" && <VersionsPanel projectId={projectId} onVersionRestored={() => fetchProject()} />}
               {activeTab === "secrets" && <SecretsPanel projectId={projectId} secrets={project.secrets || []} onSecretsChanged={() => fetchProject()} />}
@@ -494,6 +498,7 @@ export default function WorkspacePage() {
           ) : (
             <div className="h-full overflow-hidden">
               {activeTab === "preview" && <PreviewPanel key={previewKey} previewUrl={previewUrl} cached={previewCached} onRefresh={() => { fetchProject(); setPreviewKey((k) => k + 1); }} loading={isBuilding} mobilePreview={false} iframePath={iframePath} />}
+              {activeTab === "code" && <CodePanel projectId={projectId} darkMode={darkMode} />}
               {activeTab === "database" && <DatabasePanel projectId={projectId} />}
               {activeTab === "versions" && <VersionsPanel projectId={projectId} onVersionRestored={() => fetchProject()} />}
               {activeTab === "secrets" && <SecretsPanel projectId={projectId} secrets={project.secrets || []} onSecretsChanged={() => fetchProject()} />}

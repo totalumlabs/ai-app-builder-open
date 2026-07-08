@@ -127,6 +127,16 @@ const translations = {
     restartServer: "Restart Agent Server",
     english: "English",
     spanish: "Spanish",
+    // Code explorer tab
+    code: "Code",
+    codeExplorer: "Code Explorer",
+    refreshCode: "Refresh",
+    loadingCode: "Loading source code...",
+    codeLoadFailed: "Failed to load source code",
+    retry: "Retry",
+    selectFileHint: "Select a file to view its contents",
+    previewNotAvailable: "Preview not available for this file type",
+    filesCount: "files",
     // GitHub
     github: "GitHub",
     connected: "Connected",
@@ -396,6 +406,16 @@ const translations = {
     restartServer: "Reiniciar servidor del agente",
     english: "Ingls",
     spanish: "Espaol",
+    // Code explorer tab
+    code: "Código",
+    codeExplorer: "Explorador de código",
+    refreshCode: "Actualizar",
+    loadingCode: "Cargando código fuente...",
+    codeLoadFailed: "No se pudo cargar el código fuente",
+    retry: "Reintentar",
+    selectFileHint: "Selecciona un archivo para ver su contenido",
+    previewNotAvailable: "Vista previa no disponible para este tipo de archivo",
+    filesCount: "archivos",
     // GitHub
     github: "GitHub",
     connected: "Conectado",
