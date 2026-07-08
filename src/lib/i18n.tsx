@@ -215,6 +215,30 @@ const translations = {
     connectDomainDesc: "Use a subdomain like app.yourdomain.com",
     deployFirst: "Your project must be deployed before adding a domain. DNS records will be shown after connecting.",
     configureDns: "Configure these DNS records at your domain provider",
+    dnsPropagation: "DNS changes can take up to 5 hours to propagate. Your domain will go live automatically once the records are verified.",
+    // Deploy / publish
+    deployNow: "Deploy now",
+    deployHint: "Building & deploying takes ~3 minutes. You can keep working meanwhile.",
+    deployStarted: "Deploying… this takes ~3 minutes",
+    deployedToast: "Published successfully!",
+    deployFailedToast: "Deployment failed",
+    liveNow: "Live now",
+    notPublishedYet: "Not published yet",
+    publishedMsg: "🚀 Your app is now live at",
+    domainStatusLabel: "Domain status",
+    openLive: "Open live site",
+    // Database CMS
+    editRecord: "Edit Record",
+    deleteRecord: "Delete Record",
+    confirmDelete: "Delete this record? This cannot be undone.",
+    recordUpdated: "Record updated",
+    recordDeleted: "Record deleted",
+    recordCreated: "Record created",
+    actions: "Actions",
+    noEditableFields: "No editable fields",
+    dataView: "Data",
+    schemaView: "Schema",
+    downloadFile: "Download",
     noPreview: "No preview yet",
     sendPrompt: "Send a prompt to start building",
     buildingApp: "Building your app...",
@@ -458,6 +482,30 @@ const translations = {
     connectDomainDesc: "Usa un subdominio como app.tudominio.com",
     deployFirst: "Tu proyecto debe estar desplegado antes de aadir un dominio.",
     configureDns: "Configura estos registros DNS en tu proveedor de dominio",
+    dnsPropagation: "Los cambios DNS pueden tardar hasta 5 horas en propagarse. Tu dominio se activará automáticamente cuando se verifiquen los registros.",
+    // Deploy / publish
+    deployNow: "Desplegar ahora",
+    deployHint: "Construir y desplegar tarda ~3 minutos. Puedes seguir trabajando mientras tanto.",
+    deployStarted: "Desplegando… esto tarda ~3 minutos",
+    deployedToast: "¡Publicado con éxito!",
+    deployFailedToast: "El despliegue falló",
+    liveNow: "En vivo ahora",
+    notPublishedYet: "Aún no publicado",
+    publishedMsg: "🚀 Tu app ya está en vivo en",
+    domainStatusLabel: "Estado del dominio",
+    openLive: "Abrir sitio en vivo",
+    // Database CMS
+    editRecord: "Editar registro",
+    deleteRecord: "Eliminar registro",
+    confirmDelete: "¿Eliminar este registro? Esto no se puede deshacer.",
+    recordUpdated: "Registro actualizado",
+    recordDeleted: "Registro eliminado",
+    recordCreated: "Registro creado",
+    actions: "Acciones",
+    noEditableFields: "Sin campos editables",
+    dataView: "Datos",
+    schemaView: "Esquema",
+    downloadFile: "Descargar",
     noPreview: "Sin vista previa an",
     sendPrompt: "Enva un prompt para empezar a construir",
     buildingApp: "Construyendo tu app...",
@@ -518,8 +566,19 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
   const [lang, setLangState] = useState<Lang>("en");
 
   useEffect(() => {
-    const saved = localStorage.getItem("vibebuild-lang") as Lang;
-    if (saved && (saved === "en" || saved === "es")) setLangState(saved);
+    // 1) If the user already picked a language, always honor it.
+    const saved = localStorage.getItem("vibebuild-lang") as Lang | null;
+    if (saved && (saved === "en" || saved === "es")) {
+      setLangState(saved);
+      return;
+    }
+    // 2) First visit only: default is English, but if the browser is in
+    //    Spanish switch to Spanish once, then persist so it never auto-changes again.
+    const browserLang = (typeof navigator !== "undefined" ? navigator.language || "" : "").toLowerCase();
+    const initial: Lang = browserLang.startsWith("es") ? "es" : "en";
+    console.log("[i18n] First visit — browser lang:", browserLang || "(unknown)", "→ using:", initial);
+    setLangState(initial);
+    localStorage.setItem("vibebuild-lang", initial);
   }, []);
 
   const setLang = useCallback((l: Lang) => {

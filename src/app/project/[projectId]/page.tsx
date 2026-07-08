@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import {
   Rocket, Loader2, Eye, Database, Key, Globe, Terminal,
   RefreshCw, Server, PanelLeftClose, PanelLeft, Monitor, Smartphone,
-  ExternalLink, Sparkles, ChevronDown, FolderOpen, Plus, Languages,
+  ExternalLink, Sparkles, ChevronDown, FolderOpen, Plus, AlertTriangle,
   Clock, X, Github,
 } from "lucide-react";
 import Link from "next/link";
@@ -22,6 +22,7 @@ import { SecretsPanel } from "@/components/workspace/SecretsPanel";
 import { DomainPanel } from "@/components/workspace/DomainPanel";
 import { LogsPanel } from "@/components/workspace/LogsPanel";
 import { GithubPanel } from "@/components/workspace/GithubPanel";
+import { LanguageSelect } from "@/components/LanguageSelect";
 import type { VcaasProject, AgentStatus, ConversationMessage } from "@/lib/vcaas-types";
 
 // Pick the correct development preview URL following the VCaaS docs:
@@ -38,11 +39,22 @@ function isCachedPreview(proj: VcaasProject): boolean {
   return proj.developmentUrlFieldToUse === "cachedDevelopmentUrl";
 }
 
+// Colour + label for a custom-domain status, used in the deploy popup.
+function domainStatusMeta(status: string | undefined, es: boolean): { color: string; label: string } {
+  switch (status) {
+    case "active": return { color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400", label: es ? "Activo" : "Active" };
+    case "pending_validation": return { color: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400", label: es ? "DNS pendiente" : "Pending DNS" };
+    case "pending_deployment": return { color: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400", label: es ? "Desplegando" : "Deploying" };
+    case "blocked": return { color: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400", label: es ? "Bloqueado" : "Blocked" };
+    default: return { color: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400", label: status || (es ? "Pendiente" : "Pending") };
+  }
+}
+
 export default function WorkspacePage() {
   const params = useParams();
   const router = useRouter();
   const projectId = params.projectId as string;
-  const { t, lang, setLang } = useI18n();
+  const { t, lang } = useI18n();
 
   const TABS = [
     { id: "preview", label: t("preview"), icon: Eye },
@@ -175,8 +187,23 @@ export default function WorkspacePage() {
     const res = await api.get<{ status: string }>(`/api/vcaas/projects/${projectId}/deployments/status`);
     if (!mountedRef.current) return;
     if (res.ok && res.data) {
-      if (res.data.status === "success") { setDeploying(false); toast.success(lang === "es" ? "Desplegado!" : "Deployed!"); fetchProject(); return; }
-      if (res.data.status === "error") { setDeploying(false); toast.error(lang === "es" ? "Despliegue fallido" : "Deploy failed"); return; }
+      if (res.data.status === "success") {
+        setDeploying(false);
+        toast.success(t("deployedToast"));
+        const proj = await fetchProject();
+        // Surface the deploy result in the chat and pull the latest conversation.
+        const liveUrl = proj?.productionProjectUrl || project?.productionProjectUrl || `${projectId}.totalum-project.com`;
+        setMessages((prev) => [...prev, {
+          author: "agent",
+          message: `${t("publishedMsg")} https://${liveUrl}`,
+          messageType: "finished",
+          createdAt: new Date().toISOString(),
+        }]);
+        fetchConversation();
+        console.log("[Deploy] Success. Live at:", liveUrl);
+        return;
+      }
+      if (res.data.status === "error") { setDeploying(false); toast.error(t("deployFailedToast")); console.error("[Deploy] Failed for project:", projectId); return; }
     }
     setTimeout(pollDeployOnce, 10000);
   }
@@ -206,7 +233,7 @@ export default function WorkspacePage() {
   const handleDeploy = async () => {
     if (deploying) return; setDeploying(true);
     const res = await api.post(`/api/vcaas/projects/${projectId}/deployments/deploy`, {});
-    if (res.ok) { toast.success(lang === "es" ? "Desplegando..." : "Deploying..."); pollDeployOnce(); }
+    if (res.ok) { toast.success(t("deployStarted")); pollDeployOnce(); }
     else { toast.error(res.error || "Failed to deploy"); setDeploying(false); }
   };
   const handleRestartServer = async () => {
@@ -216,6 +243,11 @@ export default function WorkspacePage() {
   };
 
   const isBuilding = project?.agentProcessStatus === "init";
+  // Publish/live state for the deploy popup.
+  const isPublished = project?.deployment?.status === "success";
+  const publishedUrl = project?.productionProjectUrl || `${projectId}.totalum-project.com`;
+  const hasDomain = !!project?.customDomain?.hostname;
+  const domainActive = project?.customDomain?.status === "active";
   const leftHeaderWidth = chatCollapsed ? "auto" : chatWidth + 5;
   const pageBg = darkMode ? "#1a1a1a" : "#fcfbf8";
   const cardBg = darkMode ? "#222" : "#fff";
@@ -266,11 +298,7 @@ export default function WorkspacePage() {
           className="w-full sm:hidden flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-black/5 dark:hover:bg-white/10 transition-colors text-gray-700 dark:text-gray-200">
           <Rocket className="w-4 h-4 text-gray-400" /> {deploying ? t("deploying") : t("publish")}
         </button>
-        <button onClick={() => { setLang(lang === "en" ? "es" : "en"); setMenuOpen(false); }}
-          className="w-full flex items-center justify-between px-3 py-2 text-sm hover:bg-black/5 dark:hover:bg-white/10 transition-colors text-gray-700 dark:text-gray-200">
-          <span className="flex items-center gap-2.5"><Languages className="w-4 h-4 text-gray-400" /> {t("language")}</span>
-          <span className="text-xs text-gray-400">{lang === "en" ? "EN" : "ES"}</span>
-        </button>
+        <LanguageSelect variant="menu" dark={darkMode} />
       </div>
       <div className="border-t py-1" style={{ borderColor: darkMode ? "#444" : "#eee" }}>
         <button onClick={() => { handleRestartServer(); setMenuOpen(false); }}
@@ -337,6 +365,12 @@ export default function WorkspacePage() {
               <Button size="sm" onClick={() => setDeployMenuOpen(!deployMenuOpen)} disabled={deploying || isBuilding} className={`bg-gray-900 dark:bg-white hover:bg-gray-800 dark:hover:bg-gray-100 text-white dark:text-gray-900 h-7 text-sm rounded-lg px-3 border ${btnBorder}`}>
                 {deploying ? <><Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />{t("deploying")}</> : <><Rocket className="w-3.5 h-3.5 mr-1" />{t("publish")}</>}
               </Button>
+              {/* Small "takes ~3 min" caption while deploying */}
+              {deploying && (
+                <span className="absolute top-full right-0 mt-1 flex items-center gap-1 text-[10px] text-gray-400 whitespace-nowrap">
+                  <Clock className="w-2.5 h-2.5" />{t("deployStarted")}
+                </span>
+              )}
               {deployMenuOpen && (
                 <div data-deploy-menu className="absolute top-full right-0 mt-1.5 w-72 rounded-xl shadow-xl z-[60] overflow-hidden" style={{ background: darkMode ? "#2a2a2a" : "#fff", border: `1px solid ${darkMode ? "#444" : "#e5e5e5"}` }}>
                   <div className="px-3 py-2 border-b flex items-center justify-between" style={{ borderColor: darkMode ? "#444" : "#eee" }}>
@@ -344,22 +378,56 @@ export default function WorkspacePage() {
                     <button onClick={() => setDeployMenuOpen(false)} className="text-gray-400 hover:text-gray-600"><X className="w-3.5 h-3.5" /></button>
                   </div>
                   <div className="p-3 space-y-2">
+                    {/* Current live URL — only when the project has been published */}
+                    {isPublished ? (
+                      <div className="rounded-lg border border-emerald-100 dark:border-emerald-900/40 bg-emerald-50 dark:bg-emerald-900/20 px-3 py-2.5">
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                          <span className="text-[10px] font-medium text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">{t("liveNow")}{domainActive ? " · " + (lang === "es" ? "dominio" : "domain") : ""}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <code className="text-xs font-mono text-emerald-800 dark:text-emerald-300 flex-1 truncate">{publishedUrl}</code>
+                          <a href={`https://${publishedUrl}`} target="_blank" rel="noopener noreferrer" title={t("openLive")} className="text-emerald-600 hover:text-emerald-800 dark:hover:text-emerald-300 shrink-0"><ExternalLink className="w-3.5 h-3.5" /></a>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="rounded-lg border border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/40 px-3 py-2 text-[11px] text-gray-400">
+                        {t("notPublishedYet")}
+                      </div>
+                    )}
+
                     <button onClick={() => { handleDeploy(); setDeployMenuOpen(false); }} disabled={deploying || isBuilding}
-                      className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition-colors text-gray-700 dark:text-gray-200 border border-gray-100 dark:border-gray-700">
-                      <Rocket className="w-4 h-4 text-gray-400" />
-                      <div className="text-left">
-                        <p className="font-medium">{lang === "en" ? "Deploy now" : "Desplegar ahora"}</p>
-                        <p className="text-xs text-gray-400">{project?.productionProjectUrl || `${projectId}.totalum-project.com`}</p>
+                      className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition-colors text-gray-700 dark:text-gray-200 border border-gray-100 dark:border-gray-700 disabled:opacity-50">
+                      <Rocket className="w-4 h-4 text-gray-400 shrink-0" />
+                      <div className="text-left min-w-0">
+                        <p className="font-medium">{t("deployNow")}</p>
+                        <p className="text-xs text-gray-400 truncate">{publishedUrl}</p>
                       </div>
                     </button>
+                    {/* ~3 minute hint */}
+                    <p className="flex items-start gap-1.5 text-[10px] text-gray-400 px-1 leading-snug">
+                      <Clock className="w-3 h-3 mt-px shrink-0" />{t("deployHint")}
+                    </p>
+
                     <button onClick={() => { setActiveTab("domain"); setDeployMenuOpen(false); }}
                       className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition-colors text-gray-700 dark:text-gray-200 border border-gray-100 dark:border-gray-700">
-                      <Globe className="w-4 h-4 text-gray-400" />
-                      <div className="text-left">
-                        <p className="font-medium">{lang === "en" ? "Custom domain" : "Dominio personalizado"}</p>
-                        <p className="text-xs text-gray-400">{project?.customDomain?.hostname || (lang === "en" ? "Configure your domain" : "Configura tu dominio")}</p>
+                      <Globe className="w-4 h-4 text-gray-400 shrink-0" />
+                      <div className="text-left flex-1 min-w-0">
+                        <p className="font-medium">{t("customDomain")}</p>
+                        <p className="text-xs text-gray-400 truncate">{project?.customDomain?.hostname || (lang === "en" ? "Configure your domain" : "Configura tu dominio")}</p>
                       </div>
+                      {hasDomain && (
+                        <span className={`shrink-0 text-[9px] font-medium px-1.5 py-0.5 rounded-full ${domainStatusMeta(project?.customDomain?.status, lang === "es").color}`}>
+                          {domainStatusMeta(project?.customDomain?.status, lang === "es").label}
+                        </span>
+                      )}
                     </button>
+                    {/* When a domain is added but not yet live, remind about propagation */}
+                    {hasDomain && !domainActive && (
+                      <p className="flex items-start gap-1.5 text-[10px] text-amber-600 dark:text-amber-400 px-1 leading-snug">
+                        <AlertTriangle className="w-3 h-3 mt-px shrink-0" />{t("dnsPropagation")}
+                      </p>
+                    )}
                   </div>
                 </div>
               )}

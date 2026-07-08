@@ -41,8 +41,14 @@ import {
   ArrowUp,
   ArrowDown,
   Trash2,
+  Pencil,
+  FileText,
+  Download,
+  ExternalLink,
+  ImageIcon,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useI18n } from "@/lib/i18n";
 import type { DbTable, DbProperty } from "@/lib/vcaas-types";
 
 interface DatabasePanelProps {
@@ -114,14 +120,85 @@ function getPropertyTypeColor(type: string): string {
   return colors[type] || "bg-gray-100 text-gray-700";
 }
 
-function formatCellValue(value: unknown, type: string): string {
-  if (value === null || value === undefined) return "\u2014";
-  if (type === "date" && value) {
-    try { return new Date(value as string).toLocaleDateString(); } catch { return String(value); }
+// Detect image files by extension, from either the url or the stored name.
+function isImageSource(s: string): boolean {
+  return /\.(png|jpe?g|gif|webp|svg|bmp|avif|heic)(\?|$)/i.test(s);
+}
+function fileExt(s: string): string {
+  const m = s.split("?")[0].match(/\.([a-z0-9]+)$/i);
+  return m ? m[1].toLowerCase() : "";
+}
+
+// Renders a single Totalum file object ({ name, url }) by its type:
+// images \u2192 thumbnail, everything else \u2192 typed icon + open/download link.
+function FileChip({ file }: { file: { name?: string; url?: string } }) {
+  const url = file?.url;
+  const name = file?.name || "file";
+  if (!url) return <span className="text-gray-500 text-xs">{name}</span>;
+  const img = isImageSource(url) || isImageSource(name);
+  if (img) {
+    return (
+      <a href={url} target="_blank" rel="noopener noreferrer" title={name} className="inline-block group/img relative">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={url} alt={name} className="w-9 h-9 rounded-md object-cover border border-gray-200 dark:border-gray-700 group-hover/img:ring-2 group-hover/img:ring-violet-300 transition" />
+      </a>
+    );
   }
-  if (type === "file" && typeof value === "object" && value !== null) return (value as { name?: string }).name || "File";
-  if (type === "objectReference" && typeof value === "object" && value !== null) return (value as { _id?: string })._id || JSON.stringify(value);
-  if (typeof value === "object") return JSON.stringify(value);
+  const ext = fileExt(url) || fileExt(name);
+  const isPdf = ext === "pdf";
+  return (
+    <a href={url} target="_blank" rel="noopener noreferrer" title={name}
+      className="inline-flex items-center gap-1.5 max-w-[160px] px-2 py-1 rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+      {isPdf ? <FileText className="w-3.5 h-3.5 text-red-500 shrink-0" /> : <FileText className="w-3.5 h-3.5 text-gray-400 shrink-0" />}
+      <span className="text-[11px] text-gray-600 dark:text-gray-300 truncate">{name}</span>
+      <Download className="w-3 h-3 text-gray-400 shrink-0" />
+    </a>
+  );
+}
+
+// Rich, type-aware table cell renderer.
+function CellRenderer({ value, type }: { value: unknown; type: string }) {
+  if (value === null || value === undefined || value === "") {
+    return <span className="text-gray-300 dark:text-gray-600">\u2014</span>;
+  }
+  if (type === "file") {
+    const files = Array.isArray(value) ? value : [value];
+    const valid = files.filter((f) => f && typeof f === "object");
+    if (valid.length === 0) return <span className="text-gray-300">\u2014</span>;
+    return (
+      <div className="flex items-center gap-1.5 flex-wrap">
+        {valid.slice(0, 4).map((f, i) => <FileChip key={i} file={f as { name?: string; url?: string }} />)}
+        {valid.length > 4 && <span className="text-[10px] text-gray-400">+{valid.length - 4}</span>}
+      </div>
+    );
+  }
+  if (type === "options") {
+    return <span className="inline-block text-[11px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 font-medium">{String(value)}</span>;
+  }
+  if (type === "objectReference") {
+    if (typeof value === "object" && value !== null) {
+      const ref = value as Record<string, unknown>;
+      const label = (ref.name || ref.title || ref.label || ref._id || "") as string;
+      return <span className="inline-flex items-center gap-1 text-violet-600 dark:text-violet-400"><ArrowRight className="w-3 h-3" />{String(label)}</span>;
+    }
+    return <span className="inline-flex items-center gap-1 text-violet-600 dark:text-violet-400"><ArrowRight className="w-3 h-3" />{String(value)}</span>;
+  }
+  if (type === "date") {
+    try { return <span>{new Date(value as string).toLocaleString()}</span>; } catch { return <span>{String(value)}</span>; }
+  }
+  if (typeof value === "boolean") {
+    return <span className={`text-[11px] px-1.5 py-0.5 rounded font-medium ${value ? "bg-emerald-100 text-emerald-700" : "bg-gray-100 text-gray-500"}`}>{value ? "true" : "false"}</span>;
+  }
+  if (typeof value === "object") return <span className="font-mono text-[11px]">{JSON.stringify(value)}</span>;
+  return <span>{String(value)}</span>;
+}
+
+// Plain-text version for inputs / edit prefills.
+function toEditableString(value: unknown, type: string): string {
+  if (value === null || value === undefined) return "";
+  if (type === "objectReference" && typeof value === "object" && value !== null) return (value as { _id?: string })._id || "";
+  if (type === "date" && value) { try { return new Date(value as string).toISOString().slice(0, 10); } catch { return String(value); } }
+  if (typeof value === "object") return "";
   return String(value);
 }
 
@@ -218,6 +295,7 @@ function FilterBar({ properties, filters, onChange }: {
 
 // --- Main Component ---
 export function DatabasePanel({ projectId }: DatabasePanelProps) {
+  const { t } = useI18n();
   const [tables, setTables] = useState<DbTable[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedTable, setSelectedTable] = useState<string>("");
@@ -227,6 +305,13 @@ export function DatabasePanel({ projectId }: DatabasePanelProps) {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [newRecord, setNewRecord] = useState<Record<string, string>>({});
   const [creating, setCreating] = useState(false);
+
+  // Edit / delete state
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editValues, setEditValues] = useState<Record<string, string>>({});
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   // Pagination
   const [page, setPage] = useState(1);
@@ -252,9 +337,9 @@ export function DatabasePanel({ projectId }: DatabasePanelProps) {
     setLoading(true);
     const res = await api.get<{ tables: DbTable[] }>(`/api/vcaas/projects/${projectId}/database/tables-structure`);
     if (res.ok && res.data) {
-      const t = res.data.tables || [];
-      setTables(t);
-      if (t.length > 0 && !selectedTable) setSelectedTable(t[0].type);
+      const tbls = res.data.tables || [];
+      setTables(tbls);
+      if (tbls.length > 0 && !selectedTable) setSelectedTable(tbls[0].type);
     }
     setLoading(false);
   }, [projectId]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -341,8 +426,58 @@ export function DatabasePanel({ projectId }: DatabasePanelProps) {
       setCreateDialogOpen(false);
       setNewRecord({});
       fetchRecords(selectedTable, page, { field: sortField, dir: sortDir }, appliedFilters, appliedSearch);
-    } else toast.error("Failed to create record");
+    } else toast.error(res.error || "Failed to create record");
     setCreating(false);
+  };
+
+  const openEditDialog = (record: Record<string, unknown>) => {
+    const id = record._id as string;
+    const values: Record<string, string> = {};
+    currentProperties
+      .filter((p) => !["_id", "createdAt", "updatedAt"].includes(p.name) && p.propertyType !== "file")
+      .forEach((p) => { values[p.name] = toEditableString(record[p.name], p.propertyType); });
+    setEditValues(values);
+    setEditingId(id);
+    setEditDialogOpen(true);
+  };
+
+  const handleEditRecord = async () => {
+    if (!selectedTable || !editingId) return;
+    setSaving(true);
+    console.log("[DB] Updating record", editingId, "in", selectedTable);
+    const res = await api.patch(`/api/vcaas/projects/${projectId}/database/records/${editingId}`, {
+      tableName: selectedTable,
+      data: editValues,
+    });
+    if (res.ok) {
+      toast.success(t("recordUpdated"));
+      setEditDialogOpen(false);
+      setEditingId(null);
+      fetchRecords(selectedTable, page, { field: sortField, dir: sortDir }, appliedFilters, appliedSearch);
+    } else {
+      console.error("[DB] Update failed:", res.error);
+      toast.error(res.error || "Failed to update record");
+    }
+    setSaving(false);
+  };
+
+  const handleDeleteRecord = async (record: Record<string, unknown>) => {
+    const id = record._id as string;
+    if (!id || !selectedTable) return;
+    if (!confirm(t("confirmDelete"))) return;
+    setDeletingId(id);
+    console.log("[DB] Deleting record", id, "from", selectedTable);
+    const res = await api.delete(`/api/vcaas/projects/${projectId}/database/records/${id}?tableName=${encodeURIComponent(selectedTable)}`);
+    if (res.ok) {
+      toast.success(t("recordDeleted"));
+      // If we just removed the last row on a page, step back a page.
+      if (records.length === 1 && page > 1) setPage(page - 1);
+      else fetchRecords(selectedTable, page, { field: sortField, dir: sortDir }, appliedFilters, appliedSearch);
+    } else {
+      console.error("[DB] Delete failed:", res.error);
+      toast.error(res.error || "Failed to delete record");
+    }
+    setDeletingId(null);
   };
 
   const handleApplyFilters = () => {
@@ -403,11 +538,11 @@ export function DatabasePanel({ projectId }: DatabasePanelProps) {
       {/* Toolbar */}
       <div className="px-4 py-2.5 border-b bg-white dark:bg-gray-900 flex items-center gap-2 flex-wrap">
         <div className="flex bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5">
-          <button onClick={() => setActiveView("schema")} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${activeView === "schema" ? "bg-white dark:bg-gray-700 shadow text-gray-900 dark:text-white" : "text-gray-500"}`}>
-            <Layers className="w-3.5 h-3.5" /> Schema
-          </button>
           <button onClick={() => setActiveView("data")} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${activeView === "data" ? "bg-white dark:bg-gray-700 shadow text-gray-900 dark:text-white" : "text-gray-500"}`}>
-            <Grid3X3 className="w-3.5 h-3.5" /> Data
+            <Grid3X3 className="w-3.5 h-3.5" /> {t("dataView")}
+          </button>
+          <button onClick={() => setActiveView("schema")} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${activeView === "schema" ? "bg-white dark:bg-gray-700 shadow text-gray-900 dark:text-white" : "text-gray-500"}`}>
+            <Layers className="w-3.5 h-3.5" /> {t("schemaView")}
           </button>
         </div>
 
@@ -415,7 +550,7 @@ export function DatabasePanel({ projectId }: DatabasePanelProps) {
           <>
             <Select value={selectedTable} onValueChange={handleTableChange}>
               <SelectTrigger className="w-[160px] h-8 text-xs"><SelectValue placeholder="Select table" /></SelectTrigger>
-              <SelectContent>{tables.map((t) => <SelectItem key={t.type} value={t.type}>{t.label || t.type}</SelectItem>)}</SelectContent>
+              <SelectContent>{tables.map((tbl) => <SelectItem key={tbl.type} value={tbl.type}>{tbl.label || tbl.type}</SelectItem>)}</SelectContent>
             </Select>
 
             {/* Quick search */}
@@ -462,19 +597,58 @@ export function DatabasePanel({ projectId }: DatabasePanelProps) {
               <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
                 <DialogHeader><DialogTitle>New {currentTable?.label || selectedTable} Record</DialogTitle></DialogHeader>
                 <div className="space-y-3 mt-3">
-                  {currentProperties.filter((p) => !["_id", "createdAt", "updatedAt"].includes(p.name)).map((prop) => (
+                  {currentProperties.filter((p) => !["_id", "createdAt", "updatedAt"].includes(p.name) && p.propertyType !== "file").map((prop) => (
                     <div key={prop.id}>
                       <Label className="text-xs text-gray-600">{prop.label || prop.name} <span className="text-gray-400">({prop.propertyType})</span></Label>
-                      <Input className="mt-1 h-8 text-sm" placeholder={`Enter ${prop.label || prop.name}`} value={newRecord[prop.name] || ""} onChange={(e) => setNewRecord((prev) => ({ ...prev, [prop.name]: e.target.value }))} />
+                      <Input
+                        className="mt-1 h-8 text-sm"
+                        type={prop.propertyType === "number" ? "number" : prop.propertyType === "date" ? "date" : "text"}
+                        placeholder={prop.propertyType === "objectReference" ? "Referenced record _id" : `Enter ${prop.label || prop.name}`}
+                        value={newRecord[prop.name] || ""}
+                        onChange={(e) => setNewRecord((prev) => ({ ...prev, [prop.name]: e.target.value }))}
+                      />
                     </div>
                   ))}
+                  {currentProperties.some((p) => p.propertyType === "file") && (
+                    <p className="text-[10px] text-gray-400 flex items-center gap-1"><ImageIcon className="w-3 h-3" /> File fields are uploaded by your app and can be viewed in the table.</p>
+                  )}
                   <Button className="w-full" size="sm" onClick={handleCreateRecord} disabled={creating}>
-                    {creating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Plus className="w-4 h-4 mr-2" />} Create
+                    {creating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Plus className="w-4 h-4 mr-2" />} {t("create")}
                   </Button>
                 </div>
               </DialogContent>
             </Dialog>
           )}
+
+          {/* Edit record dialog (controlled) */}
+          <Dialog open={editDialogOpen} onOpenChange={(o) => { setEditDialogOpen(o); if (!o) setEditingId(null); }}>
+            <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+              <DialogHeader><DialogTitle>{t("editRecord")} · {currentTable?.label || selectedTable}</DialogTitle></DialogHeader>
+              <div className="space-y-3 mt-3">
+                {currentProperties.filter((p) => !["_id", "createdAt", "updatedAt"].includes(p.name) && p.propertyType !== "file").map((prop) => (
+                  <div key={prop.id}>
+                    <Label className="text-xs text-gray-600">{prop.label || prop.name} <span className="text-gray-400">({prop.propertyType})</span></Label>
+                    <Input
+                      className="mt-1 h-8 text-sm"
+                      type={prop.propertyType === "number" ? "number" : prop.propertyType === "date" ? "date" : "text"}
+                      placeholder={prop.propertyType === "objectReference" ? "Referenced record _id" : `Enter ${prop.label || prop.name}`}
+                      value={editValues[prop.name] ?? ""}
+                      onChange={(e) => setEditValues((prev) => ({ ...prev, [prop.name]: e.target.value }))}
+                    />
+                  </div>
+                ))}
+                {currentProperties.filter((p) => !["_id", "createdAt", "updatedAt"].includes(p.name) && p.propertyType !== "file").length === 0 && (
+                  <p className="text-xs text-gray-400 py-4 text-center">{t("noEditableFields")}</p>
+                )}
+                {currentProperties.some((p) => p.propertyType === "file") && (
+                  <p className="text-[10px] text-gray-400 flex items-center gap-1"><ImageIcon className="w-3 h-3" /> File fields are managed by your app and shown read-only in the table.</p>
+                )}
+                <Button className="w-full" size="sm" onClick={handleEditRecord} disabled={saving}>
+                  {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Pencil className="w-4 h-4 mr-2" />} {t("saveChanges")}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
           <Button variant="ghost" size="icon" className="w-7 h-7" onClick={() => {
             fetchTables();
             if (activeView === "data" && selectedTable) {
@@ -585,16 +759,38 @@ export function DatabasePanel({ projectId }: DatabasePanelProps) {
                             </div>
                           </th>
                         ))}
+                        <th className="px-3 py-2.5 text-right text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap border-b border-gray-100 dark:border-gray-700 sticky right-0 bg-gray-50 dark:bg-gray-800/50">
+                          {t("actions")}
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
                       {records.map((record, idx) => (
-                        <tr key={(record._id as string) || idx} className="hover:bg-gray-50/50 dark:hover:bg-gray-800/30 transition-colors">
+                        <tr key={(record._id as string) || idx} className="group/row hover:bg-gray-50/50 dark:hover:bg-gray-800/30 transition-colors">
                           {currentProperties.slice(0, 8).map((prop) => (
-                            <td key={prop.id} className="px-4 py-2.5 text-xs text-gray-600 dark:text-gray-400 max-w-[200px] truncate">
-                              {formatCellValue(record[prop.name], prop.propertyType)}
+                            <td key={prop.id} className="px-4 py-2.5 text-xs text-gray-600 dark:text-gray-400 max-w-[220px] truncate align-middle">
+                              <CellRenderer value={record[prop.name]} type={prop.propertyType} />
                             </td>
                           ))}
+                          <td className="px-3 py-2 text-right whitespace-nowrap sticky right-0 bg-white dark:bg-gray-900 group-hover/row:bg-gray-50/50 dark:group-hover/row:bg-gray-800/30">
+                            <div className="flex items-center justify-end gap-1">
+                              <button
+                                onClick={() => openEditDialog(record)}
+                                title={t("editRecord")}
+                                className="w-7 h-7 inline-flex items-center justify-center rounded-md text-gray-400 hover:text-violet-600 hover:bg-violet-50 dark:hover:bg-violet-900/20 transition-colors"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteRecord(record)}
+                                disabled={deletingId === (record._id as string)}
+                                title={t("deleteRecord")}
+                                className="w-7 h-7 inline-flex items-center justify-center rounded-md text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50"
+                              >
+                                {deletingId === (record._id as string) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                              </button>
+                            </div>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
