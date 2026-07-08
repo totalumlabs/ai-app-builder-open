@@ -51,12 +51,11 @@ function initialsFor(id: string): string {
   return clean.slice(0, 2).toUpperCase() || "AP";
 }
 
-// Determine whether a project detail exposes a usable live preview URL.
-function detailHasPreview(d: VcaasProject | null | undefined): boolean {
-  if (!d) return false;
-  const field = d.developmentUrlFieldToUse || "";
-  const fieldUrl = field ? (d as unknown as Record<string, unknown>)[field] : null;
-  return !!(fieldUrl || d.temporalDevelopmentProjectUrl || d.cachedDevelopmentUrl || d.productionProjectUrl);
+// A project only serves content at `projectId.totalum-project.com` once it has
+// been PUBLISHED (a successful production deployment). Until then that URL is
+// dead, so we must show the placeholder instead of an empty/broken iframe.
+function detailIsPublished(d: VcaasProject | null | undefined): boolean {
+  return d?.deployment?.status === "success";
 }
 
 /**
@@ -95,7 +94,7 @@ function ProjectThumbnail({
     let cancelled = false;
     getDetail(projectId).then((d) => {
       if (cancelled) return;
-      setStatus(detailHasPreview(d) ? "ready" : "none");
+      setStatus(detailIsPublished(d) ? "ready" : "none");
     });
     return () => { cancelled = true; };
   }, [visible, projectId, getDetail]);
