@@ -59,15 +59,15 @@ export default function WorkspacePage() {
 
   const TABS = [
     { id: "preview", label: t("preview"), icon: Eye },
-    { id: "code", label: t("code"), icon: Code2 },
     { id: "database", label: t("database"), icon: Database },
+    { id: "code", label: t("code"), icon: Code2 },
   ];
 
   // All tabs for mobile menu (includes versions/secrets/domain/github/logs)
   const ALL_TABS = [
     { id: "preview", label: t("preview"), icon: Eye },
-    { id: "code", label: t("code"), icon: Code2 },
     { id: "database", label: t("database"), icon: Database },
+    { id: "code", label: t("code"), icon: Code2 },
     { id: "versions", label: t("versions"), icon: Clock },
     { id: "secrets", label: t("secrets"), icon: Key },
     { id: "domain", label: t("domain"), icon: Globe },
@@ -239,6 +239,17 @@ export default function WorkspacePage() {
     setSending(false);
   };
   const handleStopAgent = async () => { await api.post(`/api/vcaas/projects/${projectId}/agent/stop`, {}); toast.info("Stop signal sent"); };
+  // Autofill the chat prompt with an edit instruction for the given file, then focus the chat.
+  const handleAskAiEdit = useCallback((path: string) => {
+    setPrompt(`On file ${path} write what you want to edit`);
+    setChatCollapsed(false);
+    setMobileTab("chat");
+    // Focus the chat textarea so the user can immediately continue typing.
+    setTimeout(() => {
+      const el = document.querySelector<HTMLTextAreaElement>("[data-chat-input]");
+      if (el) { el.focus(); const len = el.value.length; el.setSelectionRange(len, len); }
+    }, 60);
+  }, []);
   const handleDeploy = async () => {
     if (deploying) return; setDeploying(true);
     const res = await api.post(`/api/vcaas/projects/${projectId}/deployments/deploy`, {});
@@ -462,7 +473,7 @@ export default function WorkspacePage() {
           <div className="flex-1 flex flex-col min-w-0">
             <div className={`flex-1 overflow-hidden ${activeTab === "preview" ? "rounded-none" : "m-2 sm:m-3 rounded-xl shadow-sm"}`} style={{ background: cardBg }}>
               {activeTab === "preview" && <PreviewPanel key={previewKey} previewUrl={previewUrl} cached={previewCached} onRefresh={() => { fetchProject(); setPreviewKey((k) => k + 1); }} loading={isBuilding} mobilePreview={mobilePreview} iframePath={iframePath} />}
-              {activeTab === "code" && <CodePanel projectId={projectId} darkMode={darkMode} />}
+              {activeTab === "code" && <CodePanel projectId={projectId} darkMode={darkMode} onAskAiEdit={handleAskAiEdit} />}
               {activeTab === "database" && <DatabasePanel projectId={projectId} />}
               {activeTab === "versions" && <VersionsPanel projectId={projectId} onVersionRestored={() => fetchProject()} />}
               {activeTab === "secrets" && <SecretsPanel projectId={projectId} secrets={project.secrets || []} onSecretsChanged={() => fetchProject()} />}
@@ -498,7 +509,7 @@ export default function WorkspacePage() {
           ) : (
             <div className="h-full overflow-hidden">
               {activeTab === "preview" && <PreviewPanel key={previewKey} previewUrl={previewUrl} cached={previewCached} onRefresh={() => { fetchProject(); setPreviewKey((k) => k + 1); }} loading={isBuilding} mobilePreview={false} iframePath={iframePath} />}
-              {activeTab === "code" && <CodePanel projectId={projectId} darkMode={darkMode} />}
+              {activeTab === "code" && <CodePanel projectId={projectId} darkMode={darkMode} onAskAiEdit={handleAskAiEdit} />}
               {activeTab === "database" && <DatabasePanel projectId={projectId} />}
               {activeTab === "versions" && <VersionsPanel projectId={projectId} onVersionRestored={() => fetchProject()} />}
               {activeTab === "secrets" && <SecretsPanel projectId={projectId} secrets={project.secrets || []} onSecretsChanged={() => fetchProject()} />}

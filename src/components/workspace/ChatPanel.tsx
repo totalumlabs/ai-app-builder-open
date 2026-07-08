@@ -488,7 +488,7 @@ export function ChatPanel({ messages, isBuilding, prompt, setPrompt, onSend, onS
 
       <div className="shrink-0 px-3 pb-3 pt-2">
         <div className="rounded-2xl overflow-hidden transition-all focus-within:ring-2 focus-within:ring-gray-200 dark:focus-within:ring-gray-600" style={{ background: "var(--textarea-bg, #f3f1ee)" }}>
-          <textarea ref={textareaRef} value={prompt} onChange={(e) => setPrompt(e.target.value)} onKeyDown={handleKeyDown}
+          <textarea data-chat-input ref={textareaRef} value={prompt} onChange={(e) => setPrompt(e.target.value)} onKeyDown={handleKeyDown}
             placeholder={isBuilding ? t("agentWorking") : t("askAnything")}
             className="w-full bg-transparent border-0 resize-none text-base outline-none placeholder:text-gray-400 min-h-[48px] max-h-[200px] px-4 pt-3.5 pb-1 leading-relaxed dark:text-gray-200"
             disabled={isBuilding} rows={1} />

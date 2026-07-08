@@ -18,6 +18,9 @@ import {
   Download,
   AlertTriangle,
   FileWarning,
+  Search,
+  Sparkles,
+  X,
 } from "lucide-react";
 import { useI18n, type TransKey } from "@/lib/i18n";
 
@@ -34,6 +37,8 @@ const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
 interface CodePanelProps {
   projectId: string;
   darkMode?: boolean;
+  // Called when the user clicks "Ask AI to edit this file" — receives the file path.
+  onAskAiEdit?: (path: string) => void;
 }
 
 // ── In-memory byte cache (survives tab switches within the session) ──────────
@@ -423,7 +428,7 @@ function TreeRow({
 }
 
 // ── Main component ───────────────────────────────────────────────────────────
-export function CodePanel({ projectId, darkMode }: CodePanelProps) {
+export function CodePanel({ projectId, darkMode, onAskAiEdit }: CodePanelProps) {
   const { t } = useI18n();
 
   const [loading, setLoading] = useState(true);
@@ -433,6 +438,7 @@ export function CodePanel({ projectId, darkMode }: CodePanelProps) {
   const [filesCount, setFilesCount] = useState(0);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [selected, setSelected] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
   const [bytesReady, setBytesReady] = useState(false); // whether raw bytes are in memory
 
   const objectUrlRef = useRef<string | null>(null);
@@ -587,7 +593,31 @@ export function CodePanel({ projectId, darkMode }: CodePanelProps) {
     };
   }, []);
 
-  const tree = useMemo(() => buildTree(paths), [paths]);
+  // ── File search (by name AND by contents) ──────────────────────────────────
+  const query = search.trim().toLowerCase();
+  const filteredPaths = useMemo(() => {
+    if (!query) return paths;
+    return paths.filter((p) => {
+      if (p.toLowerCase().includes(query)) return true; // name/path match
+      const text = textFiles[p];
+      return text ? text.toLowerCase().includes(query) : false; // content match
+    });
+  }, [paths, textFiles, query]);
+
+  const tree = useMemo(() => buildTree(filteredPaths), [filteredPaths]);
+
+  // While searching, force every ancestor folder of a match open so results show.
+  const searchExpanded = useMemo(() => {
+    if (!query) return null;
+    const s = new Set<string>();
+    for (const p of filteredPaths) {
+      const seg = p.split("/");
+      for (let i = 1; i < seg.length; i++) s.add(seg.slice(0, i).join("/"));
+    }
+    return s;
+  }, [query, filteredPaths]);
+
+  const effectiveExpanded = searchExpanded || expanded;
 
   const toggle = useCallback((path: string) => {
     setExpanded((prev) => {
@@ -733,34 +763,70 @@ export function CodePanel({ projectId, darkMode }: CodePanelProps) {
         <FileCode2 className="w-4 h-4 text-violet-500" />
         <span className="text-sm font-medium text-gray-700 dark:text-gray-200">{t("codeExplorer")}</span>
         <span className="text-[11px] text-gray-400">· {filesCount} {t("filesCount")}</span>
-        <button
-          onClick={() => fetchCode(true)}
-          className="ml-auto flex items-center gap-1.5 h-7 px-2.5 rounded-lg text-xs font-medium text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-          title={t("refreshCode")}
-        >
-          <RefreshCw className="w-3.5 h-3.5" /> {t("refreshCode")}
-        </button>
+        <div className="ml-auto flex items-center gap-2">
+          {/* Ask-AI-to-edit — only meaningful once a file is open */}
+          {selected && onAskAiEdit && (
+            <button
+              onClick={() => onAskAiEdit(selected)}
+              className="flex items-center gap-1.5 h-7 px-2.5 rounded-lg text-xs font-medium text-white bg-violet-600 hover:bg-violet-700 transition-colors shadow-sm"
+              title={t("askAiEditFile")}
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span className="hidden md:inline">{t("askAiEditFile")}</span>
+            </button>
+          )}
+          <button
+            onClick={() => fetchCode(true)}
+            className="flex items-center gap-1.5 h-7 px-2.5 rounded-lg text-xs font-medium text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+            title={t("refreshCode")}
+          >
+            <RefreshCw className="w-3.5 h-3.5" /> {t("refreshCode")}
+          </button>
+        </div>
       </div>
 
       {/* Body: tree + viewer */}
       <div className="flex-1 flex min-h-0">
         {/* Tree sidebar */}
-        <div className="w-64 shrink-0 border-r border-gray-100 dark:border-gray-800 overflow-y-auto py-1.5 px-1.5 bg-gray-50/40 dark:bg-gray-900/40">
-          {tree.children.length === 0 ? (
-            <p className="text-xs text-gray-400 p-3">{t("codeLoadFailed")}</p>
-          ) : (
-            tree.children.map((child) => (
-              <TreeRow
-                key={child.path + (child.isDir ? "/" : "")}
-                node={child}
-                depth={0}
-                expanded={expanded}
-                toggle={toggle}
-                selected={selected}
-                onSelect={setSelected}
+        <div className="w-64 shrink-0 border-r border-gray-100 dark:border-gray-800 flex flex-col bg-gray-50/40 dark:bg-gray-900/40">
+          {/* Search by file name or content */}
+          <div className="p-2 border-b border-gray-100 dark:border-gray-800 shrink-0">
+            <div className="relative">
+              <Search className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder={t("searchCodePlaceholder")}
+                className="w-full h-8 pl-8 pr-7 rounded-lg text-xs bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-violet-200 dark:focus:ring-violet-900/40 transition-shadow"
               />
-            ))
-          )}
+              {search && (
+                <button
+                  onClick={() => setSearch("")}
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 rounded text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                  title="Clear"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          </div>
+          <div className="flex-1 overflow-y-auto py-1.5 px-1.5">
+            {tree.children.length === 0 ? (
+              <p className="text-xs text-gray-400 p-3">{query ? t("noSearchResults") : t("codeLoadFailed")}</p>
+            ) : (
+              tree.children.map((child) => (
+                <TreeRow
+                  key={child.path + (child.isDir ? "/" : "")}
+                  node={child}
+                  depth={0}
+                  expanded={effectiveExpanded}
+                  toggle={toggle}
+                  selected={selected}
+                  onSelect={setSelected}
+                />
+              ))
+            )}
+          </div>
         </div>
 
         {/* Viewer */}

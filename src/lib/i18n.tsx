@@ -137,6 +137,9 @@ const translations = {
     selectFileHint: "Select a file to view its contents",
     previewNotAvailable: "Preview not available for this file type",
     filesCount: "files",
+    searchCodePlaceholder: "Search by file name or content...",
+    noSearchResults: "No files match your search",
+    askAiEditFile: "Ask AI to edit this file",
     // GitHub
     github: "GitHub",
     connected: "Connected",
@@ -416,6 +419,9 @@ const translations = {
     selectFileHint: "Selecciona un archivo para ver su contenido",
     previewNotAvailable: "Vista previa no disponible para este tipo de archivo",
     filesCount: "archivos",
+    searchCodePlaceholder: "Buscar por nombre de archivo o contenido...",
+    noSearchResults: "Ningún archivo coincide con tu búsqueda",
+    askAiEditFile: "Pedir a la IA que edite este archivo",
     // GitHub
     github: "GitHub",
     connected: "Conectado",
