@@ -38,6 +38,12 @@ export interface DnsRecord {
   value: string;
 }
 
+export interface AgentInputFile {
+  name: string;
+  url: string;
+  imageDescription: string;
+}
+
 export interface ConversationMessage {
   author: "user" | "agent";
   message: string;
@@ -46,6 +52,10 @@ export interface ConversationMessage {
   versionId?: string;
   secretKeysNeeded?: Record<string, { isProvided: boolean; description: string }>;
   gitDiffUrl?: string;
+  // Files the user attached to this message. Client-side only (the VCaaS
+  // conversation API does not echo attachments back), used to render the
+  // attachment chips/thumbnails on the user's chat bubble.
+  inputFiles?: AgentInputFile[];
 }
 
 export interface AgentStatus {

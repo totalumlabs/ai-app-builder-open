@@ -106,6 +106,10 @@ export default function WorkspacePage() {
   // actually observe "init" before allowing a "done"/"idle" to conclude the run.
   const pendingRunRef = useRef(false);
   const runWaitPollsRef = useRef(0);
+  // Attachments the user sent this session, in order. The VCaaS conversation API
+  // does not echo attachments back, so when fetchConversation() replaces the
+  // message list we re-hydrate the chips/thumbnails onto matching user messages.
+  const sentFilesRef = useRef<{ message: string; files: { name: string; url: string; imageDescription: string }[] }[]>([]);
   const pollingRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const resizeRef = useRef<{ startX: number; startWidth: number } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -169,7 +173,20 @@ export default function WorkspacePage() {
   }
   async function fetchConversation(): Promise<void> {
     const res = await api.get<{ conversation: ConversationMessage[] }>(`/api/vcaas/projects/${projectId}/agent/full-conversation`);
-    if (res.ok && res.data && mountedRef.current) setMessages(res.data.conversation || []);
+    if (res.ok && res.data && mountedRef.current) setMessages(rehydrateAttachments(res.data.conversation || []));
+  }
+  // The server conversation has no attachment info; walk it in order and re-attach
+  // the files we recorded when sending, so attachment chips survive a refetch.
+  function rehydrateAttachments(conversation: ConversationMessage[]): ConversationMessage[] {
+    if (sentFilesRef.current.length === 0) return conversation;
+    const pending = [...sentFilesRef.current];
+    return conversation.map((m) => {
+      if (m.author !== "user") return m;
+      const idx = pending.findIndex((p) => p.message === m.message);
+      if (idx === -1) return m;
+      const [match] = pending.splice(idx, 1);
+      return { ...m, inputFiles: match.files };
+    });
   }
   // Lightweight GitHub connection check — drives the green "connected" bubble on the GitHub icon.
   async function fetchGithubStatus(): Promise<void> {
@@ -254,8 +271,11 @@ export default function WorkspacePage() {
     if ((!text.trim() && (!files || files.length === 0)) || sendingRef.current) return;
     sendingRef.current = true;
     setSending(true);
-    setMessages((prev) => [...prev, { author: "user", message: text, messageType: "regular", createdAt: new Date().toISOString() }]);
+    const hasFiles = !!files && files.length > 0;
+    if (hasFiles) sentFilesRef.current.push({ message: text, files: files! });
+    setMessages((prev) => [...prev, { author: "user", message: text, messageType: "regular", createdAt: new Date().toISOString(), inputFiles: hasFiles ? files : undefined }]);
     setPrompt("");
+    console.log(`[Workspace] Starting agent for ${projectId} with ${files?.length || 0} attachment(s):`, files?.map((f) => f.url));
     const res = await api.post(`/api/vcaas/projects/${projectId}/agent/start`, { prompt: text, inputFiles: files || [] });
     if (res.ok) {
       setProject((prev) => prev ? { ...prev, agentProcessStatus: "init" } : prev);

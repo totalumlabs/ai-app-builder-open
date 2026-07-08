@@ -19,6 +19,7 @@ import {
 import Link from "next/link";
 import { toast } from "sonner";
 import { LanguageSelect } from "@/components/LanguageSelect";
+import { uploadFilesToProject as uploadFilesToProjectHelper } from "@/lib/upload";
 import type { VcaasProject } from "@/lib/vcaas-types";
 
 // Shape returned by the VCaaS "List Projects" endpoint (GET /vcaas/projects).
@@ -301,10 +302,14 @@ export default function DashboardPage() {
     let uploadedFiles: { name: string; url: string; imageDescription: string }[] = [];
     if (attachedFiles.length > 0) {
       setUploading(true);
-      uploadedFiles = await uploadFilesToProject(id, attachedFiles);
+      // Retries built in — a just-created project's storage can need a moment.
+      uploadedFiles = await uploadFilesToProjectHelper(id, attachedFiles.map((f) => f.file));
       setUploading(false);
       if (uploadedFiles.length < attachedFiles.length) {
         console.error(`[Dashboard] Only ${uploadedFiles.length}/${attachedFiles.length} attachment(s) uploaded for`, id);
+        toast.error("Some attachments could not be uploaded. The agent may not see them.");
+      } else {
+        console.log(`[Dashboard] All ${uploadedFiles.length} attachment(s) uploaded for`, id);
       }
     }
     // Stash the first prompt (and uploaded files, with real URLs) so the workspace auto-submits it.
@@ -323,33 +328,6 @@ export default function DashboardPage() {
     if (files.length === 0) return;
     setAttachedFiles((prev) => [...prev, ...files.map((file) => ({ name: file.name, imageDescription: file.name, file }))]);
     e.target.value = "";
-  };
-
-  // Upload picked files to a (now-existing) project, returning agent-ready
-  // { name, url, imageDescription } descriptors with real, publicly-fetchable URLs
-  // (only the ones that succeeded). Uses raw multipart fetch like the chat panel.
-  const uploadFilesToProject = async (
-    id: string,
-    files: { name: string; imageDescription: string; file: File }[],
-  ): Promise<{ name: string; url: string; imageDescription: string }[]> => {
-    const out: { name: string; url: string; imageDescription: string }[] = [];
-    for (const f of files) {
-      try {
-        const formData = new FormData();
-        formData.append("file", f.file);
-        const res = await fetch(`/api/vcaas/upload/${id}`, { method: "POST", body: formData });
-        const json = (await res.json()) as { ok: boolean; data?: { url: string; fileNameId: string }; error?: string };
-        if (json.ok && json.data?.url) {
-          out.push({ name: f.name, url: json.data.url, imageDescription: f.imageDescription });
-          console.log(`[Dashboard] Uploaded attachment "${f.name}" ->`, json.data.url);
-        } else {
-          console.error(`[Dashboard] Upload failed for "${f.name}":`, json.error);
-        }
-      } catch (err) {
-        console.error(`[Dashboard] Upload error for "${f.name}":`, err);
-      }
-    }
-    return out;
   };
 
   // Perform the actual deletion once the user confirms in the modal.

@@ -9,7 +9,13 @@ import {
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { api } from "@/lib/api";
-import type { ConversationMessage, VcaasSecret } from "@/lib/vcaas-types";
+import { uploadFilesToProject } from "@/lib/upload";
+import type { ConversationMessage, VcaasSecret, AgentInputFile } from "@/lib/vcaas-types";
+
+// An attachment is an image we can preview inline when its name looks like one.
+function isImageFile(name: string): boolean {
+  return /\.(png|jpe?g|gif|webp|svg|avif|bmp)$/i.test(name);
+}
 
 interface ChatPanelProps {
   messages: ConversationMessage[];
@@ -113,7 +119,29 @@ function FormattedText({ text }: { text: string }) {
 const USER_MSG_PREVIEW_CHARS = 550; // length of the preview shown when collapsed
 const USER_MSG_TRUNCATE_AT = 700;   // only truncate messages longer than this
 
-function UserMessage({ text }: { text: string }) {
+function UserAttachments({ files }: { files: AgentInputFile[] }) {
+  if (!files || files.length === 0) return null;
+  return (
+    <div className="flex flex-wrap gap-1.5 mt-2">
+      {files.map((f, i) =>
+        isImageFile(f.name) ? (
+          <a key={i} href={f.url} target="_blank" rel="noopener noreferrer" title={f.name}
+            className="block w-14 h-14 rounded-lg overflow-hidden border border-black/10 dark:border-white/10 bg-white/40">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={f.url} alt={f.name} className="w-full h-full object-cover" />
+          </a>
+        ) : (
+          <a key={i} href={f.url} target="_blank" rel="noopener noreferrer" title={f.name}
+            className="flex items-center gap-1 bg-white/60 dark:bg-black/20 text-gray-700 dark:text-gray-200 rounded-md px-2 py-1 text-[11px] border border-black/5 dark:border-white/10 hover:bg-white transition-colors">
+            <Paperclip className="w-2.5 h-2.5" /><span className="truncate max-w-[120px]">{f.name}</span>
+          </a>
+        )
+      )}
+    </div>
+  );
+}
+
+function UserMessage({ text, files }: { text: string; files?: AgentInputFile[] }) {
   const { t } = useI18n();
   const [expanded, setExpanded] = useState(false);
   const isLong = text.length > USER_MSG_TRUNCATE_AT;
@@ -130,16 +158,19 @@ function UserMessage({ text }: { text: string }) {
   return (
     <div className="flex justify-end">
       <div className="max-w-[88%] rounded-2xl rounded-br-sm px-4 py-2.5" style={{ background: "var(--user-bubble, #eeecea)" }}>
-        <p className="text-[15px] leading-relaxed whitespace-pre-wrap break-words text-gray-800 dark:text-gray-200">
-          {isLong && !expanded ? (
-            <>
-              {preview}
-              <span className="text-gray-400">…</span>
-            </>
-          ) : (
-            text
-          )}
-        </p>
+        {text.trim() && (
+          <p className="text-[15px] leading-relaxed whitespace-pre-wrap break-words text-gray-800 dark:text-gray-200">
+            {isLong && !expanded ? (
+              <>
+                {preview}
+                <span className="text-gray-400">…</span>
+              </>
+            ) : (
+              text
+            )}
+          </p>
+        )}
+        {files && files.length > 0 && <UserAttachments files={files} />}
         {isLong && (
           <button
             onClick={() => setExpanded((v) => !v)}
@@ -486,15 +517,15 @@ export function ChatPanel({ messages, isBuilding, prompt, setPrompt, onSend, onS
   }, [setPrompt, onSend]);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]; if (!file) return;
+    const files = e.target.files ? Array.from(e.target.files) : [];
+    e.target.value = "";
+    if (files.length === 0) return;
     setUploading(true);
-    try {
-      const formData = new FormData(); formData.append("file", file);
-      const res = await fetch(`/api/vcaas/upload/${projectId}`, { method: "POST", body: formData });
-      const json = (await res.json()) as { ok: boolean; data?: { url: string; fileNameId: string } };
-      if (json.ok && json.data) setAttachedFiles((prev) => [...prev, { name: file.name, url: json.data!.url, imageDescription: file.name }]);
-    } catch (err) { console.error("[ChatPanel] Upload error:", err); }
-    setUploading(false); e.target.value = "";
+    // Real multipart upload (with retry) so the agent receives publicly-fetchable URLs.
+    const uploaded = await uploadFilesToProject(projectId, files);
+    if (uploaded.length > 0) setAttachedFiles((prev) => [...prev, ...uploaded]);
+    if (uploaded.length < files.length) console.error(`[ChatPanel] Only ${uploaded.length}/${files.length} attachment(s) uploaded`);
+    setUploading(false);
   };
 
   const messageGroups = groupMessages(messages);
@@ -543,7 +574,7 @@ export function ChatPanel({ messages, isBuilding, prompt, setPrompt, onSend, onS
           if (group.type === "build-group") return <BuildGroup key={gi} group={group} projectId={projectId} onTellAi={handleTellAiSecretsReady} projectSecrets={projectSecrets} />;
           const msg = group.messages[0];
           if (msg.author === "user") {
-            return <UserMessage key={gi} text={msg.message} />;
+            return <UserMessage key={gi} text={msg.message} files={msg.inputFiles} />;
           }
           // Agent message - NO background
           return <div key={gi} className="max-w-full"><FormattedText text={msg.message} /></div>;
@@ -580,7 +611,7 @@ export function ChatPanel({ messages, isBuilding, prompt, setPrompt, onSend, onS
             disabled={isBuilding} rows={1} />
           <div className="flex items-center justify-between px-3 pb-2.5">
             <label className="cursor-pointer p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition-colors">
-              <input type="file" className="hidden" onChange={handleFileUpload} accept="image/*,.pdf,.svg" />
+              <input type="file" multiple className="hidden" onChange={handleFileUpload} accept="image/*,.pdf,.svg" />
               {uploading ? <Loader2 className="w-4 h-4 text-gray-400 animate-spin" /> : <Paperclip className="w-4 h-4 text-gray-400" />}
             </label>
             {isBuilding ? (
