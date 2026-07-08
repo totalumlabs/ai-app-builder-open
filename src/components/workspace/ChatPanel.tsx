@@ -4,7 +4,7 @@ import { useRef, useEffect, useState, useCallback } from "react";
 import { Badge } from "@/components/ui/badge";
 import {
   Send, Square, Loader2, Bot, AlertCircle, CheckCircle2,
-  Key, ExternalLink, ChevronDown, ChevronRight, Paperclip, X, Check,
+  Key, ExternalLink, ChevronDown, ChevronRight, ChevronUp, Paperclip, X, Check,
   Plus, Eye, EyeOff, CheckCircle, ArrowRight,
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
@@ -102,6 +102,62 @@ function FormattedText({ text }: { text: string }) {
           return <p key={lineKey}>{renderInline(line, lineKey)}</p>;
         });
       })}
+    </div>
+  );
+}
+
+// --- User Message (with large-text preview + "See all") ---
+// When a user pastes/uploads a very large block of text, we don't want the chat
+// bubble to become a giant wall. Instead we show a generous preview (not too
+// short) and a toggle to expand/collapse the full content on demand.
+const USER_MSG_PREVIEW_CHARS = 550; // length of the preview shown when collapsed
+const USER_MSG_TRUNCATE_AT = 700;   // only truncate messages longer than this
+
+function UserMessage({ text }: { text: string }) {
+  const { t } = useI18n();
+  const [expanded, setExpanded] = useState(false);
+  const isLong = text.length > USER_MSG_TRUNCATE_AT;
+
+  // Cut at a whitespace boundary near the limit so we don't slice a word in half.
+  const preview = (() => {
+    if (!isLong) return text;
+    let cut = text.slice(0, USER_MSG_PREVIEW_CHARS);
+    const lastBreak = Math.max(cut.lastIndexOf(" "), cut.lastIndexOf("\n"));
+    if (lastBreak > USER_MSG_PREVIEW_CHARS * 0.6) cut = cut.slice(0, lastBreak);
+    return cut.trimEnd();
+  })();
+
+  return (
+    <div className="flex justify-end">
+      <div className="max-w-[88%] rounded-2xl rounded-br-sm px-4 py-2.5" style={{ background: "var(--user-bubble, #eeecea)" }}>
+        <p className="text-[15px] leading-relaxed whitespace-pre-wrap break-words text-gray-800 dark:text-gray-200">
+          {isLong && !expanded ? (
+            <>
+              {preview}
+              <span className="text-gray-400">…</span>
+            </>
+          ) : (
+            text
+          )}
+        </p>
+        {isLong && (
+          <button
+            onClick={() => setExpanded((v) => !v)}
+            className="mt-1.5 inline-flex items-center gap-1 text-xs font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+          >
+            {expanded ? (
+              <>
+                <ChevronDown className="w-3 h-3 rotate-180" /> {t("showLess")}
+              </>
+            ) : (
+              <>
+                <ChevronDown className="w-3 h-3" /> {t("seeAll")}
+                <span className="text-gray-400">· {text.length.toLocaleString()} {t("charactersCount")}</span>
+              </>
+            )}
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -409,6 +465,13 @@ export function ChatPanel({ messages, isBuilding, prompt, setPrompt, onSend, onS
   const [uploading, setUploading] = useState(false);
   const { t } = useI18n();
 
+  // --- Load-on-demand for long conversations ---
+  // Rather than rendering every message group (which gets heavy on long chats),
+  // we only render the most recent window and let the user load older ones.
+  const INITIAL_VISIBLE_GROUPS = 12;
+  const LOAD_STEP = 12;
+  const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_GROUPS);
+
   useEffect(() => { if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight; }, [messages, isBuilding]);
   useEffect(() => { if (textareaRef.current) { textareaRef.current.style.height = "auto"; textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 200) + "px"; } }, [prompt]);
 
@@ -435,6 +498,22 @@ export function ChatPanel({ messages, isBuilding, prompt, setPrompt, onSend, onS
   };
 
   const messageGroups = groupMessages(messages);
+  const hiddenCount = Math.max(0, messageGroups.length - visibleCount);
+  // Keep original indices as keys so React reuses nodes correctly across loads.
+  const visibleGroups = messageGroups
+    .map((group, gi) => ({ group, gi }))
+    .slice(hiddenCount);
+
+  const handleLoadEarlier = () => {
+    const el = scrollRef.current;
+    const prevHeight = el ? el.scrollHeight : 0;
+    setVisibleCount((c) => c + LOAD_STEP);
+    // Preserve the scroll position so the viewport doesn't jump after older
+    // groups are prepended.
+    requestAnimationFrame(() => {
+      if (el) el.scrollTop += el.scrollHeight - prevHeight;
+    });
+  };
 
   return (
     <div className="flex flex-col h-full bg-inherit">
@@ -447,17 +526,24 @@ export function ChatPanel({ messages, isBuilding, prompt, setPrompt, onSend, onS
           </div>
         )}
 
-        {messageGroups.map((group, gi) => {
+        {hiddenCount > 0 && (
+          <div className="flex justify-center pb-1">
+            <button
+              onClick={handleLoadEarlier}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+            >
+              <ChevronUp className="w-3.5 h-3.5" />
+              {t("loadEarlierMessages")}
+              <span className="text-gray-400">· {hiddenCount}</span>
+            </button>
+          </div>
+        )}
+
+        {visibleGroups.map(({ group, gi }) => {
           if (group.type === "build-group") return <BuildGroup key={gi} group={group} projectId={projectId} onTellAi={handleTellAiSecretsReady} projectSecrets={projectSecrets} />;
           const msg = group.messages[0];
           if (msg.author === "user") {
-            return (
-              <div key={gi} className="flex justify-end">
-                <div className="max-w-[88%] rounded-2xl rounded-br-sm px-4 py-2.5" style={{ background: "var(--user-bubble, #eeecea)" }}>
-                  <p className="text-[15px] leading-relaxed whitespace-pre-wrap text-gray-800 dark:text-gray-200">{msg.message}</p>
-                </div>
-              </div>
-            );
+            return <UserMessage key={gi} text={msg.message} />;
           }
           // Agent message - NO background
           return <div key={gi} className="max-w-full"><FormattedText text={msg.message} /></div>;

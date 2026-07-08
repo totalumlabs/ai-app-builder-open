@@ -140,6 +140,10 @@ const translations = {
     searchCodePlaceholder: "Search by file name or content...",
     noSearchResults: "No files match your search",
     askAiEditFile: "Ask AI to edit this file",
+    seeAll: "See all",
+    showLess: "Show less",
+    charactersCount: "characters",
+    loadEarlierMessages: "Load earlier messages",
     // GitHub
     github: "GitHub",
     connected: "Connected",
@@ -422,6 +426,10 @@ const translations = {
     searchCodePlaceholder: "Buscar por nombre de archivo o contenido...",
     noSearchResults: "Ningún archivo coincide con tu búsqueda",
     askAiEditFile: "Pedir a la IA que edite este archivo",
+    seeAll: "Ver todo",
+    showLess: "Ver menos",
+    charactersCount: "caracteres",
+    loadEarlierMessages: "Cargar mensajes anteriores",
     // GitHub
     github: "GitHub",
     connected: "Conectado",
