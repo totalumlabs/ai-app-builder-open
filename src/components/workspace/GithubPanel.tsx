@@ -18,9 +18,11 @@ import type {
 
 interface GithubPanelProps {
   projectId: string;
+  /** Reports the current connection state to the parent (drives the header's green bubble). */
+  onStatusChange?: (connected: boolean) => void;
 }
 
-export function GithubPanel({ projectId }: GithubPanelProps) {
+export function GithubPanel({ projectId, onStatusChange }: GithubPanelProps) {
   const { t, lang } = useI18n();
   const [status, setStatus] = useState<GithubStatus | null>(null);
   const [loading, setLoading] = useState(true);
@@ -54,9 +56,9 @@ export function GithubPanel({ projectId }: GithubPanelProps) {
 
   const fetchStatus = useCallback(async () => {
     const res = await api.get<GithubStatus>(`/api/vcaas/projects/${projectId}/github/status`);
-    if (res.ok && res.data && mountedRef.current) setStatus(res.data);
+    if (res.ok && res.data && mountedRef.current) { setStatus(res.data); onStatusChange?.(!!res.data.connected); }
     return res.ok ? res.data : null;
-  }, [projectId]);
+  }, [projectId, onStatusChange]);
 
   useEffect(() => {
     (async () => {

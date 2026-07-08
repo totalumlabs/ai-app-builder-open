@@ -23,7 +23,7 @@ import { DomainPanel } from "@/components/workspace/DomainPanel";
 import { LogsPanel } from "@/components/workspace/LogsPanel";
 import { GithubPanel } from "@/components/workspace/GithubPanel";
 import { LanguageSelect } from "@/components/LanguageSelect";
-import type { VcaasProject, AgentStatus, ConversationMessage } from "@/lib/vcaas-types";
+import type { VcaasProject, AgentStatus, ConversationMessage, GithubStatus } from "@/lib/vcaas-types";
 
 // Pick the correct development preview URL following the VCaaS docs:
 // use `developmentUrlFieldToUse` to decide between the live server URL and the
@@ -90,6 +90,7 @@ export default function WorkspacePage() {
   const [iframePath, setIframePath] = useState("/");
   const [darkMode, setDarkMode] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [githubConnected, setGithubConnected] = useState(false);
   const [deployMenuOpen, setDeployMenuOpen] = useState(false);
   const deployMenuRef = useRef<HTMLDivElement>(null);
 
@@ -159,6 +160,11 @@ export default function WorkspacePage() {
     const res = await api.get<{ conversation: ConversationMessage[] }>(`/api/vcaas/projects/${projectId}/agent/full-conversation`);
     if (res.ok && res.data && mountedRef.current) setMessages(res.data.conversation || []);
   }
+  // Lightweight GitHub connection check — drives the green "connected" bubble on the GitHub icon.
+  async function fetchGithubStatus(): Promise<void> {
+    const res = await api.get<GithubStatus>(`/api/vcaas/projects/${projectId}/github/status`);
+    if (res.ok && res.data && mountedRef.current) setGithubConnected(!!res.data.connected);
+  }
   function startAgentPolling() { stopAgentPolling(); pollAgentOnce(); }
   function stopAgentPolling() { if (pollingRef.current) { clearTimeout(pollingRef.current); pollingRef.current = null; } }
   async function pollAgentOnce() {
@@ -211,7 +217,7 @@ export default function WorkspacePage() {
     let cancelled = false;
     async function init() {
       setLoading(true);
-      const [proj] = await Promise.all([fetchProject(), fetchConversation()]);
+      const [proj] = await Promise.all([fetchProject(), fetchConversation(), fetchGithubStatus()]);
       if (cancelled) return; setLoading(false);
       if (proj?.agentProcessStatus === "init") startAgentPolling();
       if (proj?.deployment?.status === "deploying") { setDeploying(true); pollDeployOnce(); }
@@ -280,7 +286,12 @@ export default function WorkspacePage() {
         </button>
         <button onClick={() => { setActiveTab("github"); setMobileTab("panel"); setMenuOpen(false); }}
           className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-black/5 dark:hover:bg-white/10 transition-colors ${activeTab === "github" ? "text-gray-900 dark:text-white font-medium" : "text-gray-700 dark:text-gray-200"}`}>
-          <Github className="w-4 h-4 text-gray-400" /> {t("github")}
+          <span className="relative flex items-center">
+            <Github className="w-4 h-4 text-gray-400" />
+            {githubConnected && <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-[#1e1e1e]" />}
+          </span>
+          <span className="flex-1 text-left">{t("github")}</span>
+          {githubConnected && <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400">{lang === "es" ? "Conectado" : "Connected"}</span>}
         </button>
       </div>
       {/* Tabs - visible on mobile only */}
@@ -358,8 +369,9 @@ export default function WorkspacePage() {
             <button onClick={() => setActiveTab("secrets")} className={`h-7 w-7 flex items-center justify-center rounded-lg transition-colors shrink-0 border ${btnBorder} ${activeTab === "secrets" ? "bg-gray-900 dark:bg-white text-white dark:text-gray-900" : "text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-black/5 dark:hover:bg-white/10"}`} title={t("secrets")}>
               <Key className="w-3.5 h-3.5" />
             </button>
-            <button onClick={() => setActiveTab("github")} className={`h-7 w-7 flex items-center justify-center rounded-lg transition-colors shrink-0 border ${btnBorder} ${activeTab === "github" ? "bg-gray-900 dark:bg-white text-white dark:text-gray-900" : "text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-black/5 dark:hover:bg-white/10"}`} title={t("github")}>
+            <button onClick={() => setActiveTab("github")} className={`relative h-7 w-7 flex items-center justify-center rounded-lg transition-colors shrink-0 border ${btnBorder} ${activeTab === "github" ? "bg-gray-900 dark:bg-white text-white dark:text-gray-900" : "text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-black/5 dark:hover:bg-white/10"}`} title={githubConnected ? (lang === "es" ? "GitHub conectado" : "GitHub connected") : t("github")}>
               <Github className="w-3.5 h-3.5" />
+              {githubConnected && <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-[#1e1e1e]" />}
             </button>
             <div className="relative shrink-0" ref={deployMenuRef}>
               <Button size="sm" onClick={() => setDeployMenuOpen(!deployMenuOpen)} disabled={deploying || isBuilding} className={`bg-gray-900 dark:bg-white hover:bg-gray-800 dark:hover:bg-gray-100 text-white dark:text-gray-900 h-7 text-sm rounded-lg px-3 border ${btnBorder}`}>
@@ -451,7 +463,7 @@ export default function WorkspacePage() {
               {activeTab === "versions" && <VersionsPanel projectId={projectId} onVersionRestored={() => fetchProject()} />}
               {activeTab === "secrets" && <SecretsPanel projectId={projectId} secrets={project.secrets || []} onSecretsChanged={() => fetchProject()} />}
               {activeTab === "domain" && <DomainPanel projectId={projectId} domain={project.customDomain} productionUrl={project.productionProjectUrl} onDomainChanged={() => fetchProject()} />}
-              {activeTab === "github" && <GithubPanel projectId={projectId} />}
+              {activeTab === "github" && <GithubPanel projectId={projectId} onStatusChange={setGithubConnected} />}
               {activeTab === "logs" && <LogsPanel projectId={projectId} />}
             </div>
           </div>
@@ -486,7 +498,7 @@ export default function WorkspacePage() {
               {activeTab === "versions" && <VersionsPanel projectId={projectId} onVersionRestored={() => fetchProject()} />}
               {activeTab === "secrets" && <SecretsPanel projectId={projectId} secrets={project.secrets || []} onSecretsChanged={() => fetchProject()} />}
               {activeTab === "domain" && <DomainPanel projectId={projectId} domain={project.customDomain} productionUrl={project.productionProjectUrl} onDomainChanged={() => fetchProject()} />}
-              {activeTab === "github" && <GithubPanel projectId={projectId} />}
+              {activeTab === "github" && <GithubPanel projectId={projectId} onStatusChange={setGithubConnected} />}
               {activeTab === "logs" && <LogsPanel projectId={projectId} />}
             </div>
           )}
