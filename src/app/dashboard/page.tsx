@@ -11,8 +11,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   Sparkles, Plus, Loader2, Trash2, Send, Paperclip, X, ArrowRight,
   Search, LayoutGrid, Table as TableIcon, ArrowUpDown, ChevronLeft, ChevronRight,
-  AlertCircle,
+  AlertCircle, MoreVertical, AlertTriangle,
 } from "lucide-react";
+import {
+  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem,
+} from "@/components/ui/dropdown-menu";
 import Link from "next/link";
 import { toast } from "sonner";
 import { LanguageSelect } from "@/components/LanguageSelect";
@@ -154,6 +157,10 @@ export default function DashboardPage() {
   const [buildName, setBuildName] = useState("");
   const [buildError, setBuildError] = useState<string | null>(null);
   const [buildCreating, setBuildCreating] = useState(false);
+
+  // Delete confirmation modal
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   // List controls
   const [search, setSearch] = useState("");
@@ -303,13 +310,23 @@ export default function DashboardPage() {
     setUploading(false); e.target.value = "";
   };
 
-  const handleDeleteProject = async (projectId: string, e: React.MouseEvent) => {
-    e.preventDefault(); e.stopPropagation();
-    if (!confirm(`Delete "${projectId}"?`)) return;
+  // Perform the actual deletion once the user confirms in the modal.
+  const confirmDelete = async () => {
+    const projectId = deleteTarget;
+    if (!projectId) return;
+    setDeleting(true);
+    console.log("[Dashboard] Deleting project:", projectId);
     detailCache.current.delete(projectId);
     const res = await api.delete(`/api/vcaas/projects/${projectId}`);
-    if (res.ok) { toast.success("Project deleted"); setProjects((prev) => prev.filter((p) => p.projectId !== projectId)); }
-    else toast.error(res.error || "Failed to delete project");
+    if (res.ok) {
+      toast.success("Project deleted");
+      setProjects((prev) => prev.filter((p) => p.projectId !== projectId));
+      setDeleteTarget(null);
+    } else {
+      console.error("[Dashboard] Delete failed:", res.error);
+      toast.error(res.error || "Failed to delete project");
+    }
+    setDeleting(false);
   };
 
   const hasProjects = projects.length > 0;
@@ -492,9 +509,25 @@ export default function DashboardPage() {
                       <div className="p-4">
                         <div className="flex items-start justify-between mb-1">
                           <h3 className="font-medium text-sm text-gray-800 group-hover:text-gray-900 truncate flex-1">{p.projectId}</h3>
-                          <button className="w-6 h-6 rounded-md flex items-center justify-center opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 hover:bg-gray-50 transition-all shrink-0 ml-2" onClick={(e) => handleDeleteProject(p.projectId, e)}>
-                            <Trash2 className="w-3 h-3" />
-                          </button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <button
+                                onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                                title="Options"
+                                className="w-6 h-6 rounded-md flex items-center justify-center text-gray-300 hover:text-gray-600 hover:bg-gray-100 transition-all shrink-0 ml-2"
+                              >
+                                <MoreVertical className="w-3.5 h-3.5" />
+                              </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-40">
+                              <DropdownMenuItem
+                                className="text-red-600 focus:text-red-600 focus:bg-red-50 cursor-pointer"
+                                onSelect={(e) => { e.preventDefault(); setDeleteTarget(p.projectId); }}
+                              >
+                                <Trash2 className="w-3.5 h-3.5 mr-2" /> Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
                         <p className="text-[11px] text-gray-500 line-clamp-1">{p.description || "No description"}</p>
                         <div className="flex items-center justify-between mt-2">
@@ -542,12 +575,25 @@ export default function DashboardPage() {
                             <span className="text-xs text-gray-400">{new Date(p.createdAt).toLocaleDateString()}</span>
                           </td>
                           <td className="px-4 py-2 text-right">
-                            <button
-                              className="w-6 h-6 rounded-md inline-flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-gray-100 transition-all"
-                              onClick={(e) => handleDeleteProject(p.projectId, e)}
-                            >
-                              <Trash2 className="w-3 h-3" />
-                            </button>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <button
+                                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                                  title="Options"
+                                  className="w-6 h-6 rounded-md inline-flex items-center justify-center text-gray-300 hover:text-gray-600 hover:bg-gray-100 transition-all"
+                                >
+                                  <MoreVertical className="w-3.5 h-3.5" />
+                                </button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-40" onClick={(e) => e.stopPropagation()}>
+                                <DropdownMenuItem
+                                  className="text-red-600 focus:text-red-600 focus:bg-red-50 cursor-pointer"
+                                  onSelect={(e) => { e.preventDefault(); setDeleteTarget(p.projectId); }}
+                                >
+                                  <Trash2 className="w-3.5 h-3.5 mr-2" /> Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </td>
                         </tr>
                       ))}
@@ -614,6 +660,54 @@ export default function DashboardPage() {
             <Button className="w-full bg-gray-900 hover:bg-gray-800" onClick={confirmBuild} disabled={buildCreating || normalizeId(buildName).length < 3}>
               {buildCreating ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Creating...</> : <><ArrowRight className="w-4 h-4 mr-2" /> Create & Build</>}
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Beautiful destructive confirmation modal */}
+      <Dialog open={!!deleteTarget} onOpenChange={(o) => { if (!o && !deleting) setDeleteTarget(null); }}>
+        <DialogContent className="sm:max-w-md overflow-hidden p-0 gap-0">
+          {/* Red accent header */}
+          <div className="relative bg-gradient-to-br from-red-50 to-rose-100/60 px-6 pt-7 pb-6 text-center">
+            <div className="mx-auto w-14 h-14 rounded-2xl bg-white shadow-sm ring-1 ring-red-100 flex items-center justify-center">
+              <AlertTriangle className="w-7 h-7 text-red-500" />
+            </div>
+            <DialogHeader className="mt-4">
+              <DialogTitle className="text-center text-lg font-semibold text-gray-900">Delete this project?</DialogTitle>
+            </DialogHeader>
+          </div>
+
+          <div className="px-6 py-5 space-y-4">
+            <p className="text-sm text-gray-600 text-center leading-relaxed">
+              You&rsquo;re about to permanently delete{" "}
+              <span className="font-semibold text-gray-900 font-mono break-all">{deleteTarget}</span>.
+            </p>
+            <div className="flex items-start gap-2.5 text-xs text-red-700 bg-red-50 border border-red-200 rounded-xl p-3">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>This action is <strong>irreversible</strong>. Once deleted, the project and all its data cannot be recovered.</span>
+            </div>
+
+            <div className="flex gap-2.5 pt-1">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => setDeleteTarget(null)}
+                disabled={deleting}
+              >
+                Cancel
+              </Button>
+              <Button
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+                onClick={confirmDelete}
+                disabled={deleting}
+              >
+                {deleting ? (
+                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Deleting...</>
+                ) : (
+                  <><Trash2 className="w-4 h-4 mr-2" /> Delete forever</>
+                )}
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
