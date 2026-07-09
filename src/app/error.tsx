@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { usePathname } from "next/navigation";
 
 export default function Error({
@@ -22,19 +22,9 @@ export default function Error({
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
-      console.error("Failed to copy:", err);
+      /* ignore */
     }
   };
-
-  useEffect(() => {
-    // Log error to console with full details
-    console.error("[Error Boundary] Error caught:", error);
-    console.error("[Error Boundary] Message:", error.message);
-    console.error("[Error Boundary] Stack:", error.stack);
-    if (error.digest) {
-      console.error("[Error Boundary] Digest:", error.digest);
-    }
-  }, [error]);
 
   return (
     <div className="flex min-h-[400px] w-full items-center justify-center p-4">

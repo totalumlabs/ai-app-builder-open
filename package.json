@@ -1,34 +1,16 @@
 {
-  "name": "nextjs-totalum-project",
+  "name": "ai-app-builder-open",
   "description": "Build a full-stack web application with Next.js and Totalum.",
   "scripts": {
-    "dev": "NEXT_TELEMETRY_DISABLED=1 DISABLE_OPENNEXT=true next dev",
+    "dev": "NEXT_TELEMETRY_DISABLED=1 next dev",
     "check-types-errors": "tsc --noEmit --skipLibCheck",
-    "start": "NEXT_TELEMETRY_DISABLED=1 DISABLE_OPENNEXT=true PORT=80 next start",
-    "build": "NEXT_TELEMETRY_DISABLED=1 DISABLE_OPENNEXT=true npx next build",
-    "cloudflare-build": "opennextjs-cloudflare build",
-    "cloudflare-deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
-    "cf-typegen": "wrangler types --env-interface CloudflareEnv env.d.ts",
-    "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
-    "setup:stripe-webhook": "ts-node scripts/setup-stripe-webhook.ts",
-    "test:serve": "TESTING_MODE=true NEXT_TELEMETRY_DISABLED=1 DISABLE_OPENNEXT=true PORT=3000 next start"
-  },
-  "cloudflare": {
-    "label": "Totalum App",
-    "products": [
-      "Workers"
-    ],
-    "categories": [],
-    "icon_urls": [
-      "https://imagedelivery.net/wSMYJvS3Xw-n339CbDyDIA/5ca0ca32-e897-4699-d4c1-6b680512f000/public"
-    ],
-    "preview_image_url": "https://imagedelivery.net/wSMYJvS3Xw-n339CbDyDIA/e42eec61-db86-49c8-7b29-c3ed4783e400/public",
-    "publish": true
+    "start": "NEXT_TELEMETRY_DISABLED=1 next start",
+    "build": "NEXT_TELEMETRY_DISABLED=1 next build",
+    "test:serve": "TESTING_MODE=true NEXT_TELEMETRY_DISABLED=1 PORT=3000 next start"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.1",
     "@monaco-editor/react": "^4.7.0",
-    "@opennextjs/cloudflare": "1.3.0",
     "@radix-ui/react-alert-dialog": "^1.1.14",
     "@radix-ui/react-avatar": "^1.1.10",
     "@radix-ui/react-checkbox": "^1.3.2",
@@ -67,34 +49,30 @@
     "kill-port": "^2.0.1",
     "lucide-react": "^0.536.0",
     "next-themes": "^0.4.6",
-    "pino": "^10.1.0",
-    "pino-pretty": "^13.1.2",
     "postcss": "^8.5.6",
-    "react": "19.0.1",
+    "react": "^19.2.7",
     "react-day-picker": "^9.8.1",
-    "react-dom": "19.0.1",
+    "react-dom": "^19.2.7",
     "react-hook-form": "^7.62.0",
     "recharts": "^3.8.1",
     "sonner": "^2.0.7",
     "stripe": "^19.1.0",
     "tailwind-merge": "^3.3.1",
-    "totalum-api-sdk": "^3.0.7",
     "zod": "^4.0.15"
   },
   "devDependencies": {
     "@eslint/eslintrc": "3",
     "@tailwindcss/postcss": "^4.1.4",
     "@types/node": "24.0.4",
-    "@types/react": "19.0.10",
-    "@types/react-dom": "19.0.4",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
     "eslint": "9.27.0",
-    "eslint-config-next": "15.3.9",
-    "next": "15.3.9",
+    "eslint-config-next": "^16.2.10",
+    "next": "^16.2.10",
     "tailwindcss": "^4.1.1",
     "ts-node": "^10.9.2",
     "tw-animate-css": "^1.3.6",
-    "typescript": "5.8.3",
-    "wrangler": "4.21.x"
+    "typescript": "5.8.3"
   },
   "private": true
 }

@@ -32,8 +32,7 @@ export async function POST(
     }
 
     return NextResponse.json({ ok: true, data: json.data });
-  } catch (error) {
-    console.error("[Upload Proxy] Error:", error);
+  } catch {
     return NextResponse.json({ ok: false, error: "Upload failed" }, { status: 500 });
   }
 }

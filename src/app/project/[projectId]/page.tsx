@@ -245,10 +245,9 @@ export default function WorkspacePage() {
           createdAt: new Date().toISOString(),
         }]);
         fetchConversation();
-        console.log("[Deploy] Success. Live at:", liveUrl);
         return;
       }
-      if (res.data.status === "error") { setDeploying(false); toast.error(t("deployFailedToast")); console.error("[Deploy] Failed for project:", projectId); return; }
+      if (res.data.status === "error") { setDeploying(false); toast.error(t("deployFailedToast")); return; }
     }
     setTimeout(pollDeployOnce, 10000);
   }
@@ -275,14 +274,13 @@ export default function WorkspacePage() {
     if (hasFiles) sentFilesRef.current.push({ message: text, files: files! });
     setMessages((prev) => [...prev, { author: "user", message: text, messageType: "regular", createdAt: new Date().toISOString(), inputFiles: hasFiles ? files : undefined }]);
     setPrompt("");
-    console.log(`[Workspace] Starting agent for ${projectId} with ${files?.length || 0} attachment(s):`, files?.map((f) => f.url));
     const res = await api.post(`/api/vcaas/projects/${projectId}/agent/start`, { prompt: text, inputFiles: files || [] });
     if (res.ok) {
       setProject((prev) => prev ? { ...prev, agentProcessStatus: "init" } : prev);
       pendingRunRef.current = true; runWaitPollsRef.current = 0;
       startAgentPolling();
     }
-    else { toast.error(res.error || "Failed to start agent"); console.error("[Workspace] agent/start failed:", res.error); }
+    else { toast.error(res.error || "Failed to start agent"); }
     setSending(false);
     sendingRef.current = false;
   }, [projectId]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -309,9 +307,8 @@ export default function WorkspacePage() {
     try {
       const raw = sessionStorage.getItem(filesKey);
       if (raw) files = JSON.parse(raw);
-    } catch (e) { console.error("[Workspace] Failed to parse pending files:", e); }
+    } catch { /* ignore */ }
     sessionStorage.removeItem(filesKey);
-    console.log("[Workspace] Auto-submitting first prompt for", projectId);
     sendPromptText(pending, files);
   }, [loading, project, projectId, sendPromptText]);
   const handleStopAgent = async () => { await api.post(`/api/vcaas/projects/${projectId}/agent/stop`, {}); toast.info("Stop signal sent"); };

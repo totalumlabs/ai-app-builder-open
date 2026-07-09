@@ -23,10 +23,6 @@ export async function GET(
       const errorMessage =
         metaJson.errors?.errorMessage ||
         "No download URL returned for project source code";
-      console.error(
-        `[SourceCode Proxy] Failed to get source-code URL for ${projectId}:`,
-        metaJson.errors || "missing downloadUrl"
-      );
       // Map known VCaaS error codes to sensible HTTP statuses.
       const code = metaJson.errors?.errorCode;
       const status =
@@ -43,16 +39,10 @@ export async function GET(
     }
 
     const { downloadUrl, filesCount, lastCommitSha } = metaJson.data;
-    console.log(
-      `[SourceCode Proxy] Downloading ZIP for ${projectId} (files: ${filesCount ?? "?"}, sha: ${lastCommitSha ?? "?"})`
-    );
 
     // 2) Download the ZIP archive server-side.
     const zipRes = await fetch(downloadUrl);
     if (!zipRes.ok) {
-      console.error(
-        `[SourceCode Proxy] ZIP download failed for ${projectId}: HTTP ${zipRes.status}`
-      );
       return NextResponse.json(
         { ok: false, error: `Failed to download source archive (HTTP ${zipRes.status})` },
         { status: 502 }
@@ -60,9 +50,6 @@ export async function GET(
     }
 
     const buffer = await zipRes.arrayBuffer();
-    console.log(
-      `[SourceCode Proxy] ZIP downloaded for ${projectId}: ${buffer.byteLength} bytes`
-    );
 
     // 3) Return raw ZIP bytes with metadata headers.
     return new NextResponse(buffer, {
@@ -76,7 +63,6 @@ export async function GET(
       },
     });
   } catch (error) {
-    console.error(`[SourceCode Proxy] Error for ${projectId}:`, error);
     return NextResponse.json(
       { ok: false, error: error instanceof Error ? error.message : "Failed to fetch source code" },
       { status: 500 }

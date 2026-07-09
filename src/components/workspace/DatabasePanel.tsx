@@ -444,7 +444,6 @@ export function DatabasePanel({ projectId }: DatabasePanelProps) {
   const handleEditRecord = async () => {
     if (!selectedTable || !editingId) return;
     setSaving(true);
-    console.log("[DB] Updating record", editingId, "in", selectedTable);
     const res = await api.patch(`/api/vcaas/projects/${projectId}/database/records/${editingId}`, {
       tableName: selectedTable,
       data: editValues,
@@ -455,7 +454,6 @@ export function DatabasePanel({ projectId }: DatabasePanelProps) {
       setEditingId(null);
       fetchRecords(selectedTable, page, { field: sortField, dir: sortDir }, appliedFilters, appliedSearch);
     } else {
-      console.error("[DB] Update failed:", res.error);
       toast.error(res.error || "Failed to update record");
     }
     setSaving(false);
@@ -466,7 +464,6 @@ export function DatabasePanel({ projectId }: DatabasePanelProps) {
     if (!id || !selectedTable) return;
     if (!confirm(t("confirmDelete"))) return;
     setDeletingId(id);
-    console.log("[DB] Deleting record", id, "from", selectedTable);
     const res = await api.delete(`/api/vcaas/projects/${projectId}/database/records/${id}?tableName=${encodeURIComponent(selectedTable)}`);
     if (res.ok) {
       toast.success(t("recordDeleted"));
@@ -474,7 +471,6 @@ export function DatabasePanel({ projectId }: DatabasePanelProps) {
       if (records.length === 1 && page > 1) setPage(page - 1);
       else fetchRecords(selectedTable, page, { field: sortField, dir: sortDir }, appliedFilters, appliedSearch);
     } else {
-      console.error("[DB] Delete failed:", res.error);
       toast.error(res.error || "Failed to delete record");
     }
     setDeletingId(null);

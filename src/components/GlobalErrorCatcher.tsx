@@ -11,17 +11,11 @@ export function GlobalErrorCatcher() {
     // Prevent Next.js error overlay using stopImmediatePropagation
     // This must run BEFORE Next.js attaches its listeners
     const handleError = (event: ErrorEvent) => {
-      console.error("[Global Error Handler] Unhandled error:", event.error);
-      console.error("[Global Error Handler] Message:", event.message);
-      console.error("[Global Error Handler] Source:", event.filename, "Line:", event.lineno, "Col:", event.colno);
-
       // Stop Next.js overlay from showing
       event.stopImmediatePropagation();
     };
 
     const handleRejection = (event: PromiseRejectionEvent) => {
-      console.error("[Global Error Handler] Unhandled promise rejection:", event.reason);
-
       // Stop Next.js overlay from showing
       event.stopImmediatePropagation();
     };

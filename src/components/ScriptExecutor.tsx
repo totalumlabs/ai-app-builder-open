@@ -39,7 +39,6 @@ export function ScriptExecutor() {
           }, event.origin);
 
         } catch (error) {
-          console.error('[SCRIPT-EXECUTOR] ❌ Error injecting script:', error);
           sendResponse(event.source as Window, {
             type: 'script-injected',
             id,
@@ -63,7 +62,6 @@ export function ScriptExecutor() {
           }, event.origin);
 
         } catch (error) {
-          console.error('[SCRIPT-EXECUTOR] ❌ Error removing script:', error);
           sendResponse(event.source as Window, {
             type: 'script-removed',
             id,
@@ -87,7 +85,6 @@ export function ScriptExecutor() {
           }, event.origin);
 
         } catch (error) {
-          console.error('[SCRIPT-EXECUTOR] ❌ Error executing script:', error);
           sendResponse(event.source as Window, {
             type: 'script-result',
             id,

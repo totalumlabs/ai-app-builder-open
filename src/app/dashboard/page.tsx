@@ -191,8 +191,6 @@ export default function DashboardPage() {
       const list = Array.isArray(res.data) ? res.data : [];
       list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       setProjects(list);
-    } else {
-      console.error("[Dashboard] Failed to list projects:", res.error);
     }
     setLoading(false);
   }, []);
@@ -289,7 +287,6 @@ export default function DashboardPage() {
     setBuildError(null);
     const res = await api.post("/api/vcaas/projects", { projectId: id, description: firstPrompt.trim().slice(0, 200) });
     if (!res.ok) {
-      console.error("[Dashboard] Create failed:", res.error);
       setBuildError(`Could not create "${id}". This name is probably already taken — please choose a different project name.`);
       setBuildCreating(false);
       return;
@@ -305,17 +302,14 @@ export default function DashboardPage() {
       uploadedFiles = await uploadFilesToProjectHelper(id, attachedFiles.map((f) => f.file));
       setUploading(false);
       if (uploadedFiles.length < attachedFiles.length) {
-        console.error(`[Dashboard] Only ${uploadedFiles.length}/${attachedFiles.length} attachment(s) uploaded for`, id);
         toast.error("Some attachments could not be uploaded. The agent may not see them.");
-      } else {
-        console.log(`[Dashboard] All ${uploadedFiles.length} attachment(s) uploaded for`, id);
       }
     }
     // Stash the first prompt (and uploaded files, with real URLs) so the workspace auto-submits it.
     try {
       sessionStorage.setItem(`vibebuild:pendingPrompt:${id}`, firstPrompt.trim());
       if (uploadedFiles.length > 0) sessionStorage.setItem(`vibebuild:pendingFiles:${id}`, JSON.stringify(uploadedFiles));
-    } catch (e) { console.error("[Dashboard] Failed to stash pending prompt:", e); }
+    } catch { /* ignore */ }
     router.push(`/project/${id}`);
   };
 
@@ -334,7 +328,6 @@ export default function DashboardPage() {
     const projectId = deleteTarget;
     if (!projectId) return;
     setDeleting(true);
-    console.log("[Dashboard] Deleting project:", projectId);
     detailCache.current.delete(projectId);
     const res = await api.delete(`/api/vcaas/projects/${projectId}`);
     if (res.ok) {
@@ -342,7 +335,6 @@ export default function DashboardPage() {
       setProjects((prev) => prev.filter((p) => p.projectId !== projectId));
       setDeleteTarget(null);
     } else {
-      console.error("[Dashboard] Delete failed:", res.error);
       toast.error(res.error || "Failed to delete project");
     }
     setDeleting(false);

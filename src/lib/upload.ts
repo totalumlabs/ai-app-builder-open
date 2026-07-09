@@ -27,12 +27,10 @@ export async function uploadFileToProject(
       const res = await fetch(`/api/vcaas/upload/${projectId}`, { method: "POST", body: formData });
       const json = (await res.json()) as { ok: boolean; data?: { url: string; fileNameId: string }; error?: string };
       if (json.ok && json.data?.url) {
-        console.log(`[Upload] "${file.name}" -> ${json.data.url} (attempt ${attempt})`);
         return { name: file.name, url: json.data.url, imageDescription: file.name };
       }
-      console.error(`[Upload] Failed "${file.name}" (attempt ${attempt}/${retries}):`, json.error);
-    } catch (err) {
-      console.error(`[Upload] Error "${file.name}" (attempt ${attempt}/${retries}):`, err);
+    } catch {
+      /* ignore */
     }
     if (attempt < retries) await new Promise((r) => setTimeout(r, delayMs));
   }

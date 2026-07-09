@@ -24,18 +24,15 @@ export function LogsPanel({ projectId }: LogsPanelProps) {
   const fetchLogs = useCallback(async () => {
     setLoading(true);
     setError(null);
-    console.log(`[Logs] Fetching server logs for:`, projectId);
     const res = await api.get<{ logs: string }>(
       `/api/vcaas/projects/${projectId}/backend/dev/logs`
     );
     if (res.ok && res.data) {
       const text = res.data.logs?.trim() ? res.data.logs : "";
       setLogs(text);
-      console.log(`[Logs] Loaded ${text.length} chars of logs`);
     } else {
       // Surface the REAL error so failures are debuggable (no silent/vague swallow).
       const message = res.error || t("logsFailed");
-      console.error(`[Logs] Failed to fetch logs:`, res.error);
       setError(message);
       setLogs("");
     }

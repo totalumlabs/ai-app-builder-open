@@ -16,7 +16,7 @@ function isAllowedOrigin(origin: string, request: NextRequest): boolean {
   if (appOrigin && origin === appOrigin) return true;
   if (/^https:\/\/[^/]+\.totalum-project\.com$/.test(origin)) return true;
 
-  // Trust same-host requests — custom domains served by this same worker
+  // Trust same-host requests — custom domains served by this same server
   const host = request.headers.get("host");
   if (host && origin === `https://${host}`) return true;
 
@@ -47,9 +47,9 @@ function addCspHeaders(response: NextResponse) {
 }
 
 // NOTE: Authentication has been removed — the platform is fully open and every
-// route is public. No user account is required. This middleware now only handles
+// route is public. No user account is required. This proxy now only handles
 // CORS and CSP headers (needed for the live preview iframe and custom domains).
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   // Handle CORS preflight requests
   if (request.method === "OPTIONS") {
     const response = new NextResponse(null, { status: 204 });

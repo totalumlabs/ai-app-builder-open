@@ -70,7 +70,6 @@ async function downloadAndDecompress(projectId: string): Promise<ArchiveResult> 
   const sha = res.headers.get("x-commit-sha") || "";
   const count = parseInt(res.headers.get("x-files-count") || "0", 10) || 0;
   const buffer = await res.arrayBuffer();
-  console.log(`[CodePanel] Received ${buffer.byteLength} bytes, decompressing...`);
   const files = decompressArchive(buffer);
   return { files, sha, count };
 }
@@ -482,8 +481,6 @@ export function CodePanel({ projectId, darkMode, onAskAiEdit }: CodePanelProps) 
         }
       }
 
-      console.log(`[CodePanel] Unzipped ${filteredPaths.length} files (text: ${Object.keys(decodedText).length})`);
-
       setPaths(filteredPaths);
       setTextFiles(decodedText);
       setFilesCount(count || filteredPaths.length);
@@ -498,9 +495,8 @@ export function CodePanel({ projectId, darkMode, onAskAiEdit }: CodePanelProps) 
       };
       try {
         localStorage.setItem(cacheKey, JSON.stringify(payload));
-        console.log("[CodePanel] Cache written to localStorage");
-      } catch (e) {
-        console.warn("[CodePanel] Could not persist code cache (kept in memory only):", e);
+      } catch {
+        /* ignore */
       }
 
       return filteredPaths;
@@ -530,7 +526,6 @@ export function CodePanel({ projectId, darkMode, onAskAiEdit }: CodePanelProps) 
     async (bypassCache: boolean) => {
       setLoading(true);
       setError(null);
-      console.log(`[CodePanel] fetch start (bypassCache=${bypassCache}) for ${projectId}`);
 
       // Try the 3-minute localStorage cache first.
       if (!bypassCache) {
@@ -539,7 +534,6 @@ export function CodePanel({ projectId, darkMode, onAskAiEdit }: CodePanelProps) 
           if (raw) {
             const payload = JSON.parse(raw) as CachePayload;
             if (payload && typeof payload.ts === "number" && Date.now() - payload.ts < CACHE_TTL_MS) {
-              console.log("[CodePanel] Cache HIT — serving from localStorage");
               setPaths(payload.paths || []);
               setTextFiles(payload.textFiles || {});
               setFilesCount((payload.paths || []).length);
@@ -549,15 +543,10 @@ export function CodePanel({ projectId, darkMode, onAskAiEdit }: CodePanelProps) 
               setLoading(false);
               return;
             }
-            console.log("[CodePanel] Cache STALE — refetching");
-          } else {
-            console.log("[CodePanel] Cache MISS — fetching fresh");
           }
-        } catch (e) {
-          console.warn("[CodePanel] Failed to read cache:", e);
+        } catch {
+          /* ignore */
         }
-      } else {
-        console.log("[CodePanel] Bypassing cache (refresh) — fetching fresh");
       }
 
       try {
@@ -569,7 +558,6 @@ export function CodePanel({ projectId, darkMode, onAskAiEdit }: CodePanelProps) 
         autoExpand(filtered);
         setLoading(false);
       } catch (e) {
-        console.error("[CodePanel] Error fetching/unzipping source code:", e);
         setError(e instanceof Error ? e.message : String(e));
         setLoading(false);
       }
@@ -633,11 +621,9 @@ export function CodePanel({ projectId, darkMode, onAskAiEdit }: CodePanelProps) 
   const ensureBytes = useCallback(async () => {
     const byteMap = byteCacheByProject.get(projectId);
     if (byteMap && byteMap.size > 0) return byteMap;
-    console.log("[CodePanel] Bytes not in memory — background re-fetching zip");
     try {
       const res = await fetch(`/api/vcaas/source-code/${projectId}`, { cache: "no-store" });
       if (!res.ok) {
-        console.error("[CodePanel] Background byte re-fetch failed:", res.status);
         return null;
       }
       const buffer = await res.arrayBuffer();
@@ -646,8 +632,7 @@ export function CodePanel({ projectId, darkMode, onAskAiEdit }: CodePanelProps) 
       const count = parseInt(res.headers.get("x-files-count") || "0", 10) || 0;
       applyUnzipped(files, sha, count);
       return byteCacheByProject.get(projectId) || null;
-    } catch (e) {
-      console.error("[CodePanel] Background byte re-fetch error:", e);
+    } catch {
       return null;
     }
   }, [projectId, applyUnzipped]);
@@ -663,7 +648,6 @@ export function CodePanel({ projectId, darkMode, onAskAiEdit }: CodePanelProps) 
 
     if (!selected) return;
     const kind = detectKind(selected);
-    console.log(`[CodePanel] Selected ${selected} (kind: ${kind})`);
     if (kind !== "image") return;
 
     let cancelled = false;
@@ -717,7 +701,6 @@ export function CodePanel({ projectId, darkMode, onAskAiEdit }: CodePanelProps) 
       a.click();
       document.body.removeChild(a);
       setTimeout(() => URL.revokeObjectURL(url), 1000);
-      console.log(`[CodePanel] Downloaded ${path}`);
     },
     [projectId, ensureBytes]
   );

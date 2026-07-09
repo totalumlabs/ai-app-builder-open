@@ -287,10 +287,8 @@ function SecretKeysForm({ secretKeysNeeded, projectId, onTellAi, projectSecrets 
           environment: entry.environment,
         });
         if (res.ok) successCount++;
-        else console.error(`[SecretKeysForm] Failed to create secret ${secret.secretName}:`, res.error);
       }
     }
-    console.log(`[SecretKeysForm] Saved ${successCount} secrets`);
     setSubmitting(false);
     setSubmitted(true);
   };
@@ -524,7 +522,6 @@ export function ChatPanel({ messages, isBuilding, prompt, setPrompt, onSend, onS
     // Real multipart upload (with retry) so the agent receives publicly-fetchable URLs.
     const uploaded = await uploadFilesToProject(projectId, files);
     if (uploaded.length > 0) setAttachedFiles((prev) => [...prev, ...uploaded]);
-    if (uploaded.length < files.length) console.error(`[ChatPanel] Only ${uploaded.length}/${files.length} attachment(s) uploaded`);
     setUploading(false);
   };
 

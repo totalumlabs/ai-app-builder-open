@@ -1,7 +1,5 @@
 "use client";
 
-import { useEffect } from "react";
-
 export default function GlobalError({
   error,
   reset,
@@ -9,16 +7,6 @@ export default function GlobalError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
-  useEffect(() => {
-    // Log critical global errors silently
-    console.error("[Global Error Boundary] Critical global error:", error);
-    console.error("[Global Error Boundary] Message:", error.message);
-    console.error("[Global Error Boundary] Stack:", error.stack);
-    if (error.digest) {
-      console.error("[Global Error Boundary] Digest:", error.digest);
-    }
-  }, [error]);
-
   // Must include html and body tags as per Next.js docs
   // Show user-friendly error message for critical errors
   return (

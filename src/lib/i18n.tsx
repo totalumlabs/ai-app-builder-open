@@ -614,7 +614,6 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
     //    Spanish switch to Spanish once, then persist so it never auto-changes again.
     const browserLang = (typeof navigator !== "undefined" ? navigator.language || "" : "").toLowerCase();
     const initial: Lang = browserLang.startsWith("es") ? "es" : "en";
-    console.log("[i18n] First visit — browser lang:", browserLang || "(unknown)", "→ using:", initial);
     setLangState(initial);
     localStorage.setItem("vibebuild-lang", initial);
   }, []);

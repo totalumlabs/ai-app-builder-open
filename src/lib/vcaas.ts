@@ -11,7 +11,6 @@ export async function vcaasRequest(
   options: RequestInit = {}
 ): Promise<Response> {
   const url = `${VCAAS_BASE_URL}${path}`;
-  console.log(`[VCaaS] ${options.method || "GET"} ${url}`);
 
   const headers: Record<string, string> = {
     "api-key": getVcaasApiKey(),
@@ -26,6 +25,5 @@ export async function vcaasRequest(
     headers,
   });
 
-  console.log(`[VCaaS] Response: ${response.status}`);
   return response;
 }

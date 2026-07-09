@@ -246,7 +246,6 @@ export default function LandingPage() {
           <div className="flex items-center gap-4 text-xs text-gray-400">
             <Link href="/dashboard" className="hover:text-gray-600">{en ? "Open Builder" : "Abrir Constructor"}</Link>
             <a href="mailto:contacto@totalum.app" className="hover:text-gray-600">{en ? "Contact" : "Contacto"}</a>
-            <Link href="/privacy-policy" className="hover:text-gray-600">{en ? "Privacy" : "Privacidad"}</Link>
           </div>
           <p className="text-xs text-gray-400">&copy; {new Date().getFullYear()} {en ? "Powered by Totalum" : "Desarrollado por Totalum"}</p>
         </div>

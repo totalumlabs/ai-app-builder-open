@@ -4,7 +4,6 @@ import type { Metadata } from "next";
 import { DM_Sans, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ScriptExecutor } from "@/components/ScriptExecutor";
-import { DevToolsHandler } from "@/components/DevToolsHandler";
 import { GlobalErrorCatcher } from "@/components/GlobalErrorCatcher";
 import { Toaster } from "@/components/ui/sonner";
 import { I18nProvider } from "@/lib/i18n";
@@ -28,7 +27,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <I18nProvider>
           <GlobalErrorCatcher />
           <ScriptExecutor />
-          <DevToolsHandler />
           <Toaster position="top-right" richColors />
           <div className="min-h-screen flex flex-col">
             <main className="flex-1">{children}</main>

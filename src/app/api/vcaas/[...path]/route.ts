@@ -30,8 +30,6 @@ async function handleRequest(
       }
     }
 
-    console.log(`[VCaaS Proxy] ${req.method} ${fullPath}`);
-
     const response = await vcaasRequest(fullPath, {
       method: req.method,
       body,
@@ -41,7 +39,6 @@ async function handleRequest(
 
     // Transform VCaaS response format to our { ok, data, error } format
     if (json.errors) {
-      console.log(`[VCaaS Proxy] Error: ${json.errors.errorCode} - ${json.errors.errorMessage}`);
       return NextResponse.json(
         {
           ok: false,
@@ -57,8 +54,7 @@ async function handleRequest(
       { ok: true, data: json.data },
       { status: 200 }
     );
-  } catch (error) {
-    console.error("[VCaaS Proxy] Internal error:", error);
+  } catch {
     return NextResponse.json(
       { ok: false, error: "Internal server error" },
       { status: 500 }

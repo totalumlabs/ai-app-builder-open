@@ -105,7 +105,6 @@ function SelectItem({
 }: React.ComponentProps<typeof SelectPrimitive.Item>) {
   const value = props?.value;
   if (value === "" || value === null || value === undefined || (typeof value !== "number" && !value)) {
-    console.error("[SelectItem] value cannot be empty:", value);
     return null;
   }
   return (
