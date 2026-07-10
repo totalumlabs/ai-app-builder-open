@@ -1,12 +1,12 @@
 {
   "name": "ai-app-builder-open",
-  "description": "Build a full-stack web application with Next.js and Totalum.",
+  "description": "Open-source AI app builder — turn a prompt into a full-stack Next.js web app with built-in hosting, sandbox, database, auth, AI integration, github bidirectional, multitenant, custom domain & more. Self-hosted, no-code. A free v0 / Lovable / Bolt / Replit alternative. ⭐",
   "scripts": {
-    "dev": "NEXT_TELEMETRY_DISABLED=1 next dev",
+    "dev": "next dev",
     "check-types-errors": "tsc --noEmit --skipLibCheck",
-    "start": "NEXT_TELEMETRY_DISABLED=1 next start",
-    "build": "NEXT_TELEMETRY_DISABLED=1 next build",
-    "test:serve": "TESTING_MODE=true NEXT_TELEMETRY_DISABLED=1 PORT=3000 next start"
+    "start": "next start",
+    "build": "next build",
+    "test:serve": "TESTING_MODE=true PORT=3000 next start"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.1",

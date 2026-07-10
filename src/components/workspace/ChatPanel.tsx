@@ -4,11 +4,12 @@ import { useRef, useEffect, useState, useCallback } from "react";
 import { Badge } from "@/components/ui/badge";
 import {
   Send, Square, Loader2, Bot, AlertCircle, CheckCircle2,
-  Key, ExternalLink, ChevronDown, ChevronRight, ChevronUp, Paperclip, X, Check,
+  Key, FileDiff, ChevronDown, ChevronRight, ChevronUp, Paperclip, X, Check,
   Plus, Eye, EyeOff, CheckCircle, ArrowRight,
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { api } from "@/lib/api";
+import { DiffViewer } from "@/components/workspace/DiffViewer";
 import { uploadFilesToProject } from "@/lib/upload";
 import type { ConversationMessage, VcaasSecret, AgentInputFile } from "@/lib/vcaas-types";
 
@@ -422,6 +423,7 @@ function SecretKeysForm({ secretKeysNeeded, projectId, onTellAi, projectSecrets 
 // --- Build Group ---
 function BuildGroup({ group, projectId, onTellAi, projectSecrets }: { group: MessageGroup; projectId: string; onTellAi: (count: number) => void; projectSecrets?: VcaasSecret[] }) {
   const [expanded, setExpanded] = useState(false);
+  const [diffOpen, setDiffOpen] = useState(false);
   const hasBuildMsgs = (group.buildMsgs?.length || 0) > 0;
   const isComplete = !!group.finishMsg;
   const { t } = useI18n();
@@ -476,7 +478,20 @@ function BuildGroup({ group, projectId, onTellAi, projectSecrets }: { group: Mes
             />
           )}
           {group.finishMsg.gitDiffUrl && (
-            <a href={group.finishMsg.gitDiffUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 mt-2 text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"><ExternalLink className="w-2.5 h-2.5" /> {t("viewChanges")}</a>
+            <>
+              <button
+                type="button"
+                onClick={() => setDiffOpen(true)}
+                className="inline-flex items-center gap-1 mt-2 text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+              >
+                <FileDiff className="w-2.5 h-2.5" /> {t("viewChanges")}
+              </button>
+              <DiffViewer
+                open={diffOpen}
+                onOpenChange={setDiffOpen}
+                diffUrl={group.finishMsg.gitDiffUrl}
+              />
+            </>
           )}
         </div>
       )}
