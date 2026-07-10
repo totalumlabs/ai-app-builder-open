@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { api } from "@/lib/api";
+import { vcaasApi } from "@/lib/vcaas";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -21,7 +21,7 @@ export function VersionsPanel({ projectId, onVersionRestored }: VersionsPanelPro
 
   const fetchVersions = useCallback(async () => {
     setLoading(true);
-    const res = await api.get<{ versions: ProjectVersion[]; totalCount: number }>(`/api/vcaas/projects/${projectId}/versions?limit=50&skip=0`);
+    const res = await vcaasApi.versions.list(projectId, { limit: 50, skip: 0 });
     if (res.ok && res.data) setVersions(res.data.versions || []);
     setLoading(false);
   }, [projectId]);
@@ -31,7 +31,7 @@ export function VersionsPanel({ projectId, onVersionRestored }: VersionsPanelPro
   const handleRecover = async (versionId: string) => {
     if (!confirm("Restore this version? Current changes will be overwritten.")) return;
     setRecovering(versionId);
-    const res = await api.post(`/api/vcaas/projects/${projectId}/versions/${versionId}/recover`, {});
+    const res = await vcaasApi.versions.recover(projectId, versionId);
     if (res.ok) { toast.success("Version recovery started..."); onVersionRestored(); }
     else toast.error(res.error || "Failed to start recovery");
     setRecovering(null);

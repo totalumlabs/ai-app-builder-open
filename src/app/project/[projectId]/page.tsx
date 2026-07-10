@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { api } from "@/lib/api";
+import { vcaasApi } from "@/lib/vcaas";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -22,7 +22,7 @@ import { DomainPanel } from "@/components/workspace/DomainPanel";
 import { LogsPanel } from "@/components/workspace/LogsPanel";
 import { GithubPanel } from "@/components/workspace/GithubPanel";
 import { CodePanel } from "@/components/workspace/CodePanel";
-import type { VcaasProject, AgentStatus, ConversationMessage, GithubStatus } from "@/lib/vcaas-types";
+import type { VcaasProject, ConversationMessage } from "@/lib/vcaas-types";
 
 // Pick the correct development preview URL following the VCaaS docs:
 // use `developmentUrlFieldToUse` to decide between the live server URL and the
@@ -165,11 +165,11 @@ export default function WorkspacePage() {
   }, [isResizing]);
 
   async function fetchProject(): Promise<VcaasProject | null> {
-    const res = await api.get<VcaasProject>(`/api/vcaas/projects/${projectId}`);
+    const res = await vcaasApi.projects.get(projectId);
     if (res.ok && res.data && mountedRef.current) { setProject(res.data); setPreviewUrl(getPreviewUrlFromProject(res.data)); setPreviewCached(isCachedPreview(res.data)); return res.data; } return null;
   }
   async function fetchConversation(): Promise<void> {
-    const res = await api.get<{ conversation: ConversationMessage[] }>(`/api/vcaas/projects/${projectId}/agent/full-conversation`);
+    const res = await vcaasApi.agent.fullConversation(projectId);
     if (res.ok && res.data && mountedRef.current) setMessages(rehydrateAttachments(res.data.conversation || []));
   }
   // The server conversation has no attachment info; walk it in order and re-attach
@@ -187,14 +187,14 @@ export default function WorkspacePage() {
   }
   // Lightweight GitHub connection check — drives the green "connected" bubble on the GitHub icon.
   async function fetchGithubStatus(): Promise<void> {
-    const res = await api.get<GithubStatus>(`/api/vcaas/projects/${projectId}/github/status`);
+    const res = await vcaasApi.github.status(projectId);
     if (res.ok && res.data && mountedRef.current) setGithubConnected(!!res.data.connected);
   }
   function startAgentPolling() { stopAgentPolling(); pollAgentOnce(); }
   function stopAgentPolling() { if (pollingRef.current) { clearTimeout(pollingRef.current); pollingRef.current = null; } }
   async function pollAgentOnce() {
     if (!mountedRef.current) return;
-    const res = await api.get<AgentStatus>(`/api/vcaas/projects/${projectId}/agent/status`);
+    const res = await vcaasApi.agent.status(projectId);
     if (!mountedRef.current) return;
     if (res.ok && res.data) {
       const rt = res.data.realtimeConversation || [];
@@ -226,7 +226,7 @@ export default function WorkspacePage() {
   }
   async function pollDeployOnce() {
     if (!mountedRef.current) return;
-    const res = await api.get<{ status: string }>(`/api/vcaas/projects/${projectId}/deployments/status`);
+    const res = await vcaasApi.deployments.status(projectId);
     if (!mountedRef.current) return;
     if (res.ok && res.data) {
       if (res.data.status === "success") {
@@ -271,7 +271,7 @@ export default function WorkspacePage() {
     if (hasFiles) sentFilesRef.current.push({ message: text, files: files! });
     setMessages((prev) => [...prev, { author: "user", message: text, messageType: "regular", createdAt: new Date().toISOString(), inputFiles: hasFiles ? files : undefined }]);
     setPrompt("");
-    const res = await api.post(`/api/vcaas/projects/${projectId}/agent/start`, { prompt: text, inputFiles: files || [] });
+    const res = await vcaasApi.agent.start(projectId, { prompt: text, inputFiles: files || [] });
     if (res.ok) {
       setProject((prev) => prev ? { ...prev, agentProcessStatus: "init" } : prev);
       pendingRunRef.current = true; runWaitPollsRef.current = 0;
@@ -308,7 +308,7 @@ export default function WorkspacePage() {
     sessionStorage.removeItem(filesKey);
     sendPromptText(pending, files);
   }, [loading, project, projectId, sendPromptText]);
-  const handleStopAgent = async () => { await api.post(`/api/vcaas/projects/${projectId}/agent/stop`, {}); toast.info("Stop signal sent"); };
+  const handleStopAgent = async () => { await vcaasApi.agent.stop(projectId); toast.info("Stop signal sent"); };
   // Autofill the chat prompt with an edit instruction for the given file, then focus the chat.
   const handleAskAiEdit = useCallback((path: string) => {
     setPrompt(`On file ${path} write what you want to edit`);
@@ -322,12 +322,12 @@ export default function WorkspacePage() {
   }, []);
   const handleDeploy = async () => {
     if (deploying) return; setDeploying(true);
-    const res = await api.post(`/api/vcaas/projects/${projectId}/deployments/deploy`, {});
+    const res = await vcaasApi.deployments.deploy(projectId);
     if (res.ok) { toast.success("Deploying… this takes ~3 minutes"); pollDeployOnce(); }
     else { toast.error(res.error || "Failed to deploy"); setDeploying(false); }
   };
   const handleRestartServer = async () => {
-    const res = await api.post(`/api/vcaas/projects/${projectId}/agent/server/start-or-restart`, {});
+    const res = await vcaasApi.agent.restartServer(projectId);
     if (res.ok) toast.success("Server restarting...");
     else toast.error(res.error || "Failed");
   };

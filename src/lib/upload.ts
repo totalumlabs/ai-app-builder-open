@@ -1,6 +1,7 @@
 "use client";
 
 import type { AgentInputFile } from "@/lib/vcaas-types";
+import { vcaasApi } from "@/lib/vcaas";
 
 /**
  * Upload a single file to a VCaaS project and return an agent-ready
@@ -24,8 +25,7 @@ export async function uploadFileToProject(
     try {
       const formData = new FormData();
       formData.append("file", file);
-      const res = await fetch(`/api/vcaas/upload/${projectId}`, { method: "POST", body: formData });
-      const json = (await res.json()) as { ok: boolean; data?: { url: string; fileNameId: string }; error?: string };
+      const json = await vcaasApi.upload(projectId, formData);
       if (json.ok && json.data?.url) {
         return { name: file.name, url: json.data.url, imageDescription: file.name };
       }

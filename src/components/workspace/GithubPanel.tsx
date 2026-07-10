@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { api } from "@/lib/api";
+import { vcaasApi } from "@/lib/vcaas";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -10,10 +10,7 @@ import {
   GitBranch, CheckCircle2, AlertTriangle, Download, Copy, ExternalLink, Info,
 } from "lucide-react";
 import { toast } from "sonner";
-import type {
-  GithubStatus, GithubConnectResult, GithubPullResult, GithubPullStatus,
-  GithubEnv, GithubSyncDirection,
-} from "@/lib/vcaas-types";
+import type { GithubStatus, GithubEnv, GithubSyncDirection } from "@/lib/vcaas-types";
 
 interface GithubPanelProps {
   projectId: string;
@@ -53,7 +50,7 @@ export function GithubPanel({ projectId, onStatusChange }: GithubPanelProps) {
   }, []);
 
   const fetchStatus = useCallback(async () => {
-    const res = await api.get<GithubStatus>(`/api/vcaas/projects/${projectId}/github/status`);
+    const res = await vcaasApi.github.status(projectId);
     if (res.ok && res.data && mountedRef.current) { setStatus(res.data); onStatusChange?.(!!res.data.connected); }
     return res.ok ? res.data : null;
   }, [projectId, onStatusChange]);
@@ -71,7 +68,7 @@ export function GithubPanel({ projectId, onStatusChange }: GithubPanelProps) {
     if (pullPollRef.current) clearTimeout(pullPollRef.current);
     const tick = async () => {
       if (!mountedRef.current) return;
-      const res = await api.get<GithubPullStatus>(`/api/vcaas/projects/${projectId}/github/pull-status`);
+      const res = await vcaasApi.github.pullStatus(projectId);
       if (!mountedRef.current) return;
       const st = res.ok ? res.data?.status : null;
       if (st === "success") {
@@ -93,7 +90,7 @@ export function GithubPanel({ projectId, onStatusChange }: GithubPanelProps) {
   const handleConnect = async () => {
     if (!token.trim() || !repo.trim()) return;
     setConnecting(true);
-    const res = await api.post<GithubConnectResult>(`/api/vcaas/projects/${projectId}/github/connect`, {
+    const res = await vcaasApi.github.connect(projectId, {
       token: token.trim(),
       repositoryFullName: repo.trim(),
       syncDirection,
@@ -116,7 +113,7 @@ export function GithubPanel({ projectId, onStatusChange }: GithubPanelProps) {
   const handleDisconnect = async () => {
     if (!confirm("Disconnect GitHub? Your project code is not affected.")) return;
     setDisconnecting(true);
-    const res = await api.delete(`/api/vcaas/projects/${projectId}/github/connect`);
+    const res = await vcaasApi.github.disconnect(projectId);
     if (res.ok) {
       toast.success("GitHub disconnected");
       setEnv(null);
@@ -129,7 +126,7 @@ export function GithubPanel({ projectId, onStatusChange }: GithubPanelProps) {
 
   const handlePull = async () => {
     setPulling(true);
-    const res = await api.post<GithubPullResult>(`/api/vcaas/projects/${projectId}/github/pull`, {});
+    const res = await vcaasApi.github.pull(projectId);
     if (res.ok && res.data) {
       if (res.data.status === "no_changes") {
         toast.info("No changes to pull");
@@ -149,7 +146,7 @@ export function GithubPanel({ projectId, onStatusChange }: GithubPanelProps) {
 
   const handleLoadEnv = async () => {
     setLoadingEnv(true);
-    const res = await api.get<GithubEnv>(`/api/vcaas/projects/${projectId}/github/env`);
+    const res = await vcaasApi.github.env(projectId);
     if (res.ok && res.data && mountedRef.current) setEnv(res.data);
     else toast.error(res.error || ("Failed to load env variables"));
     setLoadingEnv(false);

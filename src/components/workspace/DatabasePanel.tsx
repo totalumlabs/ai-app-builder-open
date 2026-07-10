@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { api } from "@/lib/api";
+import { vcaasApi } from "@/lib/vcaas";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -333,7 +333,7 @@ export function DatabasePanel({ projectId }: DatabasePanelProps) {
 
   const fetchTables = useCallback(async () => {
     setLoading(true);
-    const res = await api.get<{ tables: DbTable[] }>(`/api/vcaas/projects/${projectId}/database/tables-structure`);
+    const res = await vcaasApi.database.tablesStructure(projectId);
     if (res.ok && res.data) {
       const tbls = res.data.tables || [];
       setTables(tbls);
@@ -374,7 +374,7 @@ export function DatabasePanel({ projectId }: DatabasePanelProps) {
       queryOptions._filter = filterObj;
     }
 
-    const res = await api.post<{ results: Record<string, unknown>[] }>(`/api/vcaas/projects/${projectId}/database/query`, {
+    const res = await vcaasApi.database.query(projectId, {
       tableName,
       queryOptions,
     });
@@ -418,7 +418,7 @@ export function DatabasePanel({ projectId }: DatabasePanelProps) {
   const handleCreateRecord = async () => {
     if (!selectedTable) return;
     setCreating(true);
-    const res = await api.post(`/api/vcaas/projects/${projectId}/database/records`, { tableName: selectedTable, data: newRecord });
+    const res = await vcaasApi.database.createRecord(projectId, { tableName: selectedTable, data: newRecord });
     if (res.ok) {
       toast.success("Record created");
       setCreateDialogOpen(false);
@@ -442,7 +442,7 @@ export function DatabasePanel({ projectId }: DatabasePanelProps) {
   const handleEditRecord = async () => {
     if (!selectedTable || !editingId) return;
     setSaving(true);
-    const res = await api.patch(`/api/vcaas/projects/${projectId}/database/records/${editingId}`, {
+    const res = await vcaasApi.database.updateRecord(projectId, editingId, {
       tableName: selectedTable,
       data: editValues,
     });
@@ -462,7 +462,7 @@ export function DatabasePanel({ projectId }: DatabasePanelProps) {
     if (!id || !selectedTable) return;
     if (!confirm("Delete this record? This cannot be undone.")) return;
     setDeletingId(id);
-    const res = await api.delete(`/api/vcaas/projects/${projectId}/database/records/${id}?tableName=${encodeURIComponent(selectedTable)}`);
+    const res = await vcaasApi.database.deleteRecord(projectId, id, selectedTable);
     if (res.ok) {
       toast.success("Record deleted");
       // If we just removed the last row on a page, step back a page.

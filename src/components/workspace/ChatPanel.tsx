@@ -7,7 +7,7 @@ import {
   Key, FileDiff, ChevronDown, ChevronRight, ChevronUp, Paperclip, X, Check,
   Plus, Eye, EyeOff, CheckCircle, ArrowRight,
 } from "lucide-react";
-import { api } from "@/lib/api";
+import { vcaasApi } from "@/lib/vcaas";
 import { DiffViewer } from "@/components/workspace/DiffViewer";
 import { uploadFilesToProject } from "@/lib/upload";
 import type { ConversationMessage, VcaasSecret, AgentInputFile } from "@/lib/vcaas-types";
@@ -279,7 +279,7 @@ function SecretKeysForm({ secretKeysNeeded, projectId, onTellAi, projectSecrets 
     let successCount = 0;
     for (const secret of secrets) {
       for (const entry of secret.entries) {
-        const res = await api.post(`/api/vcaas/projects/${projectId}/secrets`, {
+        const res = await vcaasApi.secrets.create(projectId, {
           secretName: secret.secretName,
           secretValue: entry.value.trim(),
           environment: entry.environment,

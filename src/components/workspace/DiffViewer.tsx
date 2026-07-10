@@ -11,7 +11,7 @@ import {
   Loader2, AlertCircle, Copy, Check, Download,
   ChevronDown, ChevronRight, UnfoldVertical, FoldVertical, FileDiff,
 } from "lucide-react";
-import { api } from "@/lib/api";
+import { vcaasApi } from "@/lib/vcaas";
 
 /* ────────────────────────── unified diff parsing ────────────────────────── */
 
@@ -271,8 +271,8 @@ export function DiffViewer({ open, onOpenChange, diffUrl }: DiffViewerProps) {
     setLoading(true);
     setError(null);
 
-    api
-      .get<{ diff: string }>(`/api/vcaas/git-diff?url=${encodeURIComponent(diffUrl)}`)
+    vcaasApi
+      .gitDiff(diffUrl)
       .then((res) => {
         if (cancelled) return;
         if (res.ok && res.data) {

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
+import { vcaasApi } from "@/lib/vcaas";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,12 +21,7 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { uploadFilesToProject as uploadFilesToProjectHelper } from "@/lib/upload";
 import { SetupBanners } from "@/components/SetupBanners";
-import type { VcaasProject } from "@/lib/vcaas-types";
-
-// Shape returned by the VCaaS "List Projects" endpoint (GET /vcaas/projects).
-// The platform is fully open — this lists every project in the account, no user
-// account or database association is involved.
-interface VcaasProjectSummary { projectId: string; description: string; plan: string; createdAt: string; }
+import type { VcaasProject, VcaasProjectSummary } from "@/lib/vcaas-types";
 
 type ViewMode = "cards" | "table";
 type SortKey = "date-desc" | "date-asc" | "name-asc" | "name-desc";
@@ -183,7 +179,7 @@ export default function DashboardPage() {
   const getDetail = useCallback(async (id: string): Promise<VcaasProject | null> => {
     if (detailCache.current.has(id)) return detailCache.current.get(id)!;
     if (inflight.current.has(id)) return inflight.current.get(id)!;
-    const p = api.get<VcaasProject>(`/api/vcaas/projects/${id}`).then((r) => {
+    const p = vcaasApi.projects.get(id).then((r) => {
       const d = r.ok && r.data ? r.data : null;
       detailCache.current.set(id, d);
       inflight.current.delete(id);
@@ -195,7 +191,7 @@ export default function DashboardPage() {
 
   const fetchData = useCallback(async () => {
     setLoading(true);
-    const res = await api.get<VcaasProjectSummary[]>("/api/vcaas/projects");
+    const res = await vcaasApi.projects.list();
     if (res.ok && res.data) {
       const list = Array.isArray(res.data) ? res.data : [];
       list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -271,7 +267,7 @@ export default function DashboardPage() {
     const id = normalizeId(newProjectId);
     if (!id) return;
     setCreating(true);
-    const res = await api.post("/api/vcaas/projects", { projectId: id, description: newProjectDesc.trim() });
+    const res = await vcaasApi.projects.create({ projectId: id, description: newProjectDesc.trim() });
     if (res.ok) {
       toast.success("Project created!"); setDialogOpen(false); setNewProjectId(""); setNewProjectDesc("");
       router.push(`/project/${id}`);
@@ -294,7 +290,7 @@ export default function DashboardPage() {
     if (id.length < 3) { setBuildError("Project name must be at least 3 characters (lowercase, hyphens allowed)."); return; }
     setBuildCreating(true);
     setBuildError(null);
-    const res = await api.post("/api/vcaas/projects", { projectId: id, description: firstPrompt.trim().slice(0, 200) });
+    const res = await vcaasApi.projects.create({ projectId: id, description: firstPrompt.trim().slice(0, 200) });
     if (!res.ok) {
       setBuildError(`Could not create "${id}". This name is probably already taken — please choose a different project name.`);
       setBuildCreating(false);
@@ -338,7 +334,7 @@ export default function DashboardPage() {
     if (!projectId) return;
     setDeleting(true);
     detailCache.current.delete(projectId);
-    const res = await api.delete(`/api/vcaas/projects/${projectId}`);
+    const res = await vcaasApi.projects.remove(projectId);
     if (res.ok) {
       toast.success("Project deleted");
       setProjects((prev) => prev.filter((p) => p.projectId !== projectId));
@@ -373,12 +369,9 @@ export default function DashboardPage() {
       </header>
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
-        {/* Setup guidance — only when the Totalum VCaaS API key is missing */}
-        {keyConfigured === false && <SetupBanners />}
-
         {/* Hero prompt */}
         {!loading && (
-          <div className={hasProjects ? "mb-10" : "flex flex-col items-center justify-center min-h-[50vh]"}>
+          <div className={hasProjects || keyConfigured === false ? "mb-10" : "flex flex-col items-center justify-center min-h-[50vh]"}>
             <div className="w-full max-w-2xl mx-auto">
               <div className="text-center mb-6">
                 {!hasProjects && (
@@ -421,6 +414,9 @@ export default function DashboardPage() {
                   </button>
                 </div>
               </div>
+
+              {/* Setup guidance — right under the prompt, only when the key is missing */}
+              {keyConfigured === false && <SetupBanners />}
             </div>
           </div>
         )}

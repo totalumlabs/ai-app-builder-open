@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { api } from "@/lib/api";
+import { vcaasApi } from "@/lib/vcaas";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -34,7 +34,7 @@ export function SecretsPanel({ projectId, secrets, onSecretsChanged }: SecretsPa
   const handleCreate = async () => {
     if (!name.trim() || !value.trim()) return;
     setSaving(true);
-    const res = await api.post(`/api/vcaas/projects/${projectId}/secrets`, {
+    const res = await vcaasApi.secrets.create(projectId, {
       secretName: name.trim(),
       secretValue: value.trim(),
       environment: env,
@@ -50,7 +50,7 @@ export function SecretsPanel({ projectId, secrets, onSecretsChanged }: SecretsPa
   const handleDelete = async (secretId: string, secretName: string) => {
     if (!confirm(`Delete "${secretName}"?`)) return;
     setDeleting(secretId);
-    const res = await api.delete(`/api/vcaas/projects/${projectId}/secrets/${secretId}`);
+    const res = await vcaasApi.secrets.remove(projectId, secretId);
     if (res.ok) { toast.success("Secret deleted"); onSecretsChanged(); }
     else toast.error(res.error || "Failed to delete secret");
     setDeleting(null);

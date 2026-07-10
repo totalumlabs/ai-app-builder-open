@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { api } from "@/lib/api";
+import { vcaasApi } from "@/lib/vcaas";
 import { Button } from "@/components/ui/button";
 import { RefreshCw, Terminal, Loader2, AlertTriangle } from "lucide-react";
 
@@ -22,9 +22,7 @@ export function LogsPanel({ projectId }: LogsPanelProps) {
   const fetchLogs = useCallback(async () => {
     setLoading(true);
     setError(null);
-    const res = await api.get<{ logs: string }>(
-      `/api/vcaas/projects/${projectId}/backend/dev/logs`
-    );
+    const res = await vcaasApi.logs.dev(projectId);
     if (res.ok && res.data) {
       const text = res.data.logs?.trim() ? res.data.logs : "";
       setLogs(text);

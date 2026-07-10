@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { api } from "@/lib/api";
+import { vcaasApi } from "@/lib/vcaas";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -26,7 +26,7 @@ export function DomainPanel({ projectId, domain, productionUrl, onDomainChanged 
   const handleAdd = async () => {
     if (!hostname.trim()) return;
     setAdding(true);
-    const res = await api.put(`/api/vcaas/projects/${projectId}/domain`, { hostname: hostname.trim() });
+    const res = await vcaasApi.domain.set(projectId, { hostname: hostname.trim() });
     if (res.ok) { toast.success("Domain added! Configure DNS records below."); setHostname(""); onDomainChanged(); }
     else toast.error(res.error || "Failed to add domain. Deploy your project first.");
     setAdding(false);
@@ -35,7 +35,7 @@ export function DomainPanel({ projectId, domain, productionUrl, onDomainChanged 
   const handleRemove = async () => {
     if (!confirm("Remove custom domain?")) return;
     setRemoving(true);
-    const res = await api.delete(`/api/vcaas/projects/${projectId}/domain`);
+    const res = await vcaasApi.domain.remove(projectId);
     if (res.ok) { toast.success("Domain removed"); onDomainChanged(); }
     else toast.error(res.error || "Failed to remove domain");
     setRemoving(false);

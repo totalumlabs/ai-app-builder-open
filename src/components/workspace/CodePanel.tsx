@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import dynamic from "next/dynamic";
 import { unzipSync, gunzipSync } from "fflate";
+import { vcaasApi } from "@/lib/vcaas";
 import {
   Loader2,
   RefreshCw,
@@ -53,7 +54,7 @@ type ArchiveResult = { files: { [path: string]: Uint8Array }; sha: string; count
 const inflightByProject: Map<string, Promise<ArchiveResult>> = new Map();
 
 async function downloadAndDecompress(projectId: string): Promise<ArchiveResult> {
-  const res = await fetch(`/api/vcaas/source-code/${projectId}`, { cache: "no-store" });
+  const res = await vcaasApi.sourceCode(projectId);
   const contentType = res.headers.get("content-type") || "";
   if (!res.ok || !contentType.includes("application/zip")) {
     // Error path: the route returns JSON { ok:false, error }.
@@ -620,7 +621,7 @@ export function CodePanel({ projectId, darkMode, onAskAiEdit }: CodePanelProps) 
     const byteMap = byteCacheByProject.get(projectId);
     if (byteMap && byteMap.size > 0) return byteMap;
     try {
-      const res = await fetch(`/api/vcaas/source-code/${projectId}`, { cache: "no-store" });
+      const res = await vcaasApi.sourceCode(projectId);
       if (!res.ok) {
         return null;
       }

@@ -19,6 +19,16 @@ export interface VcaasProject {
   totalCreditsSpent?: number;
 }
 
+// Shape returned by the "List Projects" endpoint (GET /vcaas/projects). The
+// platform is fully open — this lists every project in the account; there is no
+// per-user account or database association involved.
+export interface VcaasProjectSummary {
+  projectId: string;
+  description: string;
+  plan: string;
+  createdAt: string;
+}
+
 export interface VcaasSecret {
   _id: string;
   secretName: string;
