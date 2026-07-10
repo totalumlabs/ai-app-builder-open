@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-
-const VCAAS_BASE_URL = "https://api-accounts.totalum.app/api/v1/vcaas";
+import { vcaasUploadRequest } from "@/lib/vcaas";
 
 export async function POST(
   req: NextRequest,
@@ -8,18 +7,12 @@ export async function POST(
 ) {
   try {
     const { projectId } = await params;
-    const apiKey = process.env.VCAAS_API_KEY || "";
 
-    // Forward the multipart form data directly
+    // Forward the multipart form data straight through to the VCaaS endpoint.
     const formData = await req.formData();
-
-    const response = await fetch(
-      `${VCAAS_BASE_URL}/projects/${projectId}/files/upload`,
-      {
-        method: "POST",
-        headers: { "api-key": apiKey },
-        body: formData,
-      }
+    const response = await vcaasUploadRequest(
+      `/projects/${projectId}/files/upload`,
+      formData
     );
 
     const json = (await response.json()) as { errors: { errorCode: string; errorMessage: string } | null; data: unknown };
