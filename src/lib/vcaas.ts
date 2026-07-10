@@ -37,12 +37,14 @@ const VCAAS_BASE_URL = "https://api-accounts.totalum.app/api/v1/vcaas";
 /**
  * The Totalum VCaaS API key, read from the environment.
  *
- * This is the only credential the app requires (see README). Returns an empty
- * string when unset so callers still get a structured `{ errors }` response
- * from VCaaS (an auth error) rather than a thrown exception.
+ * This is the only credential the app requires (see README). The documented
+ * name is `TOTALUM_VCAAS_API_KEY`; the legacy `VCAAS_API_KEY` is still accepted
+ * as a fallback so older setups keep working. Returns an empty string when
+ * unset so callers still get a structured `{ errors }` response from VCaaS (an
+ * auth error) rather than a thrown exception.
  */
 export function getVcaasApiKey(): string {
-  return process.env.VCAAS_API_KEY || "";
+  return process.env.TOTALUM_VCAAS_API_KEY || process.env.VCAAS_API_KEY || "";
 }
 
 /**

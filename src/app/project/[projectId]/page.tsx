@@ -13,7 +13,6 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
-import { useI18n } from "@/lib/i18n";
 import { ChatPanel } from "@/components/workspace/ChatPanel";
 import { PreviewPanel } from "@/components/workspace/PreviewPanel";
 import { DatabasePanel } from "@/components/workspace/DatabasePanel";
@@ -23,7 +22,6 @@ import { DomainPanel } from "@/components/workspace/DomainPanel";
 import { LogsPanel } from "@/components/workspace/LogsPanel";
 import { GithubPanel } from "@/components/workspace/GithubPanel";
 import { CodePanel } from "@/components/workspace/CodePanel";
-import { LanguageSelect } from "@/components/LanguageSelect";
 import type { VcaasProject, AgentStatus, ConversationMessage, GithubStatus } from "@/lib/vcaas-types";
 
 // Pick the correct development preview URL following the VCaaS docs:
@@ -41,13 +39,13 @@ function isCachedPreview(proj: VcaasProject): boolean {
 }
 
 // Colour + label for a custom-domain status, used in the deploy popup.
-function domainStatusMeta(status: string | undefined, es: boolean): { color: string; label: string } {
+function domainStatusMeta(status: string | undefined): { color: string; label: string } {
   switch (status) {
-    case "active": return { color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400", label: es ? "Activo" : "Active" };
-    case "pending_validation": return { color: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400", label: es ? "DNS pendiente" : "Pending DNS" };
-    case "pending_deployment": return { color: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400", label: es ? "Desplegando" : "Deploying" };
-    case "blocked": return { color: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400", label: es ? "Bloqueado" : "Blocked" };
-    default: return { color: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400", label: status || (es ? "Pendiente" : "Pending") };
+    case "active": return { color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400", label: "Active" };
+    case "pending_validation": return { color: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400", label: "Pending DNS" };
+    case "pending_deployment": return { color: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400", label: "Deploying" };
+    case "blocked": return { color: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400", label: "Blocked" };
+    default: return { color: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400", label: status || "Pending" };
   }
 }
 
@@ -55,24 +53,23 @@ export default function WorkspacePage() {
   const params = useParams();
   const router = useRouter();
   const projectId = params.projectId as string;
-  const { t, lang } = useI18n();
 
   const TABS = [
-    { id: "preview", label: t("preview"), icon: Eye },
-    { id: "database", label: t("database"), icon: Database },
-    { id: "code", label: t("code"), icon: Code2 },
+    { id: "preview", label: "Preview", icon: Eye },
+    { id: "database", label: "Database", icon: Database },
+    { id: "code", label: "Code", icon: Code2 },
   ];
 
   // All tabs for mobile menu (includes versions/secrets/domain/github/logs)
   const ALL_TABS = [
-    { id: "preview", label: t("preview"), icon: Eye },
-    { id: "database", label: t("database"), icon: Database },
-    { id: "code", label: t("code"), icon: Code2 },
-    { id: "versions", label: t("versions"), icon: Clock },
-    { id: "secrets", label: t("secrets"), icon: Key },
-    { id: "domain", label: t("domain"), icon: Globe },
-    { id: "github", label: t("github"), icon: Github },
-    { id: "logs", label: t("logs"), icon: Terminal },
+    { id: "preview", label: "Preview", icon: Eye },
+    { id: "database", label: "Database", icon: Database },
+    { id: "code", label: "Code", icon: Code2 },
+    { id: "versions", label: "Versions", icon: Clock },
+    { id: "secrets", label: "Secrets", icon: Key },
+    { id: "domain", label: "Domain", icon: Globe },
+    { id: "github", label: "GitHub", icon: Github },
+    { id: "logs", label: "Logs", icon: Terminal },
   ];
 
   const [project, setProject] = useState<VcaasProject | null>(null);
@@ -234,20 +231,20 @@ export default function WorkspacePage() {
     if (res.ok && res.data) {
       if (res.data.status === "success") {
         setDeploying(false);
-        toast.success(t("deployedToast"));
+        toast.success("Published successfully!");
         const proj = await fetchProject();
         // Surface the deploy result in the chat and pull the latest conversation.
         const liveUrl = proj?.productionProjectUrl || project?.productionProjectUrl || `${projectId}.totalum-project.com`;
         setMessages((prev) => [...prev, {
           author: "agent",
-          message: `${t("publishedMsg")} https://${liveUrl}`,
+          message: `${"🚀 Your app is now live at"} https://${liveUrl}`,
           messageType: "finished",
           createdAt: new Date().toISOString(),
         }]);
         fetchConversation();
         return;
       }
-      if (res.data.status === "error") { setDeploying(false); toast.error(t("deployFailedToast")); return; }
+      if (res.data.status === "error") { setDeploying(false); toast.error("Deployment failed"); return; }
     }
     setTimeout(pollDeployOnce, 10000);
   }
@@ -326,12 +323,12 @@ export default function WorkspacePage() {
   const handleDeploy = async () => {
     if (deploying) return; setDeploying(true);
     const res = await api.post(`/api/vcaas/projects/${projectId}/deployments/deploy`, {});
-    if (res.ok) { toast.success(t("deployStarted")); pollDeployOnce(); }
+    if (res.ok) { toast.success("Deploying… this takes ~3 minutes"); pollDeployOnce(); }
     else { toast.error(res.error || "Failed to deploy"); setDeploying(false); }
   };
   const handleRestartServer = async () => {
     const res = await api.post(`/api/vcaas/projects/${projectId}/agent/server/start-or-restart`, {});
-    if (res.ok) toast.success(lang === "es" ? "Servidor reiniciando..." : "Server restarting...");
+    if (res.ok) toast.success("Server restarting...");
     else toast.error(res.error || "Failed");
   };
 
@@ -346,8 +343,8 @@ export default function WorkspacePage() {
   const cardBg = darkMode ? "#222" : "#fff";
   const btnBorder = darkMode ? "border-gray-700/60" : "border-gray-200/60";
 
-  if (loading) return <div className="h-screen flex flex-col items-center justify-center gap-3 dark:text-gray-200" style={{ background: pageBg }}><Loader2 className="w-7 h-7 animate-spin" /><p className="text-sm text-gray-400">{t("loading")}</p></div>;
-  if (!project) return <div className="h-screen flex flex-col items-center justify-center gap-4 dark:text-gray-200" style={{ background: pageBg }}><p className="text-gray-500">Project not found</p><Link href="/dashboard"><Button variant="outline">{t("back")}</Button></Link></div>;
+  if (loading) return <div className="h-screen flex flex-col items-center justify-center gap-3 dark:text-gray-200" style={{ background: pageBg }}><Loader2 className="w-7 h-7 animate-spin" /><p className="text-sm text-gray-400">{"Loading..."}</p></div>;
+  if (!project) return <div className="h-screen flex flex-col items-center justify-center gap-4 dark:text-gray-200" style={{ background: pageBg }}><p className="text-gray-500">Project not found</p><Link href="/"><Button variant="outline">{"Back"}</Button></Link></div>;
 
   // Popup menu content (shared between desktop and mobile)
   const popupMenu = menuOpen && (
@@ -356,20 +353,20 @@ export default function WorkspacePage() {
         <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wider">{projectId}</p>
       </div>
       <div className="py-1">
-        <button onClick={() => { setMenuOpen(false); router.push("/dashboard"); }}
+        <button onClick={() => { setMenuOpen(false); router.push("/"); }}
           className="w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-black/5 dark:hover:bg-white/10 transition-colors text-gray-700 dark:text-gray-200">
-          <FolderOpen className="w-4 h-4 text-gray-400" /> {t("myProjects")}
+          <FolderOpen className="w-4 h-4 text-gray-400" /> {"My projects"}
         </button>
-        <button onClick={() => { setMenuOpen(false); router.push("/dashboard"); }}
+        <button onClick={() => { setMenuOpen(false); router.push("/"); }}
           className="w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-black/5 dark:hover:bg-white/10 transition-colors text-gray-700 dark:text-gray-200">
-          <Plus className="w-4 h-4 text-gray-400" /> {t("newProject")}
+          <Plus className="w-4 h-4 text-gray-400" /> {"New project"}
         </button>
       </div>
       {/* Secrets + GitHub options */}
       <div className="border-t py-1" style={{ borderColor: darkMode ? "#444" : "#eee" }}>
         <button onClick={() => { setActiveTab("secrets"); setMobileTab("panel"); setMenuOpen(false); }}
           className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-black/5 dark:hover:bg-white/10 transition-colors ${activeTab === "secrets" ? "text-gray-900 dark:text-white font-medium" : "text-gray-700 dark:text-gray-200"}`}>
-          <Key className="w-4 h-4 text-gray-400" /> {t("secrets")}
+          <Key className="w-4 h-4 text-gray-400" /> {"Secrets"}
         </button>
         <button onClick={() => { setActiveTab("github"); setMobileTab("panel"); setMenuOpen(false); }}
           className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-black/5 dark:hover:bg-white/10 transition-colors ${activeTab === "github" ? "text-gray-900 dark:text-white font-medium" : "text-gray-700 dark:text-gray-200"}`}>
@@ -377,8 +374,8 @@ export default function WorkspacePage() {
             <Github className="w-4 h-4 text-gray-400" />
             {githubConnected && <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-[#1e1e1e]" />}
           </span>
-          <span className="flex-1 text-left">{t("github")}</span>
-          {githubConnected && <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400">{lang === "es" ? "Conectado" : "Connected"}</span>}
+          <span className="flex-1 text-left">{"GitHub"}</span>
+          {githubConnected && <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400">{"Connected"}</span>}
         </button>
       </div>
       {/* Tabs - visible on mobile only */}
@@ -394,14 +391,13 @@ export default function WorkspacePage() {
         {/* Publish on mobile */}
         <button onClick={() => { handleDeploy(); setMenuOpen(false); }} disabled={deploying || isBuilding}
           className="w-full sm:hidden flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-black/5 dark:hover:bg-white/10 transition-colors text-gray-700 dark:text-gray-200">
-          <Rocket className="w-4 h-4 text-gray-400" /> {deploying ? t("deploying") : t("publish")}
+          <Rocket className="w-4 h-4 text-gray-400" /> {deploying ? "Deploying" : "Publish"}
         </button>
-        <LanguageSelect variant="menu" dark={darkMode} />
       </div>
       <div className="border-t py-1" style={{ borderColor: darkMode ? "#444" : "#eee" }}>
         <button onClick={() => { handleRestartServer(); setMenuOpen(false); }}
           className="w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-black/5 dark:hover:bg-white/10 transition-colors text-gray-700 dark:text-gray-200">
-          <Server className="w-4 h-4 text-gray-400" /> {t("restartServer")}
+          <Server className="w-4 h-4 text-gray-400" /> {"Restart Agent Server"}
         </button>
       </div>
     </div>
@@ -417,7 +413,7 @@ export default function WorkspacePage() {
         <header className="flex items-stretch shrink-0 z-10" style={{ height: 48 }}>
           {/* LEFT: aside width */}
           <div className="flex items-center gap-1.5 px-3 shrink-0" style={{ width: typeof leftHeaderWidth === "number" ? leftHeaderWidth : undefined }}>
-            <Link href="/dashboard" title={t("back")} className="h-7 w-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-black/5 dark:hover:bg-white/10 transition-colors shrink-0">
+            <Link href="/" title={"Back"} className="h-7 w-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-black/5 dark:hover:bg-white/10 transition-colors shrink-0">
               <ArrowLeft className="w-4 h-4" />
             </Link>
             <div className="relative flex-1 min-w-0" ref={menuRef}>
@@ -428,7 +424,7 @@ export default function WorkspacePage() {
               </button>
               {popupMenu}
             </div>
-            <button onClick={() => setActiveTab("versions")} className={`h-7 w-7 flex items-center justify-center rounded-lg transition-colors shrink-0 border ${btnBorder} ${activeTab === "versions" ? "bg-gray-900 dark:bg-white text-white dark:text-gray-900" : "text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-black/5 dark:hover:bg-white/10"}`} title={t("versions")}>
+            <button onClick={() => setActiveTab("versions")} className={`h-7 w-7 flex items-center justify-center rounded-lg transition-colors shrink-0 border ${btnBorder} ${activeTab === "versions" ? "bg-gray-900 dark:bg-white text-white dark:text-gray-900" : "text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-black/5 dark:hover:bg-white/10"}`} title={"Versions"}>
               <Clock className="w-3.5 h-3.5" />
             </button>
             <button onClick={() => setChatCollapsed(!chatCollapsed)} className={`h-7 w-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-black/5 dark:hover:bg-white/10 border ${btnBorder} transition-colors shrink-0`}>
@@ -447,7 +443,7 @@ export default function WorkspacePage() {
             </div>
             <div className="flex-1 flex items-center justify-center min-w-0">
               <div className={`flex items-center h-7 w-[320px] rounded-full border ${btnBorder} px-1.5 gap-1`}>
-                <button onClick={() => setActiveTab("logs")} className={`p-1 rounded shrink-0 ${activeTab === "logs" ? "text-gray-900 dark:text-white" : "text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"}`} title={t("logs")}><Terminal className="w-3.5 h-3.5" /></button>
+                <button onClick={() => setActiveTab("logs")} className={`p-1 rounded shrink-0 ${activeTab === "logs" ? "text-gray-900 dark:text-white" : "text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"}`} title={"Logs"}><Terminal className="w-3.5 h-3.5" /></button>
                 <div className="w-px h-3.5 bg-gray-200 dark:bg-gray-600 shrink-0" />
                 <button onClick={() => setMobilePreview(!mobilePreview)} className="p-1 rounded text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 shrink-0">{mobilePreview ? <Smartphone className="w-3.5 h-3.5" /> : <Monitor className="w-3.5 h-3.5" />}</button>
                 <input value={iframePath} onChange={(e) => setIframePath(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") setPreviewKey((k) => k + 1); }} className="flex-1 min-w-0 bg-transparent border-0 outline-none text-sm font-mono text-gray-600 dark:text-gray-300 placeholder:text-gray-400 px-1" placeholder="/" />
@@ -456,27 +452,27 @@ export default function WorkspacePage() {
               </div>
             </div>
             {/* Secrets + GitHub quick-access icons, right next to Publish */}
-            <button onClick={() => setActiveTab("secrets")} className={`h-7 w-7 flex items-center justify-center rounded-lg transition-colors shrink-0 border ${btnBorder} ${activeTab === "secrets" ? "bg-gray-900 dark:bg-white text-white dark:text-gray-900" : "text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-black/5 dark:hover:bg-white/10"}`} title={t("secrets")}>
+            <button onClick={() => setActiveTab("secrets")} className={`h-7 w-7 flex items-center justify-center rounded-lg transition-colors shrink-0 border ${btnBorder} ${activeTab === "secrets" ? "bg-gray-900 dark:bg-white text-white dark:text-gray-900" : "text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-black/5 dark:hover:bg-white/10"}`} title={"Secrets"}>
               <Key className="w-3.5 h-3.5" />
             </button>
-            <button onClick={() => setActiveTab("github")} className={`relative h-7 w-7 flex items-center justify-center rounded-lg transition-colors shrink-0 border ${btnBorder} ${activeTab === "github" ? "bg-gray-900 dark:bg-white text-white dark:text-gray-900" : "text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-black/5 dark:hover:bg-white/10"}`} title={githubConnected ? (lang === "es" ? "GitHub conectado" : "GitHub connected") : t("github")}>
+            <button onClick={() => setActiveTab("github")} className={`relative h-7 w-7 flex items-center justify-center rounded-lg transition-colors shrink-0 border ${btnBorder} ${activeTab === "github" ? "bg-gray-900 dark:bg-white text-white dark:text-gray-900" : "text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-black/5 dark:hover:bg-white/10"}`} title={githubConnected ? ("GitHub connected") : "GitHub"}>
               <Github className="w-3.5 h-3.5" />
               {githubConnected && <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-[#1e1e1e]" />}
             </button>
             <div className="relative shrink-0" ref={deployMenuRef}>
               <Button size="sm" onClick={() => setDeployMenuOpen(!deployMenuOpen)} disabled={deploying || isBuilding} className={`bg-gray-900 dark:bg-white hover:bg-gray-800 dark:hover:bg-gray-100 text-white dark:text-gray-900 h-7 text-sm rounded-lg px-3 border ${btnBorder}`}>
-                {deploying ? <><Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />{t("deploying")}</> : <><Rocket className="w-3.5 h-3.5 mr-1" />{t("publish")}</>}
+                {deploying ? <><Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />{"Deploying"}</> : <><Rocket className="w-3.5 h-3.5 mr-1" />{"Publish"}</>}
               </Button>
               {/* Small "takes ~3 min" caption while deploying */}
               {deploying && (
                 <span className="absolute top-full right-0 mt-1 flex items-center gap-1 text-[10px] text-gray-400 whitespace-nowrap">
-                  <Clock className="w-2.5 h-2.5" />{t("deployStarted")}
+                  <Clock className="w-2.5 h-2.5" />{"Deploying… this takes ~3 minutes"}
                 </span>
               )}
               {deployMenuOpen && (
                 <div data-deploy-menu className="absolute top-full right-0 mt-1.5 w-72 rounded-xl shadow-xl z-[60] overflow-hidden" style={{ background: darkMode ? "#2a2a2a" : "#fff", border: `1px solid ${darkMode ? "#444" : "#e5e5e5"}` }}>
                   <div className="px-3 py-2 border-b flex items-center justify-between" style={{ borderColor: darkMode ? "#444" : "#eee" }}>
-                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{t("publish")}</p>
+                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{"Publish"}</p>
                     <button onClick={() => setDeployMenuOpen(false)} className="text-gray-400 hover:text-gray-600"><X className="w-3.5 h-3.5" /></button>
                   </div>
                   <div className="p-3 space-y-2">
@@ -485,16 +481,16 @@ export default function WorkspacePage() {
                       <div className="rounded-lg border border-emerald-100 dark:border-emerald-900/40 bg-emerald-50 dark:bg-emerald-900/20 px-3 py-2.5">
                         <div className="flex items-center gap-1.5 mb-1">
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                          <span className="text-[10px] font-medium text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">{t("liveNow")}{domainActive ? " · " + (lang === "es" ? "dominio" : "domain") : ""}</span>
+                          <span className="text-[10px] font-medium text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">{"Live now"}{domainActive ? " · " + ("domain") : ""}</span>
                         </div>
                         <div className="flex items-center gap-2">
                           <code className="text-xs font-mono text-emerald-800 dark:text-emerald-300 flex-1 truncate">{publishedUrl}</code>
-                          <a href={`https://${publishedUrl}`} target="_blank" rel="noopener noreferrer" title={t("openLive")} className="text-emerald-600 hover:text-emerald-800 dark:hover:text-emerald-300 shrink-0"><ExternalLink className="w-3.5 h-3.5" /></a>
+                          <a href={`https://${publishedUrl}`} target="_blank" rel="noopener noreferrer" title={"Open live site"} className="text-emerald-600 hover:text-emerald-800 dark:hover:text-emerald-300 shrink-0"><ExternalLink className="w-3.5 h-3.5" /></a>
                         </div>
                       </div>
                     ) : (
                       <div className="rounded-lg border border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/40 px-3 py-2 text-[11px] text-gray-400">
-                        {t("notPublishedYet")}
+                        {"Not published yet"}
                       </div>
                     )}
 
@@ -502,32 +498,32 @@ export default function WorkspacePage() {
                       className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition-colors text-gray-700 dark:text-gray-200 border border-gray-100 dark:border-gray-700 disabled:opacity-50">
                       <Rocket className="w-4 h-4 text-gray-400 shrink-0" />
                       <div className="text-left min-w-0">
-                        <p className="font-medium">{t("deployNow")}</p>
+                        <p className="font-medium">{"Deploy now"}</p>
                         <p className="text-xs text-gray-400 truncate">{publishedUrl}</p>
                       </div>
                     </button>
                     {/* ~3 minute hint */}
                     <p className="flex items-start gap-1.5 text-[10px] text-gray-400 px-1 leading-snug">
-                      <Clock className="w-3 h-3 mt-px shrink-0" />{t("deployHint")}
+                      <Clock className="w-3 h-3 mt-px shrink-0" />{"Building & deploying takes ~3 minutes. You can keep working meanwhile."}
                     </p>
 
                     <button onClick={() => { setActiveTab("domain"); setDeployMenuOpen(false); }}
                       className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition-colors text-gray-700 dark:text-gray-200 border border-gray-100 dark:border-gray-700">
                       <Globe className="w-4 h-4 text-gray-400 shrink-0" />
                       <div className="text-left flex-1 min-w-0">
-                        <p className="font-medium">{t("customDomain")}</p>
-                        <p className="text-xs text-gray-400 truncate">{project?.customDomain?.hostname || (lang === "en" ? "Configure your domain" : "Configura tu dominio")}</p>
+                        <p className="font-medium">{"Custom Domain"}</p>
+                        <p className="text-xs text-gray-400 truncate">{project?.customDomain?.hostname || ("Configure your domain")}</p>
                       </div>
                       {hasDomain && (
-                        <span className={`shrink-0 text-[9px] font-medium px-1.5 py-0.5 rounded-full ${domainStatusMeta(project?.customDomain?.status, lang === "es").color}`}>
-                          {domainStatusMeta(project?.customDomain?.status, lang === "es").label}
+                        <span className={`shrink-0 text-[9px] font-medium px-1.5 py-0.5 rounded-full ${domainStatusMeta(project?.customDomain?.status).color}`}>
+                          {domainStatusMeta(project?.customDomain?.status).label}
                         </span>
                       )}
                     </button>
                     {/* When a domain is added but not yet live, remind about propagation */}
                     {hasDomain && !domainActive && (
                       <p className="flex items-start gap-1.5 text-[10px] text-amber-600 dark:text-amber-400 px-1 leading-snug">
-                        <AlertTriangle className="w-3 h-3 mt-px shrink-0" />{t("dnsPropagation")}
+                        <AlertTriangle className="w-3 h-3 mt-px shrink-0" />{"DNS changes can take up to 5 hours to propagate. Your domain will go live automatically once the records are verified."}
                       </p>
                     )}
                   </div>
@@ -565,7 +561,7 @@ export default function WorkspacePage() {
       <div className="flex sm:hidden flex-col h-full">
         {/* Mobile header */}
         <header className="flex items-center gap-1 px-2 shrink-0 z-10" style={{ height: 44 }}>
-          <Link href="/dashboard" title={t("back")} className="h-7 w-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-black/5 dark:hover:bg-white/10 transition-colors shrink-0">
+          <Link href="/" title={"Back"} className="h-7 w-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-black/5 dark:hover:bg-white/10 transition-colors shrink-0">
             <ArrowLeft className="w-4 h-4" />
           </Link>
           <div className="relative" ref={menuRef}>
@@ -602,8 +598,8 @@ export default function WorkspacePage() {
         {/* Fixed switch: Preview / Chat */}
         <div className="shrink-0 flex items-center justify-center py-2 px-4" style={{ background: pageBg }}>
           <div className="flex bg-gray-100 dark:bg-gray-800 rounded-full p-1 w-full max-w-xs">
-            <button onClick={() => setMobileTab("panel")} className={`w-1/2 py-2 rounded-full text-sm font-medium text-center transition-colors ${mobileTab === "panel" ? "bg-white dark:bg-gray-700 shadow text-gray-900 dark:text-white" : "text-gray-500"}`}>{t("preview")}</button>
-            <button onClick={() => setMobileTab("chat")} className={`w-1/2 py-2 rounded-full text-sm font-medium text-center transition-colors ${mobileTab === "chat" ? "bg-white dark:bg-gray-700 shadow text-gray-900 dark:text-white" : "text-gray-500"}`}>{t("chat")}</button>
+            <button onClick={() => setMobileTab("panel")} className={`w-1/2 py-2 rounded-full text-sm font-medium text-center transition-colors ${mobileTab === "panel" ? "bg-white dark:bg-gray-700 shadow text-gray-900 dark:text-white" : "text-gray-500"}`}>{"Preview"}</button>
+            <button onClick={() => setMobileTab("chat")} className={`w-1/2 py-2 rounded-full text-sm font-medium text-center transition-colors ${mobileTab === "chat" ? "bg-white dark:bg-gray-700 shadow text-gray-900 dark:text-white" : "text-gray-500"}`}>{"Chat"}</button>
           </div>
         </div>
       </div>

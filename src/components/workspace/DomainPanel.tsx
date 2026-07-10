@@ -8,7 +8,6 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Globe, Trash2, Loader2, Copy, CheckCircle2, ExternalLink, Link2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
-import { useI18n } from "@/lib/i18n";
 import type { VcaasDomain } from "@/lib/vcaas-types";
 
 interface DomainPanelProps {
@@ -19,7 +18,6 @@ interface DomainPanelProps {
 }
 
 export function DomainPanel({ projectId, domain, productionUrl, onDomainChanged }: DomainPanelProps) {
-  const { t } = useI18n();
   const [hostname, setHostname] = useState("");
   const [adding, setAdding] = useState(false);
   const [removing, setRemoving] = useState(false);
@@ -120,7 +118,7 @@ export function DomainPanel({ projectId, domain, productionUrl, onDomainChanged 
                 {/* DNS propagation warning */}
                 <div className="flex items-start gap-2 mb-3 rounded-lg bg-amber-50 border border-amber-100 px-3 py-2">
                   <AlertTriangle className="w-3.5 h-3.5 text-amber-500 mt-0.5 shrink-0" />
-                  <p className="text-[11px] text-amber-700 leading-snug">{t("dnsPropagation")}</p>
+                  <p className="text-[11px] text-amber-700 leading-snug">{"DNS changes can take up to 5 hours to propagate. Your domain will go live automatically once the records are verified."}</p>
                 </div>
                 <div className="space-y-2">
                   {domain.dnsRecordsToAdd.map((record, idx) => (

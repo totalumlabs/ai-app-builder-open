@@ -11,7 +11,6 @@ import {
   Loader2, AlertCircle, Copy, Check, Download,
   ChevronDown, ChevronRight, UnfoldVertical, FoldVertical, FileDiff,
 } from "lucide-react";
-import { useI18n } from "@/lib/i18n";
 import { api } from "@/lib/api";
 
 /* ────────────────────────── unified diff parsing ────────────────────────── */
@@ -257,7 +256,6 @@ interface DiffViewerProps {
 }
 
 export function DiffViewer({ open, onOpenChange, diffUrl }: DiffViewerProps) {
-  const { t } = useI18n();
 
   const [raw, setRaw] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -281,7 +279,7 @@ export function DiffViewer({ open, onOpenChange, diffUrl }: DiffViewerProps) {
           setRaw(res.data.diff);
           setCollapsed(new Set()); // start fully expanded
         } else {
-          setError(typeof res.error === "string" ? res.error : t("diffLoadFailed"));
+          setError(typeof res.error === "string" ? res.error : "Could not load the changes");
         }
       })
       .finally(() => {
@@ -289,7 +287,7 @@ export function DiffViewer({ open, onOpenChange, diffUrl }: DiffViewerProps) {
       });
 
     return () => { cancelled = true; };
-  }, [open, diffUrl, t]);
+  }, [open, diffUrl]);
 
   const files = useMemo(() => (raw ? parseDiff(raw) : []), [raw]);
 
@@ -325,9 +323,9 @@ export function DiffViewer({ open, onOpenChange, diffUrl }: DiffViewerProps) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      setError(t("diffCopyFailed"));
+      setError("Could not copy to clipboard");
     }
-  }, [raw, t]);
+  }, [raw]);
 
   const handleDownload = useCallback(() => {
     if (!raw) return;
@@ -343,10 +341,10 @@ export function DiffViewer({ open, onOpenChange, diffUrl }: DiffViewerProps) {
   }, [raw]);
 
   const statusLabel = (s: FileStatus) =>
-    s === "added" ? t("diffAdded")
-      : s === "deleted" ? t("diffDeleted")
-        : s === "renamed" ? t("diffRenamed")
-          : t("diffModified");
+    s === "added" ? "Added"
+      : s === "deleted" ? "Deleted"
+        : s === "renamed" ? "Renamed"
+          : "Modified";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -355,12 +353,12 @@ export function DiffViewer({ open, onOpenChange, diffUrl }: DiffViewerProps) {
           <div className="flex items-center gap-3 pr-8">
             <DialogTitle className="flex items-center gap-2 text-sm font-semibold">
               <FileDiff className="w-4 h-4" />
-              {t("viewChanges")}
+              {"View changes"}
             </DialogTitle>
 
             {files.length > 0 && (
               <span className="font-mono text-[11px] text-gray-500 tabular-nums">
-                {files.length} {files.length === 1 ? t("diffFile") : t("diffFiles")}
+                {files.length} {files.length === 1 ? "file" : "files"}
                 {" · "}
                 <span className="text-green-600 dark:text-green-400">+{totals.add}</span>
                 {" "}
@@ -376,8 +374,8 @@ export function DiffViewer({ open, onOpenChange, diffUrl }: DiffViewerProps) {
                   className="inline-flex items-center gap-1 px-2 py-1 rounded border border-gray-200 dark:border-gray-700 text-[11px] text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
                 >
                   {allCollapsed
-                    ? <><UnfoldVertical className="w-3 h-3" /> {t("diffExpandAll")}</>
-                    : <><FoldVertical className="w-3 h-3" /> {t("diffCollapseAll")}</>}
+                    ? <><UnfoldVertical className="w-3 h-3" /> {"Expand all"}</>
+                    : <><FoldVertical className="w-3 h-3" /> {"Collapse all"}</>}
                 </button>
               )}
 
@@ -388,8 +386,8 @@ export function DiffViewer({ open, onOpenChange, diffUrl }: DiffViewerProps) {
                 className="inline-flex items-center gap-1 px-2 py-1 rounded border border-gray-200 dark:border-gray-700 text-[11px] text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {copied
-                  ? <><Check className="w-3 h-3 text-green-600" /> {t("diffCopied")}</>
-                  : <><Copy className="w-3 h-3" /> {t("diffCopyAll")}</>}
+                  ? <><Check className="w-3 h-3 text-green-600" /> {"Copied"}</>
+                  : <><Copy className="w-3 h-3" /> {"Copy diff"}</>}
               </button>
 
               <button
@@ -398,7 +396,7 @@ export function DiffViewer({ open, onOpenChange, diffUrl }: DiffViewerProps) {
                 disabled={!raw}
                 className="inline-flex items-center gap-1 px-2 py-1 rounded border border-gray-200 dark:border-gray-700 text-[11px] text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                <Download className="w-3 h-3" /> {t("diffDownload")}
+                <Download className="w-3 h-3" /> {"Download"}
               </button>
             </div>
           </div>
@@ -407,7 +405,7 @@ export function DiffViewer({ open, onOpenChange, diffUrl }: DiffViewerProps) {
         <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2 min-h-0">
           {loading && (
             <div className="flex items-center justify-center gap-2 py-16 text-sm text-gray-500">
-              <Loader2 className="w-4 h-4 animate-spin" /> {t("diffLoading")}
+              <Loader2 className="w-4 h-4 animate-spin" /> {"Loading changes..."}
             </div>
           )}
 
@@ -415,14 +413,14 @@ export function DiffViewer({ open, onOpenChange, diffUrl }: DiffViewerProps) {
             <div className="flex items-start gap-2 py-10 px-3 text-sm text-red-600 dark:text-red-400">
               <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
               <div>
-                <p className="font-medium">{t("diffLoadFailed")}</p>
+                <p className="font-medium">{"Could not load the changes"}</p>
                 <p className="text-xs mt-1 text-red-500/80 break-all">{error}</p>
               </div>
             </div>
           )}
 
           {!loading && !error && files.length === 0 && raw !== null && (
-            <p className="py-16 text-center text-sm text-gray-400">{t("diffEmpty")}</p>
+            <p className="py-16 text-center text-sm text-gray-400">{"No changes in this diff"}</p>
           )}
 
           {!loading && !error && files.map((f) => (

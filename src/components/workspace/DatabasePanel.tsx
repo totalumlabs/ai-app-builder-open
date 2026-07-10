@@ -48,7 +48,6 @@ import {
   ImageIcon,
 } from "lucide-react";
 import { toast } from "sonner";
-import { useI18n } from "@/lib/i18n";
 import type { DbTable, DbProperty } from "@/lib/vcaas-types";
 
 interface DatabasePanelProps {
@@ -295,7 +294,6 @@ function FilterBar({ properties, filters, onChange }: {
 
 // --- Main Component ---
 export function DatabasePanel({ projectId }: DatabasePanelProps) {
-  const { t } = useI18n();
   const [tables, setTables] = useState<DbTable[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedTable, setSelectedTable] = useState<string>("");
@@ -449,7 +447,7 @@ export function DatabasePanel({ projectId }: DatabasePanelProps) {
       data: editValues,
     });
     if (res.ok) {
-      toast.success(t("recordUpdated"));
+      toast.success("Record updated");
       setEditDialogOpen(false);
       setEditingId(null);
       fetchRecords(selectedTable, page, { field: sortField, dir: sortDir }, appliedFilters, appliedSearch);
@@ -462,11 +460,11 @@ export function DatabasePanel({ projectId }: DatabasePanelProps) {
   const handleDeleteRecord = async (record: Record<string, unknown>) => {
     const id = record._id as string;
     if (!id || !selectedTable) return;
-    if (!confirm(t("confirmDelete"))) return;
+    if (!confirm("Delete this record? This cannot be undone.")) return;
     setDeletingId(id);
     const res = await api.delete(`/api/vcaas/projects/${projectId}/database/records/${id}?tableName=${encodeURIComponent(selectedTable)}`);
     if (res.ok) {
-      toast.success(t("recordDeleted"));
+      toast.success("Record deleted");
       // If we just removed the last row on a page, step back a page.
       if (records.length === 1 && page > 1) setPage(page - 1);
       else fetchRecords(selectedTable, page, { field: sortField, dir: sortDir }, appliedFilters, appliedSearch);
@@ -535,10 +533,10 @@ export function DatabasePanel({ projectId }: DatabasePanelProps) {
       <div className="px-4 py-2.5 border-b bg-white dark:bg-gray-900 flex items-center gap-2 flex-wrap">
         <div className="flex bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5">
           <button onClick={() => setActiveView("data")} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${activeView === "data" ? "bg-white dark:bg-gray-700 shadow text-gray-900 dark:text-white" : "text-gray-500"}`}>
-            <Grid3X3 className="w-3.5 h-3.5" /> {t("dataView")}
+            <Grid3X3 className="w-3.5 h-3.5" /> {"Data"}
           </button>
           <button onClick={() => setActiveView("schema")} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${activeView === "schema" ? "bg-white dark:bg-gray-700 shadow text-gray-900 dark:text-white" : "text-gray-500"}`}>
-            <Layers className="w-3.5 h-3.5" /> {t("schemaView")}
+            <Layers className="w-3.5 h-3.5" /> {"Schema"}
           </button>
         </div>
 
@@ -609,7 +607,7 @@ export function DatabasePanel({ projectId }: DatabasePanelProps) {
                     <p className="text-[10px] text-gray-400 flex items-center gap-1"><ImageIcon className="w-3 h-3" /> File fields are uploaded by your app and can be viewed in the table.</p>
                   )}
                   <Button className="w-full" size="sm" onClick={handleCreateRecord} disabled={creating}>
-                    {creating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Plus className="w-4 h-4 mr-2" />} {t("create")}
+                    {creating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Plus className="w-4 h-4 mr-2" />} {"Create"}
                   </Button>
                 </div>
               </DialogContent>
@@ -619,7 +617,7 @@ export function DatabasePanel({ projectId }: DatabasePanelProps) {
           {/* Edit record dialog (controlled) */}
           <Dialog open={editDialogOpen} onOpenChange={(o) => { setEditDialogOpen(o); if (!o) setEditingId(null); }}>
             <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
-              <DialogHeader><DialogTitle>{t("editRecord")} · {currentTable?.label || selectedTable}</DialogTitle></DialogHeader>
+              <DialogHeader><DialogTitle>{"Edit Record"} · {currentTable?.label || selectedTable}</DialogTitle></DialogHeader>
               <div className="space-y-3 mt-3">
                 {currentProperties.filter((p) => !["_id", "createdAt", "updatedAt"].includes(p.name) && p.propertyType !== "file").map((prop) => (
                   <div key={prop.id}>
@@ -634,13 +632,13 @@ export function DatabasePanel({ projectId }: DatabasePanelProps) {
                   </div>
                 ))}
                 {currentProperties.filter((p) => !["_id", "createdAt", "updatedAt"].includes(p.name) && p.propertyType !== "file").length === 0 && (
-                  <p className="text-xs text-gray-400 py-4 text-center">{t("noEditableFields")}</p>
+                  <p className="text-xs text-gray-400 py-4 text-center">{"No editable fields"}</p>
                 )}
                 {currentProperties.some((p) => p.propertyType === "file") && (
                   <p className="text-[10px] text-gray-400 flex items-center gap-1"><ImageIcon className="w-3 h-3" /> File fields are managed by your app and shown read-only in the table.</p>
                 )}
                 <Button className="w-full" size="sm" onClick={handleEditRecord} disabled={saving}>
-                  {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Pencil className="w-4 h-4 mr-2" />} {t("saveChanges")}
+                  {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Pencil className="w-4 h-4 mr-2" />} {"Save Changes"}
                 </Button>
               </div>
             </DialogContent>
@@ -756,7 +754,7 @@ export function DatabasePanel({ projectId }: DatabasePanelProps) {
                           </th>
                         ))}
                         <th className="px-3 py-2.5 text-right text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap border-b border-gray-100 dark:border-gray-700 sticky right-0 bg-gray-50 dark:bg-gray-800/50">
-                          {t("actions")}
+                          {"Actions"}
                         </th>
                       </tr>
                     </thead>
@@ -772,7 +770,7 @@ export function DatabasePanel({ projectId }: DatabasePanelProps) {
                             <div className="flex items-center justify-end gap-1">
                               <button
                                 onClick={() => openEditDialog(record)}
-                                title={t("editRecord")}
+                                title={"Edit Record"}
                                 className="w-7 h-7 inline-flex items-center justify-center rounded-md text-gray-400 hover:text-violet-600 hover:bg-violet-50 dark:hover:bg-violet-900/20 transition-colors"
                               >
                                 <Pencil className="w-3.5 h-3.5" />
@@ -780,7 +778,7 @@ export function DatabasePanel({ projectId }: DatabasePanelProps) {
                               <button
                                 onClick={() => handleDeleteRecord(record)}
                                 disabled={deletingId === (record._id as string)}
-                                title={t("deleteRecord")}
+                                title={"Delete Record"}
                                 className="w-7 h-7 inline-flex items-center justify-center rounded-md text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50"
                               >
                                 {deletingId === (record._id as string) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}

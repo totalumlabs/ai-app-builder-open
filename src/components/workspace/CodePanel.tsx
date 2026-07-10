@@ -22,7 +22,6 @@ import {
   Sparkles,
   X,
 } from "lucide-react";
-import { useI18n, type TransKey } from "@/lib/i18n";
 
 // Monaco must never run during SSR — bring it in dynamically with ssr:false.
 const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
@@ -428,7 +427,6 @@ function TreeRow({
 
 // ── Main component ───────────────────────────────────────────────────────────
 export function CodePanel({ projectId, darkMode, onAskAiEdit }: CodePanelProps) {
-  const { t } = useI18n();
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -710,7 +708,7 @@ export function CodePanel({ projectId, darkMode, onAskAiEdit }: CodePanelProps) 
     return (
       <div className="h-full flex flex-col items-center justify-center gap-3">
         <Loader2 className="w-6 h-6 animate-spin text-violet-500" />
-        <p className="text-sm text-gray-400">{t("loadingCode")}</p>
+        <p className="text-sm text-gray-400">{"Loading source code..."}</p>
       </div>
     );
   }
@@ -722,14 +720,14 @@ export function CodePanel({ projectId, darkMode, onAskAiEdit }: CodePanelProps) 
           <AlertTriangle className="w-6 h-6 text-red-500" />
         </div>
         <div>
-          <p className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">{t("codeLoadFailed")}</p>
+          <p className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">{"Failed to load source code"}</p>
           <p className="text-xs text-gray-400 max-w-sm break-words">{String(error)}</p>
         </div>
         <button
           onClick={() => fetchCode(true)}
           className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium transition-colors"
         >
-          <RefreshCw className="w-3.5 h-3.5" /> {t("retry")}
+          <RefreshCw className="w-3.5 h-3.5" /> {"Retry"}
         </button>
       </div>
     );
@@ -744,26 +742,26 @@ export function CodePanel({ projectId, darkMode, onAskAiEdit }: CodePanelProps) 
       {/* Header */}
       <div className="px-3 py-2 border-b border-gray-100 dark:border-gray-800 flex items-center gap-2 shrink-0">
         <FileCode2 className="w-4 h-4 text-violet-500" />
-        <span className="text-sm font-medium text-gray-700 dark:text-gray-200">{t("codeExplorer")}</span>
-        <span className="text-[11px] text-gray-400">· {filesCount} {t("filesCount")}</span>
+        <span className="text-sm font-medium text-gray-700 dark:text-gray-200">{"Code Explorer"}</span>
+        <span className="text-[11px] text-gray-400">· {filesCount} {"files"}</span>
         <div className="ml-auto flex items-center gap-2">
           {/* Ask-AI-to-edit — only meaningful once a file is open */}
           {selected && onAskAiEdit && (
             <button
               onClick={() => onAskAiEdit(selected)}
               className="flex items-center gap-1.5 h-7 px-2.5 rounded-lg text-xs font-medium text-white bg-violet-600 hover:bg-violet-700 transition-colors shadow-sm"
-              title={t("askAiEditFile")}
+              title={"Ask AI to edit this file"}
             >
               <Sparkles className="w-3.5 h-3.5" />
-              <span className="hidden md:inline">{t("askAiEditFile")}</span>
+              <span className="hidden md:inline">{"Ask AI to edit this file"}</span>
             </button>
           )}
           <button
             onClick={() => fetchCode(true)}
             className="flex items-center gap-1.5 h-7 px-2.5 rounded-lg text-xs font-medium text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-            title={t("refreshCode")}
+            title={"Refresh"}
           >
-            <RefreshCw className="w-3.5 h-3.5" /> {t("refreshCode")}
+            <RefreshCw className="w-3.5 h-3.5" /> {"Refresh"}
           </button>
         </div>
       </div>
@@ -779,7 +777,7 @@ export function CodePanel({ projectId, darkMode, onAskAiEdit }: CodePanelProps) 
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder={t("searchCodePlaceholder")}
+                placeholder={"Search by file name or content..."}
                 className="w-full h-8 pl-8 pr-7 rounded-lg text-xs bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-violet-200 dark:focus:ring-violet-900/40 transition-shadow"
               />
               {search && (
@@ -795,7 +793,7 @@ export function CodePanel({ projectId, darkMode, onAskAiEdit }: CodePanelProps) 
           </div>
           <div className="flex-1 overflow-y-auto py-1.5 px-1.5">
             {tree.children.length === 0 ? (
-              <p className="text-xs text-gray-400 p-3">{query ? t("noSearchResults") : t("codeLoadFailed")}</p>
+              <p className="text-xs text-gray-400 p-3">{query ? "No files match your search" : "Failed to load source code"}</p>
             ) : (
               tree.children.map((child) => (
                 <TreeRow
@@ -819,7 +817,7 @@ export function CodePanel({ projectId, darkMode, onAskAiEdit }: CodePanelProps) 
               <div className="w-14 h-14 rounded-2xl bg-gray-50 dark:bg-gray-800 border border-dashed border-gray-200 dark:border-gray-700 flex items-center justify-center">
                 <FileCode2 className="w-6 h-6 text-gray-300 dark:text-gray-600" />
               </div>
-              <p className="text-sm text-gray-400">{t("selectFileHint")}</p>
+              <p className="text-sm text-gray-400">{"Select a file to view its contents"}</p>
             </div>
           ) : (
             <>
@@ -850,7 +848,7 @@ export function CodePanel({ projectId, darkMode, onAskAiEdit }: CodePanelProps) 
                       }}
                     />
                   ) : (
-                    <PlaceholderBinary t={t} onDownload={() => handleDownload(selected)} />
+                    <PlaceholderBinary onDownload={() => handleDownload(selected)} />
                   )
                 ) : selectedKind === "image" ? (
                   <div className="absolute inset-0 flex items-center justify-center overflow-auto checkerboard p-6">
@@ -862,7 +860,7 @@ export function CodePanel({ projectId, darkMode, onAskAiEdit }: CodePanelProps) 
                     )}
                   </div>
                 ) : (
-                  <PlaceholderBinary t={t} onDownload={() => handleDownload(selected)} />
+                  <PlaceholderBinary onDownload={() => handleDownload(selected)} />
                 )}
               </div>
             </>
@@ -888,18 +886,18 @@ export function CodePanel({ projectId, darkMode, onAskAiEdit }: CodePanelProps) 
 }
 
 // Placeholder for binary / non-previewable files.
-function PlaceholderBinary({ t, onDownload }: { t: (k: TransKey) => string; onDownload: () => void }) {
+function PlaceholderBinary({ onDownload }: { onDownload: () => void }) {
   return (
     <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 text-center px-6">
       <div className="w-16 h-16 rounded-2xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 flex items-center justify-center">
         <FileWarning className="w-7 h-7 text-gray-300 dark:text-gray-600" />
       </div>
-      <p className="text-sm text-gray-500 dark:text-gray-400 max-w-xs">{t("previewNotAvailable")}</p>
+      <p className="text-sm text-gray-500 dark:text-gray-400 max-w-xs">{"Preview not available for this file type"}</p>
       <button
         onClick={onDownload}
         className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium transition-colors"
       >
-        <Download className="w-3.5 h-3.5" /> {t("downloadFile")}
+        <Download className="w-3.5 h-3.5" /> {"Download"}
       </button>
     </div>
   );

@@ -7,7 +7,6 @@ import {
   Key, FileDiff, ChevronDown, ChevronRight, ChevronUp, Paperclip, X, Check,
   Plus, Eye, EyeOff, CheckCircle, ArrowRight,
 } from "lucide-react";
-import { useI18n } from "@/lib/i18n";
 import { api } from "@/lib/api";
 import { DiffViewer } from "@/components/workspace/DiffViewer";
 import { uploadFilesToProject } from "@/lib/upload";
@@ -143,7 +142,6 @@ function UserAttachments({ files }: { files: AgentInputFile[] }) {
 }
 
 function UserMessage({ text, files }: { text: string; files?: AgentInputFile[] }) {
-  const { t } = useI18n();
   const [expanded, setExpanded] = useState(false);
   const isLong = text.length > USER_MSG_TRUNCATE_AT;
 
@@ -179,12 +177,12 @@ function UserMessage({ text, files }: { text: string; files?: AgentInputFile[] }
           >
             {expanded ? (
               <>
-                <ChevronDown className="w-3 h-3 rotate-180" /> {t("showLess")}
+                <ChevronDown className="w-3 h-3 rotate-180" /> {"Show less"}
               </>
             ) : (
               <>
-                <ChevronDown className="w-3 h-3" /> {t("seeAll")}
-                <span className="text-gray-400">· {text.length.toLocaleString()} {t("charactersCount")}</span>
+                <ChevronDown className="w-3 h-3" /> {"See all"}
+                <span className="text-gray-400">· {text.length.toLocaleString()} {"characters"}</span>
               </>
             )}
           </button>
@@ -207,7 +205,6 @@ function SecretKeysForm({ secretKeysNeeded, projectId, onTellAi, projectSecrets 
   onTellAi: (count: number) => void;
   projectSecrets?: VcaasSecret[];
 }) {
-  const { t } = useI18n();
 
   // Merge isProvided with current project secrets — if a secret exists in projectSecrets, treat it as provided
   const existingSecretNames = new Set((projectSecrets || []).map((s) => s.secretName));
@@ -235,12 +232,12 @@ function SecretKeysForm({ secretKeysNeeded, projectId, onTellAi, projectSecrets 
       <div className="mt-3 p-3 rounded-xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-900/10">
         <div className="flex items-center gap-2 mb-2">
           <CheckCircle className="w-4 h-4 text-emerald-500" />
-          <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">{t("requiredSecrets")}</span>
+          <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">{"Required secrets"}</span>
         </div>
         {provided.map(([key]) => (
           <div key={key} className="flex items-center gap-2 text-xs mt-1.5">
             <code className="bg-emerald-100 dark:bg-emerald-900/30 px-1.5 py-0.5 rounded font-mono text-[10px] text-emerald-800 dark:text-emerald-300">{key}</code>
-            <Badge className="text-[9px] h-3.5 border-0 bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400">{t("alreadyProvided")}</Badge>
+            <Badge className="text-[9px] h-3.5 border-0 bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400">{"Already set"}</Badge>
           </div>
         ))}
       </div>
@@ -306,7 +303,7 @@ function SecretKeysForm({ secretKeysNeeded, projectId, onTellAi, projectSecrets 
       <div className="mt-3 p-3 rounded-xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-900/10">
         <div className="flex items-center gap-2 mb-2">
           <CheckCircle className="w-4 h-4 text-emerald-500" />
-          <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">{t("secretsSaved")}</span>
+          <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">{"Secret keys saved!"}</span>
         </div>
         {secrets.map((s) => (
           <div key={s.secretName} className="flex items-center gap-2 text-xs mt-1">
@@ -319,7 +316,7 @@ function SecretKeysForm({ secretKeysNeeded, projectId, onTellAi, projectSecrets 
           className="mt-3 w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-xs font-medium hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors"
         >
           <ArrowRight className="w-3.5 h-3.5" />
-          {t("tellAiSecretsReady")}
+          {"Tell AI secrets are ready"}
         </button>
       </div>
     );
@@ -329,8 +326,8 @@ function SecretKeysForm({ secretKeysNeeded, projectId, onTellAi, projectSecrets 
     <div className="mt-3 rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50/30 dark:bg-amber-900/10 overflow-hidden">
       <div className="flex items-center gap-2 px-3 pt-3 pb-1">
         <Key className="w-4 h-4 text-amber-500" />
-        <span className="text-xs font-semibold text-amber-700 dark:text-amber-400">{t("requiredSecrets")}</span>
-        <Badge className="text-[9px] h-3.5 border-0 bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400 ml-auto">{unprovided.length} {t("missing").toLowerCase()}</Badge>
+        <span className="text-xs font-semibold text-amber-700 dark:text-amber-400">{"Required secrets"}</span>
+        <Badge className="text-[9px] h-3.5 border-0 bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400 ml-auto">{unprovided.length} {"Missing".toLowerCase()}</Badge>
       </div>
 
       {/* Already provided keys */}
@@ -339,7 +336,7 @@ function SecretKeysForm({ secretKeysNeeded, projectId, onTellAi, projectSecrets 
           {provided.map(([key]) => (
             <div key={key} className="flex items-center gap-2 text-xs mt-1">
               <code className="bg-emerald-100 dark:bg-emerald-900/30 px-1.5 py-0.5 rounded font-mono text-[10px] text-emerald-800 dark:text-emerald-300">{key}</code>
-              <Badge className="text-[9px] h-3.5 border-0 bg-emerald-100 text-emerald-700">{t("alreadyProvided")}</Badge>
+              <Badge className="text-[9px] h-3.5 border-0 bg-emerald-100 text-emerald-700">{"Already set"}</Badge>
             </div>
           ))}
         </div>
@@ -370,7 +367,7 @@ function SecretKeysForm({ secretKeysNeeded, projectId, onTellAi, projectSecrets 
                       type={entry.showValue ? "text" : "password"}
                       value={entry.value}
                       onChange={(e) => updateEntry(si, ei, "value", e.target.value)}
-                      placeholder={t("secretValue")}
+                      placeholder={"Enter value..."}
                       className="w-full h-8 px-2.5 pr-8 text-xs rounded-md border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-800 dark:text-gray-200 outline-none focus:ring-1 focus:ring-amber-300 font-mono"
                     />
                     <button
@@ -399,7 +396,7 @@ function SecretKeysForm({ secretKeysNeeded, projectId, onTellAi, projectSecrets 
                 className="flex items-center gap-1 mt-2 text-[10px] text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 transition-colors"
               >
                 <Plus className="w-3 h-3" />
-                {t("addEnvironment")}
+                {"Add another environment"}
               </button>
             )}
           </div>
@@ -413,7 +410,7 @@ function SecretKeysForm({ secretKeysNeeded, projectId, onTellAi, projectSecrets 
           className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 disabled:bg-gray-300 dark:disabled:bg-gray-700 text-white text-xs font-medium transition-colors disabled:cursor-not-allowed"
         >
           {submitting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Key className="w-3.5 h-3.5" />}
-          {submitting ? t("submittingSecrets") : t("submitSecrets")}
+          {submitting ? "Saving..." : "Save Secret Keys"}
         </button>
       </div>
     </div>
@@ -426,14 +423,13 @@ function BuildGroup({ group, projectId, onTellAi, projectSecrets }: { group: Mes
   const [diffOpen, setDiffOpen] = useState(false);
   const hasBuildMsgs = (group.buildMsgs?.length || 0) > 0;
   const isComplete = !!group.finishMsg;
-  const { t } = useI18n();
 
   return (
     <div className="space-y-1">
       {hasBuildMsgs && (
         <button onClick={() => setExpanded(!expanded)} className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 py-0.5 transition-colors">
           {expanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-          {isComplete ? `${group.buildMsgs!.length} ${t("buildSteps")}` : `${t("building")} (${group.buildMsgs!.length})`}
+          {isComplete ? `${group.buildMsgs!.length} ${"build steps"}` : `${"Building..."} (${group.buildMsgs!.length})`}
           {!isComplete && <Loader2 className="w-3 h-3 animate-spin text-gray-400" />}
         </button>
       )}
@@ -464,7 +460,7 @@ function BuildGroup({ group, projectId, onTellAi, projectSecrets }: { group: Mes
               {/* Checkmark + Completed at the end */}
               <div className="flex items-center gap-1.5 mt-3 text-sm text-emerald-600 dark:text-emerald-400">
                 <Check className="w-4 h-4" />
-                <span className="font-medium">{t("completed")}</span>
+                <span className="font-medium">{"Completed"}</span>
               </div>
             </div>
           )}
@@ -484,7 +480,7 @@ function BuildGroup({ group, projectId, onTellAi, projectSecrets }: { group: Mes
                 onClick={() => setDiffOpen(true)}
                 className="inline-flex items-center gap-1 mt-2 text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
               >
-                <FileDiff className="w-2.5 h-2.5" /> {t("viewChanges")}
+                <FileDiff className="w-2.5 h-2.5" /> {"View changes"}
               </button>
               <DiffViewer
                 open={diffOpen}
@@ -507,7 +503,6 @@ export function ChatPanel({ messages, isBuilding, prompt, setPrompt, onSend, onS
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [attachedFiles, setAttachedFiles] = useState<{ name: string; url: string; imageDescription: string }[]>([]);
   const [uploading, setUploading] = useState(false);
-  const { t } = useI18n();
 
   // --- Load-on-demand for long conversations ---
   // Rather than rendering every message group (which gets heavy on long chats),
@@ -564,8 +559,8 @@ export function ChatPanel({ messages, isBuilding, prompt, setPrompt, onSend, onS
         {messages.length === 0 && !isBuilding && (
           <div className="flex flex-col items-center justify-center h-full text-center px-4">
             <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-3"><Bot className="w-5 h-5 text-gray-400" /></div>
-            <p className="text-[15px] text-gray-500 dark:text-gray-400 mb-1">{t("startBuilding2")}</p>
-            <p className="text-sm text-gray-400">{t("describeIdea")}</p>
+            <p className="text-[15px] text-gray-500 dark:text-gray-400 mb-1">{"What do you want to build?"}</p>
+            <p className="text-sm text-gray-400">{"Describe your idea below"}</p>
           </div>
         )}
 
@@ -576,7 +571,7 @@ export function ChatPanel({ messages, isBuilding, prompt, setPrompt, onSend, onS
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
             >
               <ChevronUp className="w-3.5 h-3.5" />
-              {t("loadEarlierMessages")}
+              {"Load earlier messages"}
               <span className="text-gray-400">· {hiddenCount}</span>
             </button>
           </div>
@@ -599,7 +594,7 @@ export function ChatPanel({ messages, isBuilding, prompt, setPrompt, onSend, onS
               <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
               <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
             </div>
-            <span className="text-sm text-gray-400">{t("building")}</span>
+            <span className="text-sm text-gray-400">{"Building..."}</span>
           </div>
         )}
       </div>
@@ -618,7 +613,7 @@ export function ChatPanel({ messages, isBuilding, prompt, setPrompt, onSend, onS
       <div className="shrink-0 px-3 pb-3 pt-2">
         <div className="rounded-2xl overflow-hidden transition-all focus-within:ring-2 focus-within:ring-gray-200 dark:focus-within:ring-gray-600" style={{ background: "var(--textarea-bg, #f3f1ee)" }}>
           <textarea data-chat-input ref={textareaRef} value={prompt} onChange={(e) => setPrompt(e.target.value)} onKeyDown={handleKeyDown}
-            placeholder={isBuilding ? t("agentWorking") : t("askAnything")}
+            placeholder={isBuilding ? "Agent is working..." : "Ask anything..."}
             className="w-full bg-transparent border-0 resize-none text-base outline-none placeholder:text-gray-400 min-h-[48px] max-h-[200px] px-4 pt-3.5 pb-1 leading-relaxed dark:text-gray-200"
             disabled={isBuilding} rows={1} />
           <div className="flex items-center justify-between px-3 pb-2.5">

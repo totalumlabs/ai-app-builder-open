@@ -10,7 +10,6 @@ import {
   GitBranch, CheckCircle2, AlertTriangle, Download, Copy, ExternalLink, Info,
 } from "lucide-react";
 import { toast } from "sonner";
-import { useI18n } from "@/lib/i18n";
 import type {
   GithubStatus, GithubConnectResult, GithubPullResult, GithubPullStatus,
   GithubEnv, GithubSyncDirection,
@@ -23,7 +22,6 @@ interface GithubPanelProps {
 }
 
 export function GithubPanel({ projectId, onStatusChange }: GithubPanelProps) {
-  const { t, lang } = useI18n();
   const [status, setStatus] = useState<GithubStatus | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -78,19 +76,19 @@ export function GithubPanel({ projectId, onStatusChange }: GithubPanelProps) {
       const st = res.ok ? res.data?.status : null;
       if (st === "success") {
         setRebuilding(false);
-        toast.success(lang === "es" ? "Sincronización completada" : "Sync completed");
+        toast.success("Sync completed");
         fetchStatus();
         return;
       }
       if (st === "error") {
         setRebuilding(false);
-        toast.error(lang === "es" ? "Error al sincronizar" : "Sync failed");
+        toast.error("Sync failed");
         return;
       }
       pullPollRef.current = setTimeout(tick, 5000);
     };
     tick();
-  }, [projectId, lang, fetchStatus]);
+  }, [projectId, fetchStatus]);
 
   const handleConnect = async () => {
     if (!token.trim() || !repo.trim()) return;
@@ -101,30 +99,30 @@ export function GithubPanel({ projectId, onStatusChange }: GithubPanelProps) {
       syncDirection,
     });
     if (res.ok && res.data) {
-      toast.success(lang === "es" ? "GitHub conectado!" : "GitHub connected!");
+      toast.success("GitHub connected!");
       setToken("");
       await fetchStatus();
       if (res.data.requiresRebuild) {
         setRebuilding(true);
-        toast.info(lang === "es" ? "Reconstruyendo desde GitHub..." : "Rebuilding from GitHub...");
+        toast.info("Rebuilding from GitHub...");
         pollPullStatus();
       }
     } else {
-      toast.error(res.error || (lang === "es" ? "No se pudo conectar. Revisa el token y los permisos." : "Failed to connect. Check the token and permissions."));
+      toast.error(res.error || ("Failed to connect. Check the token and permissions."));
     }
     setConnecting(false);
   };
 
   const handleDisconnect = async () => {
-    if (!confirm(lang === "es" ? "¿Desconectar GitHub? El código de tu proyecto no se verá afectado." : "Disconnect GitHub? Your project code is not affected.")) return;
+    if (!confirm("Disconnect GitHub? Your project code is not affected.")) return;
     setDisconnecting(true);
     const res = await api.delete(`/api/vcaas/projects/${projectId}/github/connect`);
     if (res.ok) {
-      toast.success(lang === "es" ? "GitHub desconectado" : "GitHub disconnected");
+      toast.success("GitHub disconnected");
       setEnv(null);
       await fetchStatus();
     } else {
-      toast.error(res.error || (lang === "es" ? "No se pudo desconectar" : "Failed to disconnect"));
+      toast.error(res.error || ("Failed to disconnect"));
     }
     setDisconnecting(false);
   };
@@ -134,17 +132,17 @@ export function GithubPanel({ projectId, onStatusChange }: GithubPanelProps) {
     const res = await api.post<GithubPullResult>(`/api/vcaas/projects/${projectId}/github/pull`, {});
     if (res.ok && res.data) {
       if (res.data.status === "no_changes") {
-        toast.info(lang === "es" ? "No hay cambios que traer" : "No changes to pull");
+        toast.info("No changes to pull");
       } else {
         toast.success(
-          (lang === "es" ? "Trayendo cambios..." : "Pulling changes...") +
-          (res.data.filesUpdated ? ` (${res.data.filesUpdated} ${lang === "es" ? "archivos" : "files"})` : "")
+          ("Pulling changes...") +
+          (res.data.filesUpdated ? ` (${res.data.filesUpdated} ${"files"})` : "")
         );
         setRebuilding(true);
         pollPullStatus();
       }
     } else {
-      toast.error(res.error || (lang === "es" ? "No se pudo traer los cambios" : "Failed to pull changes"));
+      toast.error(res.error || ("Failed to pull changes"));
     }
     setPulling(false);
   };
@@ -153,14 +151,14 @@ export function GithubPanel({ projectId, onStatusChange }: GithubPanelProps) {
     setLoadingEnv(true);
     const res = await api.get<GithubEnv>(`/api/vcaas/projects/${projectId}/github/env`);
     if (res.ok && res.data && mountedRef.current) setEnv(res.data);
-    else toast.error(res.error || (lang === "es" ? "No se pudieron obtener las variables" : "Failed to load env variables"));
+    else toast.error(res.error || ("Failed to load env variables"));
     setLoadingEnv(false);
   };
 
   const copyEnv = (text: string, key: string) => {
     navigator.clipboard.writeText(text);
     setCopiedEnv(key);
-    toast.success(lang === "es" ? "Copiado!" : "Copied!");
+    toast.success("Copied!");
     setTimeout(() => setCopiedEnv(null), 2000);
   };
 
@@ -175,22 +173,22 @@ export function GithubPanel({ projectId, onStatusChange }: GithubPanelProps) {
           <Github className="w-5 h-5 text-white dark:text-gray-900" />
         </div>
         <div>
-          <h3 className="font-semibold text-sm dark:text-gray-100">{t("ghConnectTitle")}</h3>
-          <p className="text-xs text-gray-400">{t("ghConnectSubtitle")}</p>
+          <h3 className="font-semibold text-sm dark:text-gray-100">{"Connect GitHub Repository"}</h3>
+          <p className="text-xs text-gray-400">{"Sync your project code with a GitHub repo"}</p>
         </div>
       </div>
 
       <div className="space-y-3">
         <div>
-          <label className="text-xs font-medium text-gray-600 dark:text-gray-300 mb-1 block">{t("ghRepo")}</label>
+          <label className="text-xs font-medium text-gray-600 dark:text-gray-300 mb-1 block">{"Repository"}</label>
           <Input className="h-9 text-sm font-mono" placeholder="owner/repo" value={repo} onChange={(e) => setRepo(e.target.value)} disabled={connecting} />
         </div>
         <div>
-          <label className="text-xs font-medium text-gray-600 dark:text-gray-300 mb-1 block">{t("ghToken")}</label>
+          <label className="text-xs font-medium text-gray-600 dark:text-gray-300 mb-1 block">{"Fine-grained Personal Access Token"}</label>
           <Input className="h-9 text-sm font-mono" type="password" placeholder="github_pat_..." value={token} onChange={(e) => setToken(e.target.value)} disabled={connecting} />
         </div>
         <div>
-          <label className="text-xs font-medium text-gray-600 dark:text-gray-300 mb-1 block">{t("ghSyncDirection")}</label>
+          <label className="text-xs font-medium text-gray-600 dark:text-gray-300 mb-1 block">{"Sync direction (for repos with existing content)"}</label>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <button
               type="button"
@@ -199,8 +197,8 @@ export function GithubPanel({ projectId, onStatusChange }: GithubPanelProps) {
             >
               <ArrowUpFromLine className="w-4 h-4 text-emerald-500 mt-0.5 shrink-0" />
               <div>
-                <p className="text-xs font-medium dark:text-gray-100">{t("ghDirPushTitle")}</p>
-                <p className="text-[10px] text-gray-400 mt-0.5">{t("ghDirPushDesc")}</p>
+                <p className="text-xs font-medium dark:text-gray-100">{"Totalum → GitHub"}</p>
+                <p className="text-[10px] text-gray-400 mt-0.5">{"Push project code to GitHub, replacing repo content"}</p>
               </div>
             </button>
             <button
@@ -210,8 +208,8 @@ export function GithubPanel({ projectId, onStatusChange }: GithubPanelProps) {
             >
               <ArrowDownToLine className="w-4 h-4 text-blue-500 mt-0.5 shrink-0" />
               <div>
-                <p className="text-xs font-medium dark:text-gray-100">{t("ghDirPullTitle")}</p>
-                <p className="text-[10px] text-gray-400 mt-0.5">{t("ghDirPullDesc")}</p>
+                <p className="text-xs font-medium dark:text-gray-100">{"GitHub → Totalum"}</p>
+                <p className="text-[10px] text-gray-400 mt-0.5">{"Pull GitHub code into Totalum, replacing project code"}</p>
               </div>
             </button>
           </div>
@@ -219,24 +217,24 @@ export function GithubPanel({ projectId, onStatusChange }: GithubPanelProps) {
       </div>
 
       <Button className="w-full h-9 bg-gradient-to-r from-indigo-600 to-violet-600 text-white" onClick={handleConnect} disabled={connecting || !token.trim() || !repo.trim()}>
-        {connecting ? <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />{t("ghConnecting")}</> : <><Link2 className="w-3.5 h-3.5 mr-1.5" />{t("ghConnect")}</>}
+        {connecting ? <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />{"Connecting..."}</> : <><Link2 className="w-3.5 h-3.5 mr-1.5" />{"Connect GitHub"}</>}
       </Button>
 
       {/* How to create the token */}
       <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-3 border border-gray-100 dark:border-gray-800">
         <div className="flex items-center gap-1.5 mb-2">
           <RefreshCw className="w-3 h-3 text-gray-400" />
-          <span className="text-[11px] font-medium text-gray-600 dark:text-gray-300">{t("ghHowToTitle")}</span>
+          <span className="text-[11px] font-medium text-gray-600 dark:text-gray-300">{"How to create the token"}</span>
         </div>
         <ol className="text-[11px] text-gray-500 dark:text-gray-400 space-y-1 list-decimal list-inside">
           <li>
             <a href="https://github.com/settings/personal-access-tokens" target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline inline-flex items-center gap-1">
-              {t("ghStep1")} <ExternalLink className="w-2.5 h-2.5" />
+              {"Open GitHub token settings"} <ExternalLink className="w-2.5 h-2.5" />
             </a>
           </li>
-          <li>{t("ghStep2")}</li>
-          <li>{t("ghStep3")}</li>
-          <li>{t("ghStep4")}</li>
+          <li>{"Generate new token → Only select repositories → choose your repo"}</li>
+          <li>{"Permissions: Contents, Pull requests & Administration → Read and Write"}</li>
+          <li>{"Generate & copy the token (starts with github_pat_)"}</li>
         </ol>
       </div>
     </div>
@@ -247,9 +245,9 @@ export function GithubPanel({ projectId, onStatusChange }: GithubPanelProps) {
       {/* Header */}
       <div className="px-4 py-3 border-b bg-white dark:bg-[#222] dark:border-gray-700 flex items-center gap-2">
         <Github className="w-4 h-4 text-gray-900 dark:text-gray-100" />
-        <span className="text-sm font-medium dark:text-gray-100">{t("github")}</span>
+        <span className="text-sm font-medium dark:text-gray-100">{"GitHub"}</span>
         {status?.connected && (
-          <Badge className="ml-auto text-[9px] h-4 border-0 bg-emerald-100 text-emerald-700">{t("connected")}</Badge>
+          <Badge className="ml-auto text-[9px] h-4 border-0 bg-emerald-100 text-emerald-700">{"Connected"}</Badge>
         )}
       </div>
 
@@ -264,9 +262,9 @@ export function GithubPanel({ projectId, onStatusChange }: GithubPanelProps) {
             <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
               <AlertTriangle className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
               <div>
-                <p className="text-sm font-medium text-amber-800">{t("ghTokenExpiredTitle")}</p>
+                <p className="text-sm font-medium text-amber-800">{"GitHub token expired"}</p>
                 <p className="text-xs text-amber-700 mt-0.5">
-                  {t("ghTokenExpiredDesc")}
+                  {"Your token was revoked or expired. Reconnect to continue syncing"}
                   {status.repositoryFullName ? ` (${status.repositoryFullName})` : ""}
                 </p>
               </div>
@@ -287,8 +285,8 @@ export function GithubPanel({ projectId, onStatusChange }: GithubPanelProps) {
                     <div className="flex items-center gap-2">
                       <h3 className="font-semibold text-sm truncate dark:text-gray-100">{status.repositoryFullName}</h3>
                       {status.tokenValid
-                        ? <Badge className="text-[9px] h-4 border-0 bg-emerald-100 text-emerald-700">{t("ghTokenValid")}</Badge>
-                        : <Badge className="text-[9px] h-4 border-0 bg-red-100 text-red-700">{t("ghTokenInvalid")}</Badge>}
+                        ? <Badge className="text-[9px] h-4 border-0 bg-emerald-100 text-emerald-700">{"Token valid"}</Badge>
+                        : <Badge className="text-[9px] h-4 border-0 bg-red-100 text-red-700">{"Token invalid"}</Badge>}
                     </div>
                     <a
                       href={`https://github.com/${status.repositoryFullName}`}
@@ -300,7 +298,7 @@ export function GithubPanel({ projectId, onStatusChange }: GithubPanelProps) {
                   </div>
                 </div>
                 <Button variant="ghost" size="sm" className="text-gray-400 hover:text-red-500 h-8 text-xs shrink-0" onClick={handleDisconnect} disabled={busy}>
-                  {disconnecting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <><Unlink className="w-3 h-3 mr-1" /> {t("disconnect")}</>}
+                  {disconnecting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <><Unlink className="w-3 h-3 mr-1" /> {"Disconnect"}</>}
                 </Button>
               </div>
 
@@ -309,12 +307,12 @@ export function GithubPanel({ projectId, onStatusChange }: GithubPanelProps) {
                 <div className="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-800 rounded-md px-2 py-1">
                   <GitBranch className="w-3 h-3 text-gray-400" />
                   <span className="font-mono">{status.developBranch || "develop"}</span>
-                  <span className="text-[10px] text-gray-400">· {t("ghAfterPrompt")}</span>
+                  <span className="text-[10px] text-gray-400">· {"after each prompt"}</span>
                 </div>
                 <div className="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-800 rounded-md px-2 py-1">
                   <GitBranch className="w-3 h-3 text-gray-400" />
                   <span className="font-mono">{status.productionBranch || "main"}</span>
-                  <span className="text-[10px] text-gray-400">· {t("ghOnPublish")}</span>
+                  <span className="text-[10px] text-gray-400">· {"on publish"}</span>
                 </div>
               </div>
             </div>
@@ -323,16 +321,16 @@ export function GithubPanel({ projectId, onStatusChange }: GithubPanelProps) {
             <div className="bg-gradient-to-r from-indigo-50 to-violet-50 dark:from-indigo-950/30 dark:to-violet-950/30 rounded-xl border border-indigo-100 dark:border-indigo-900 p-4">
               <div className="flex items-center gap-2 mb-2">
                 <Info className="w-3.5 h-3.5 text-indigo-500" />
-                <span className="text-xs font-medium text-indigo-700 dark:text-indigo-300">{t("ghBidirectional")}</span>
+                <span className="text-xs font-medium text-indigo-700 dark:text-indigo-300">{"Bidirectional sync enabled"}</span>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                 <div className="flex items-start gap-2 text-gray-600 dark:text-gray-300">
                   <ArrowUpFromLine className="w-3.5 h-3.5 text-emerald-500 mt-0.5 shrink-0" />
-                  <span>{t("ghPushDesc")}</span>
+                  <span>{"Totalum auto-pushes to develop after every prompt, and to main on publish"}</span>
                 </div>
                 <div className="flex items-start gap-2 text-gray-600 dark:text-gray-300">
                   <ArrowDownToLine className="w-3.5 h-3.5 text-blue-500 mt-0.5 shrink-0" />
-                  <span>{t("ghPullDesc")}</span>
+                  <span>{"Pull changes made on GitHub back into your Totalum project"}</span>
                 </div>
               </div>
             </div>
@@ -340,13 +338,13 @@ export function GithubPanel({ projectId, onStatusChange }: GithubPanelProps) {
             {/* Pull action */}
             <div className="bg-white dark:bg-[#222] rounded-xl border border-gray-200 dark:border-gray-700 p-4 flex items-center justify-between gap-3">
               <div className="min-w-0">
-                <h3 className="font-semibold text-sm dark:text-gray-100">{t("ghPullTitle")}</h3>
-                <p className="text-xs text-gray-400 mt-0.5">{t("ghPullSubtitle")}</p>
+                <h3 className="font-semibold text-sm dark:text-gray-100">{"Pull from GitHub"}</h3>
+                <p className="text-xs text-gray-400 mt-0.5">{"Fetch latest changes from the develop branch and rebuild"}</p>
               </div>
               <Button size="sm" className="h-9 px-4 shrink-0 bg-gradient-to-r from-blue-600 to-indigo-600 text-white" onClick={handlePull} disabled={busy || !status.tokenValid}>
                 {pulling || rebuilding
-                  ? <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />{rebuilding ? t("ghRebuilding") : t("ghPulling")}</>
-                  : <><ArrowDownToLine className="w-3.5 h-3.5 mr-1.5" />{t("ghPull")}</>}
+                  ? <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />{rebuilding ? "Rebuilding..." : "Pulling..."}</>
+                  : <><ArrowDownToLine className="w-3.5 h-3.5 mr-1.5" />{"Pull"}</>}
               </Button>
             </div>
 
@@ -354,18 +352,18 @@ export function GithubPanel({ projectId, onStatusChange }: GithubPanelProps) {
             <div className="bg-white dark:bg-[#222] rounded-xl border border-gray-200 dark:border-gray-700 p-4">
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <h3 className="font-semibold text-sm dark:text-gray-100">{t("ghEnvTitle")}</h3>
-                  <p className="text-xs text-gray-400 mt-0.5">{t("ghEnvSubtitle")}</p>
+                  <h3 className="font-semibold text-sm dark:text-gray-100">{"Environment variables"}</h3>
+                  <p className="text-xs text-gray-400 mt-0.5">{"Download your .env content for local development & production"}</p>
                 </div>
                 <Button variant="outline" size="sm" className="h-9 px-4 shrink-0" onClick={handleLoadEnv} disabled={loadingEnv}>
-                  {loadingEnv ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <><Download className="w-3.5 h-3.5 mr-1.5" />{env ? t("ghEnvReload") : t("ghEnvLoad")}</>}
+                  {loadingEnv ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <><Download className="w-3.5 h-3.5 mr-1.5" />{env ? "Reload" : "Load .env"}</>}
                 </Button>
               </div>
               {env && (
                 <div className="mt-3 space-y-3">
                   {([
-                    { key: "envDev", label: t("ghEnvDev"), value: env.envDev },
-                    { key: "envProd", label: t("ghEnvProd"), value: env.envProd },
+                    { key: "envDev", label: "Development (.env)", value: env.envDev },
+                    { key: "envProd", label: "Production (.env)", value: env.envProd },
                   ] as const).map((block) => (
                     <div key={block.key}>
                       <div className="flex items-center justify-between mb-1">

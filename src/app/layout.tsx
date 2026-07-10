@@ -6,7 +6,6 @@ import "./globals.css";
 import { ScriptExecutor } from "@/components/ScriptExecutor";
 import { GlobalErrorCatcher } from "@/components/GlobalErrorCatcher";
 import { Toaster } from "@/components/ui/sonner";
-import { I18nProvider } from "@/lib/i18n";
 
 const dmSans = DM_Sans({ variable: "--font-dm-sans", subsets: ["latin"], weight: ["300", "400", "500", "600", "700"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
@@ -24,14 +23,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${dmSans.variable} ${geistMono.variable} antialiased`}>
-        <I18nProvider>
-          <GlobalErrorCatcher />
-          <ScriptExecutor />
-          <Toaster position="top-right" richColors />
-          <div className="min-h-screen flex flex-col">
-            <main className="flex-1">{children}</main>
-          </div>
-        </I18nProvider>
+        <GlobalErrorCatcher />
+        <ScriptExecutor />
+        <Toaster position="top-right" richColors />
+        <div className="min-h-screen flex flex-col">
+          <main className="flex-1">{children}</main>
+        </div>
       </body>
     </html>
   );
