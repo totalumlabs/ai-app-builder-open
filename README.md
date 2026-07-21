@@ -18,6 +18,12 @@ Run it yourself, or drop a first-class AI app builder straight into your own Saa
 
 [**🚀 Quick Start**](#-quick-start) · [**🧩 Embed in your SaaS**](#-embed-it-in-your-own-saas) · [**☁️ Deploy**](#️-deployment) · [**📚 Docs**](https://www.totalum.app/docs) · [**⭐ Star this repo**](https://github.com/totalumlabs/ai-app-builder-open)
 
+<br/>
+
+<img src=".github/assets/ai_app_builder_open_demo.gif" alt="Demo: typing a prompt and watching the AI build, preview and deploy a full-stack Next.js app" width="90%" />
+
+*From prompt to deployed full-stack app — live preview, code editor, database and deploy, all in one place.*
+
 </div>
 
 ---
