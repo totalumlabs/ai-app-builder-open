@@ -37,7 +37,13 @@ All responses follow: { "errors": null | { "errorCode": "...", "errorMessage": "
 | Export project         | 2 credits       |
 | Import project         | 6 credits       |
 | Add custom domain      | 2 credits          |
+| Write a file           | 0.1 credits       |
+| Rebuild project        | 1 credits         |
 | All other endpoints    | Free              |
+
+(The project file TREE and READING a file are free — see "PROJECT FILES" below.)
+
+These fixed prices are also served by the API itself: `GET /api/v1/vcaas/credit-costs` returns the exact table the API charges against. Read it at runtime instead of hard-coding the numbers above. Running the AI agent has no entry there because its price depends on how much work the prompt turns out to be.
 
 **Infrastructure credits** (when built-in service plan limits are exceeded):
 | Operation              | Cost              |
@@ -96,9 +102,13 @@ You can also use any API or npm package simply by mentioning it in your prompt. 
 Cost: Free
 
 Response schema:
-  | Field          | Type   | Description               |
-  |----------------|--------|---------------------------|
-  | data.credits   | number | Current credit balance     |
+  | Field                  | Type              | Description                                                                          |
+  |------------------------|-------------------|--------------------------------------------------------------------------------------|
+  | data.credits           | number            | TOTAL spendable balance = recurrentCredits + oneTimeCredits. Gate every call on this |
+  | data.recurrentCredits  | number\|undefined | Monthly plan credits remaining. Reset each billing period. 0 when the plan has none  |
+  | data.oneTimeCredits    | number\|undefined | Purchased credits remaining. These never expire                                       |
+
+Plan credits are spent before purchased ones, so `oneTimeCredits` is what is left once the monthly allowance runs out. Accounts created before plan credits existed report their whole balance under `oneTimeCredits`. You only ever need `data.credits` to decide whether a call can go ahead.
 
 Error responses:
   | Error Code         | HTTP | Description                          |
@@ -112,7 +122,59 @@ Response:
   {
     "errors": null,
     "data": {
-      "credits": 425
+      "credits": 425,
+      "recurrentCredits": 100,
+      "oneTimeCredits": 325
+    }
+  }
+
+### GET https://api-accounts.totalum.app/api/v1/vcaas/credit-costs
+**Get Credit Costs** — The current price, in development credits, of every fixed-cost operation. Read this at runtime instead of hard-coding prices: it is the same table the API charges against, so a price change reaches your app without a release.
+Cost: Free
+
+Only FIXED-price operations appear here. Running the AI agent is not one of them — a prompt costs roughly 2 to 30 credits depending on how much work it turns out to be — and infrastructure credits (ChatGPT, image generation, emails, PDFs, ...) are usage-based. Every endpoint not named in the response is free.
+
+Response schema:
+  | Field                             | Type   | Description                                       |
+  |-----------------------------------|--------|---------------------------------------------------|
+  | data.creditCosts                  | object | Map of operation name to cost in development credits |
+  | data.creditCosts.CREATE_PROJECT   | number | Creating a project                                |
+  | data.creditCosts.CREATE_DEPLOYMENT| number | Deploying to production                           |
+  | data.creditCosts.START_SERVER     | number | Starting or restarting the dev server             |
+  | data.creditCosts.GET_SOURCE_CODE  | number | Downloading the full source archive               |
+  | data.creditCosts.RECOVER_VERSION  | number | Recovering a previous version                     |
+  | data.creditCosts.UPLOAD_FILE      | number | Uploading a file to the project                   |
+  | data.creditCosts.ADD_CUSTOM_DOMAIN| number | Attaching a custom domain                         |
+  | data.creditCosts.EXPORT_PROJECT   | number | Exporting a project                               |
+  | data.creditCosts.IMPORT_PROJECT   | number | Importing a project                               |
+  | data.creditCosts.UPDATE_FILE      | number | Writing one file through the project-files API    |
+  | data.creditCosts.REBUILD_PROJECT  | number | Rebuilding the project after file writes          |
+
+Error responses:
+  | Error Code              | HTTP | Description                          |
+  |-------------------------|------|--------------------------------------|
+  | GET_CREDIT_COSTS_ERROR  | 400  | Internal error fetching credit costs |
+
+cURL:
+  curl -H "api-key: tlm_sk_your_key" https://api-accounts.totalum.app/api/v1/vcaas/credit-costs
+
+Response:
+  {
+    "errors": null,
+    "data": {
+      "creditCosts": {
+        "CREATE_PROJECT": 1,
+        "CREATE_DEPLOYMENT": 1,
+        "START_SERVER": 3,
+        "GET_SOURCE_CODE": 1,
+        "RECOVER_VERSION": 2,
+        "UPLOAD_FILE": 0.5,
+        "ADD_CUSTOM_DOMAIN": 2,
+        "EXPORT_PROJECT": 2,
+        "IMPORT_PROJECT": 6,
+        "UPDATE_FILE": 0.1,
+        "REBUILD_PROJECT": 1
+      }
     }
   }
 
@@ -127,16 +189,22 @@ Cost: 1 credits
 Request body schema:
   | Field       | Type   | Required | Description                                                                      |
   |-------------|--------|----------|----------------------------------------------------------------------------------|
-  | projectId   | string | Yes      | 4-35 chars, lowercase letters + numbers + hyphens, must start with letter        |
+  | projectId   | string | Yes      | 4-35 chars, lowercase letters + numbers + hyphens, must start with letter. PERMANENT — it is the organization id and the production hostname, and can never be renamed |
   | description | string | No       | Project description, max 500 characters                                          |
+  | label       | string | No       | Human display name, max 80 chars. This IS changeable later (PATCH /projects/:projectId). Omitted → clients show the projectId |
+  | groupId     | string | No       | File the project under an existing project group. Omitted → ungrouped            |
 
 Response schema:
-  | Field            | Type   | Description                        |
-  |------------------|--------|------------------------------------|
-  | data.projectId   | string | The project ID                     |
-  | data.description | string | Project description                |
-  | data.plan        | string | Always "api" for VCaaS projects    |
-  | data.createdAt   | string | ISO 8601 creation date             |
+  | Field            | Type              | Description                                             |
+  |------------------|-------------------|---------------------------------------------------------|
+  | data.projectId   | string            | The project ID                                          |
+  | data.description | string            | Project description                                     |
+  | data.plan        | string            | Always "api" for VCaaS projects                         |
+  | data.createdAt   | string            | ISO 8601 creation date                                  |
+  | data.label       | string\|undefined | The display name, when one was given                    |
+  | data.groupId     | string\|undefined | The group it was filed under. Absent when ungrouped     |
+
+A bad `groupId` fails the WHOLE request: the group is resolved before the project is created and before credits are spent, so an unknown, malformed, someone else's or a full group returns 400 INVALID_PROJECT_GROUP and nothing is created. You are never left with a charged project that silently landed outside the folder you asked for.
 
 Error responses:
   | Error Code                   | HTTP | Description                                                                |
@@ -145,6 +213,7 @@ Error responses:
   | INVALID_PROJECT_NAME         | 400  | Invalid format. Use lowercase letters, numbers, and hyphens. Must start with a letter |
   | INVALID_PROJECT_NAME_LENGTH  | 400  | Project name must be between 4 and 35 characters                           |
   | PROJECT_ALREADY_EXISTS       | 409  | A project with this name already exists                                    |
+  | INVALID_PROJECT_GROUP        | 400  | The groupId does not exist, is not yours, or the group is full             |
   | INSUFFICIENT_CREDITS         | 402  | Not enough credits for this operation                                      |
   | RATE_LIMIT_EXCEEDED          | 429  | Maximum 10 project creations per 60 seconds                                |
 
@@ -152,7 +221,7 @@ cURL:
   curl -X POST \
     -H "api-key: tlm_sk_your_key" \
     -H "Content-Type: application/json" \
-    -d '{"projectId":"my-app","description":"A SaaS landing page"}' \
+    -d '{"projectId":"my-app","description":"A SaaS landing page","label":"Acme storefront"}' \
     https://api-accounts.totalum.app/api/v1/vcaas/projects
 
 Response:
@@ -162,24 +231,43 @@ Response:
       "projectId": "my-app",
       "description": "A SaaS landing page",
       "plan": "api",
-      "createdAt": "2026-03-11T10:30:00.000Z"
+      "createdAt": "2026-03-11T10:30:00.000Z",
+      "label": "Acme storefront"
     }
   }
 
 ---
 
 ### 3. GET https://api-accounts.totalum.app/api/v1/vcaas/projects
-**List Projects** — Get all your projects.
+**List Projects** — Your projects, most recently created first. Returns AT MOST 100 per call; page with `skip` or narrow with `search`.
 Cost: Free
 
+Query params:
+  | Field         | Type   | Required | Description                                                                 |
+  |---------------|--------|----------|-----------------------------------------------------------------------------|
+  | limit         | number | No       | Projects per page, 1-100 (default 100)                                      |
+  | skip          | number | No       | Projects to skip, for paging (default 0)                                    |
+  | search        | string | No       | Case-insensitive match on project ID and description                        |
+  | sortDirection | string | No       | "desc" (default) newest first, or "asc" for oldest first                    |
+  | groupId       | string | No       | Only the projects in one group. The literal value "none" returns only UNGROUPED projects |
+
+There is deliberately NO `plan` filter — each project's plan is still returned, but the list cannot be sliced by it. An unknown, malformed or someone else's `groupId` matches nothing and returns an EMPTY list, never everything.
+
+Response headers: `X-Total-Count` (total across all pages), `X-Limit`, `X-Skip`, `X-Has-More` (true when more pages exist). The body stays a plain array.
+
 Response schema:
-  | Field              | Type   | Description                     |
-  |--------------------|--------|---------------------------------|
-  | data               | array  | Array of project objects        |
-  | data[].projectId   | string | The project ID                  |
-  | data[].description | string | Project description             |
-  | data[].plan        | string | Always "api" for VCaaS projects |
-  | data[].createdAt   | string | ISO 8601 creation date          |
+  | Field                   | Type              | Description                                                                   |
+  |-------------------------|-------------------|-------------------------------------------------------------------------------|
+  | data                    | array             | Array of project objects                                                      |
+  | data[].projectId        | string            | The project ID                                                                |
+  | data[].description      | string            | Project description                                                           |
+  | data[].plan             | string            | Always "api" for VCaaS projects                                               |
+  | data[].createdAt        | string            | ISO 8601 creation date                                                        |
+  | data[].label            | string\|undefined | Display name. Absent when none is set — fall back to projectId                |
+  | data[].groupId          | string\|undefined | The group it is filed under. Absent when ungrouped                            |
+  | data[].previewImageUrl  | string\|undefined | Screenshot of the project home page, refreshed when a prompt finishes. Absent until the first prompt completes |
+
+`previewImageUrl` is on the LIST item on purpose: a dashboard draws its cards from this one call instead of a GET /projects/:projectId per tile.
 
 Error responses:
   | Error Code          | HTTP | Description                     |
@@ -188,6 +276,8 @@ Error responses:
 
 cURL:
   curl -H "api-key: tlm_sk_your_key" https://api-accounts.totalum.app/api/v1/vcaas/projects
+  curl -H "api-key: tlm_sk_your_key" "https://api-accounts.totalum.app/api/v1/vcaas/projects?limit=50&skip=50"
+  curl -H "api-key: tlm_sk_your_key" "https://api-accounts.totalum.app/api/v1/vcaas/projects?groupId=none"
 
 Response:
   {
@@ -197,7 +287,10 @@ Response:
         "projectId": "my-app",
         "description": "A SaaS landing page",
         "plan": "api",
-        "createdAt": "2026-03-11T10:30:00.000Z"
+        "createdAt": "2026-03-11T10:30:00.000Z",
+        "label": "Acme storefront",
+        "groupId": "65f1a2b3c4d5e6f7a8b9c0d1",
+        "previewImageUrl": "https://storage.totalum.app/previews/my-app.png"
       }
     ]
   }
@@ -212,6 +305,9 @@ Response schema:
   | Field                                 | Type               | Description                                                              |
   |---------------------------------------|--------------------|--------------------------------------------------------------------------|
   | data.projectId                        | string             | The project ID                                                           |
+  | data.label                            | string \| undefined | Display name. Absent when none is set — fall back to projectId. Returned here as well as on the list so a single-project screen can show and EDIT the name without paging every project to find its own row |
+  | data.groupId                          | string \| undefined | The group the project is filed under. Absent when ungrouped              |
+  | data.previewImageUrl                  | string \| undefined | Screenshot of the project home page, refreshed when a prompt finishes. Absent until the first prompt completes |
   | data.description                      | string             | Project description                                                      |
   | data.plan                             | string             | Always "api" for VCaaS projects                                          |
   | data.agentProcessStatus               | string \| undefined | "init" (running) \| "done" (finished) \| "idle" (not started)            |
@@ -265,6 +361,9 @@ Response:
     "errors": null,
     "data": {
       "projectId": "my-app",
+      "label": "Acme storefront",
+      "groupId": "65f1a2b3c4d5e6f7a8b9c0d1",
+      "previewImageUrl": "https://storage.totalum.app/previews/my-app.png",
       "description": "A SaaS landing page",
       "plan": "api",
       "agentProcessStatus": "done",
@@ -336,6 +435,72 @@ Response:
 
 ---
 
+### PATCH https://api-accounts.totalum.app/api/v1/vcaas/projects/:projectId
+**Update Project** — Change a project's display label, its description, or the group it is filed under.
+Cost: Free
+
+⚠️ `projectId` CANNOT BE CHANGED. It is the organization id AND the production hostname, and there is no rename anywhere in the stack — which is exactly why `label` exists. Sending `projectId` in the body does nothing.
+
+⚠️ ABSENT KEYS ARE LEFT ALONE; `null` CLEARS. These are different requests: `{}` is rejected as a no-op, `{"label":"New name"}` touches nothing but the label, and `{"label":null}` removes it. Updating one field can never blank another by omission.
+
+URL parameters:
+  | Field     | Type   | Required | Description    |
+  |-----------|--------|----------|----------------|
+  | projectId | string | Yes      | The project ID |
+
+Request body schema:
+  | Field       | Type          | Required | Description                                                                    |
+  |-------------|---------------|----------|--------------------------------------------------------------------------------|
+  | label       | string \| null | No       | Display name, trimmed and capped at 80 chars. null or "" clears it and clients fall back to projectId |
+  | description | string \| null | No       | Trimmed and capped at 500 chars. null or "" clears it                          |
+  | groupId     | string \| null | No       | An existing project group to file it under. null removes it from its group     |
+
+Response schema:
+  | Field            | Type              | Description                                          |
+  |------------------|-------------------|------------------------------------------------------|
+  | data.projectId   | string            | Unchanged — the id is immutable                      |
+  | data.label       | string\|undefined | The label after the update. Absent when cleared/unset |
+  | data.description | string            | The description after the update. "" when unset      |
+  | data.groupId     | string\|undefined | The group after the update. Absent when ungrouped    |
+
+Reading back immediately is safe: GET /projects/:projectId serves a snapshot cached for a few seconds, and a successful PATCH drops it — so an editing UI that saves a name and refetches straight away reads the NEW value.
+
+Error responses:
+  | Error Code             | HTTP | Description                                                              |
+  |------------------------|------|--------------------------------------------------------------------------|
+  | MISSING_PROJECT_ID     | 400  | projectId is required                                                    |
+  | PROJECT_NOT_FOUND      | 404  | Project does not exist or you don't own it                               |
+  | NOTHING_TO_UPDATE      | 400  | The body contained none of label, description or groupId                 |
+  | INVALID_PROJECT_GROUP  | 400  | The group does not exist, is not yours, or already holds 100000 projects |
+  | UPDATE_PROJECT_ERROR   | 400  | Internal error updating the project                                      |
+
+cURL:
+  curl -X PATCH \
+    -H "api-key: tlm_sk_your_key" \
+    -H "Content-Type: application/json" \
+    -d '{"label":"Acme storefront","groupId":"65f1a2b3c4d5e6f7a8b9c0d1"}' \
+    https://api-accounts.totalum.app/api/v1/vcaas/projects/my-app
+
+  # clear the label and take it out of its group
+  curl -X PATCH \
+    -H "api-key: tlm_sk_your_key" \
+    -H "Content-Type: application/json" \
+    -d '{"label":null,"groupId":null}' \
+    https://api-accounts.totalum.app/api/v1/vcaas/projects/my-app
+
+Response:
+  {
+    "errors": null,
+    "data": {
+      "projectId": "my-app",
+      "label": "Acme storefront",
+      "description": "A SaaS landing page",
+      "groupId": "65f1a2b3c4d5e6f7a8b9c0d1"
+    }
+  }
+
+---
+
 ### 6. PATCH https://api-accounts.totalum.app/api/v1/vcaas/projects/:projectId/credit-limits
 **Update Project Credit Limits** — Set monthly spending caps per project for development and/or infrastructure credits. By default, projects have no credit limits. Set a field to null to remove that limit.
 Cost: Free
@@ -390,6 +555,231 @@ To remove a limit, set it to null:
     https://api-accounts.totalum.app/api/v1/vcaas/projects/my-app/credit-limits
 
 By default, projects have no credit limits — all operations are allowed as long as you have credits in your account. When a project reaches its monthly limit, operations in that category return a 403 PROJECT_CREDIT_LIMIT_REACHED error. Limits reset automatically on the 1st of each month.
+
+---
+
+### ── PROJECT GROUPS ──
+
+Optional FOLDERS for projects. Nothing requires one: a project with no group behaves exactly as every project did before groups existed, and filing one away never hides it from GET /projects. All group endpoints are free.
+
+A project joins a group via `groupId` on POST /projects or PATCH /projects/:projectId, and you filter with `GET /projects?groupId=<id>` (or `?groupId=none` for ungrouped).
+
+A group is a LABEL, not a container: membership is stored on the project, never as a list of ids on the group. That is why deleting a group is cheap and never touches a project.
+
+Every lookup is scoped to the calling account — a group owned by somebody else is indistinguishable from one that does not exist (404 either way).
+
+Limits: 3000 groups per account · 100000 projects per group · name ≤ 80 chars · description ≤ 500 chars.
+
+### POST https://api-accounts.totalum.app/api/v1/vcaas/project-groups
+**Create Project Group** — Create a folder for projects.
+Cost: Free
+
+Request body schema:
+  | Field       | Type   | Required | Description                                                    |
+  |-------------|--------|----------|----------------------------------------------------------------|
+  | name        | string | Yes      | Trimmed, up to 80 characters. An empty name is rejected        |
+  | description | string | No       | Trimmed and TRUNCATED to 500 characters rather than rejected   |
+
+Response schema:
+  | Field            | Type   | Description                                       |
+  |------------------|--------|---------------------------------------------------|
+  | data.groupId     | string | The new group's id — use this as `groupId` elsewhere |
+  | data.name        | string | The group name                                    |
+  | data.description | string | The description, or "" when none was given        |
+  | data.createdAt   | string | ISO 8601 creation date                            |
+  | data.updatedAt   | string | ISO 8601 last-modified date                       |
+
+Error responses:
+  | Error Code                 | HTTP | Description                                                            |
+  |----------------------------|------|------------------------------------------------------------------------|
+  | CREATE_PROJECT_GROUP_ERROR | 400  | Name missing or longer than 80 chars, or the account already has 3000 groups |
+
+cURL:
+  curl -X POST \
+    -H "api-key: tlm_sk_your_key" \
+    -H "Content-Type: application/json" \
+    -d '{"name":"Client work","description":"Everything billed to clients"}' \
+    https://api-accounts.totalum.app/api/v1/vcaas/project-groups
+
+Response:
+  {
+    "errors": null,
+    "data": {
+      "groupId": "65f1a2b3c4d5e6f7a8b9c0d1",
+      "name": "Client work",
+      "description": "Everything billed to clients",
+      "createdAt": "2026-08-04T10:00:00.000Z",
+      "updatedAt": "2026-08-04T10:00:00.000Z"
+    }
+  }
+
+---
+
+### GET https://api-accounts.totalum.app/api/v1/vcaas/project-groups
+**List Project Groups** — Your groups, NEWEST FIRST, each with the number of projects filed under it.
+Cost: Free
+
+Query params:
+  | Field  | Type   | Required | Description                                |
+  |--------|--------|----------|--------------------------------------------|
+  | search | string | No       | Case-insensitive match on the group NAME only |
+  | limit  | number | No       | Page size, default 100, maximum 200        |
+  | skip   | number | No       | Groups to skip, for paging (default 0)     |
+
+Response headers: `X-Total-Count`, `X-Limit`, `X-Skip`.
+
+Response schema:
+  | Field                | Type   | Description                                     |
+  |----------------------|--------|-------------------------------------------------|
+  | data                 | array  | Array of group objects, newest first            |
+  | data[].groupId       | string | The group ID                                    |
+  | data[].name          | string | The group name                                  |
+  | data[].description   | string | The description, or ""                          |
+  | data[].createdAt     | string | ISO 8601 creation date                          |
+  | data[].updatedAt     | string | ISO 8601 last-modified date                     |
+  | data[].projectCount  | number | How many of your projects are filed under it    |
+
+Error responses:
+  | Error Code                | HTTP | Description                           |
+  |---------------------------|------|---------------------------------------|
+  | LIST_PROJECT_GROUPS_ERROR | 400  | Internal error listing project groups |
+
+cURL:
+  curl -H "api-key: tlm_sk_your_key" "https://api-accounts.totalum.app/api/v1/vcaas/project-groups?limit=100"
+
+Response:
+  {
+    "errors": null,
+    "data": [
+      {
+        "groupId": "65f1a2b3c4d5e6f7a8b9c0d1",
+        "name": "Client work",
+        "description": "Everything billed to clients",
+        "createdAt": "2026-08-04T10:00:00.000Z",
+        "updatedAt": "2026-08-04T10:00:00.000Z",
+        "projectCount": 12
+      }
+    ]
+  }
+
+---
+
+### GET https://api-accounts.totalum.app/api/v1/vcaas/project-groups/:groupId
+**Get Project Group** — One group, with its current project count.
+Cost: Free
+
+URL parameters:
+  | Field   | Type   | Required | Description  |
+  |---------|--------|----------|--------------|
+  | groupId | string | Yes      | The group ID |
+
+Response schema:
+  | Field              | Type   | Description                                  |
+  |--------------------|--------|----------------------------------------------|
+  | data.groupId       | string | The group ID                                 |
+  | data.name          | string | The group name                               |
+  | data.description   | string | The description, or ""                       |
+  | data.createdAt     | string | ISO 8601 creation date                       |
+  | data.updatedAt     | string | ISO 8601 last-modified date                  |
+  | data.projectCount  | number | How many of your projects are filed under it |
+
+Error responses:
+  | Error Code              | HTTP | Description                                             |
+  |-------------------------|------|---------------------------------------------------------|
+  | PROJECT_GROUP_NOT_FOUND | 404  | No such group, the id is malformed, or it is not yours  |
+  | GET_PROJECT_GROUP_ERROR | 400  | Internal error getting the project group                |
+
+cURL:
+  curl -H "api-key: tlm_sk_your_key" https://api-accounts.totalum.app/api/v1/vcaas/project-groups/65f1a2b3c4d5e6f7a8b9c0d1
+
+Response:
+  {
+    "errors": null,
+    "data": {
+      "groupId": "65f1a2b3c4d5e6f7a8b9c0d1",
+      "name": "Client work",
+      "description": "",
+      "createdAt": "2026-08-04T10:00:00.000Z",
+      "updatedAt": "2026-08-04T10:00:00.000Z",
+      "projectCount": 12
+    }
+  }
+
+---
+
+### PATCH https://api-accounts.totalum.app/api/v1/vcaas/project-groups/:groupId
+**Update Project Group** — Rename a group or change its description. Keys you do not send are left alone, so renaming cannot blank the description.
+Cost: Free
+
+URL parameters:
+  | Field   | Type   | Required | Description  |
+  |---------|--------|----------|--------------|
+  | groupId | string | Yes      | The group ID |
+
+Request body schema:
+  | Field       | Type   | Required | Description                                                             |
+  |-------------|--------|----------|-------------------------------------------------------------------------|
+  | name        | string | No       | Trimmed, up to 80 chars. Sending an EMPTY name is an error — omit the key |
+  | description | string | No       | Trimmed and truncated to 500 chars. Send "" to clear it                 |
+
+Response schema: same shape as GET /project-groups/:groupId (including `projectCount`).
+
+Error responses:
+  | Error Code                 | HTTP | Description                                                    |
+  |----------------------------|------|----------------------------------------------------------------|
+  | PROJECT_GROUP_NOT_FOUND    | 404  | No such group, the id is malformed, or it is not yours         |
+  | UPDATE_PROJECT_GROUP_ERROR | 400  | Empty name, name longer than 80 chars, or an internal error    |
+
+cURL:
+  curl -X PATCH \
+    -H "api-key: tlm_sk_your_key" \
+    -H "Content-Type: application/json" \
+    -d '{"name":"Client work 2026"}' \
+    https://api-accounts.totalum.app/api/v1/vcaas/project-groups/65f1a2b3c4d5e6f7a8b9c0d1
+
+Response:
+  {
+    "errors": null,
+    "data": {
+      "groupId": "65f1a2b3c4d5e6f7a8b9c0d1",
+      "name": "Client work 2026",
+      "description": "Everything billed to clients",
+      "createdAt": "2026-08-04T10:00:00.000Z",
+      "updatedAt": "2026-08-04T12:30:00.000Z",
+      "projectCount": 12
+    }
+  }
+
+---
+
+### DELETE https://api-accounts.totalum.app/api/v1/vcaas/project-groups/:groupId
+**Delete Project Group** — Delete the FOLDER only.
+Cost: Free
+
+⚠️ DELETING A GROUP NEVER DELETES A PROJECT. Its members simply become ungrouped — the state every project is in by default — and `releasedProjects` says how many were released. There is deliberately no cascade: a folder is not an owner. To delete the projects themselves, call DELETE /projects/:projectId for each.
+
+URL parameters:
+  | Field   | Type   | Required | Description  |
+  |---------|--------|----------|--------------|
+  | groupId | string | Yes      | The group ID |
+
+Response schema:
+  | Field                 | Type    | Description                                       |
+  |-----------------------|---------|---------------------------------------------------|
+  | data.deleted          | boolean | true on successful deletion                       |
+  | data.releasedProjects | number  | How many projects became ungrouped. None deleted  |
+
+Error responses:
+  | Error Code                 | HTTP | Description                                            |
+  |----------------------------|------|--------------------------------------------------------|
+  | PROJECT_GROUP_NOT_FOUND    | 404  | No such group, the id is malformed, or it is not yours |
+  | DELETE_PROJECT_GROUP_ERROR | 400  | Internal error deleting the project group              |
+
+cURL:
+  curl -X DELETE -H "api-key: tlm_sk_your_key" https://api-accounts.totalum.app/api/v1/vcaas/project-groups/65f1a2b3c4d5e6f7a8b9c0d1
+
+Response:
+  { "errors": null, "data": { "deleted": true, "releasedProjects": 12 } }
 
 ---
 
@@ -880,8 +1270,10 @@ Response:
 ---
 
 ### 14. GET https://api-accounts.totalum.app/api/v1/vcaas/projects/:projectId/backend/dev/logs
-**Get Dev Server Logs** — Retrieve backend development server stdout/stderr output.
+**Get Dev Server Logs** — Retrieve backend DEVELOPMENT server stdout/stderr output — literally the dev server's log file on the project's sandbox VM.
 Cost: Free
+
+⚠️ DEV AND PRODUCTION ARE DIFFERENT MACHINES. A published project runs on Cloudflare, not on the sandbox, so its request logs are NOT in this response. Use `GET .../backend/prod/logs` when debugging the live site.
 
 Response schema:
   | Field     | Type   | Description                              |
@@ -901,6 +1293,83 @@ Response:
   {
     "errors": null,
     "data": { "logs": "Server running on port 3000\n..." }
+  }
+
+---
+
+### GET https://api-accounts.totalum.app/api/v1/vcaas/projects/:projectId/backend/prod/logs
+**Get Production Logs** — The request logs of the PUBLISHED project, the one running at your production URL. Each record is one request, with the console output and exceptions produced while serving it.
+Cost: Free
+
+Only exists after a successful deployment — a project that was never deployed simply has no records. Retention is 3 DAYS; `from`/`to` must fall inside that window (`to` may reach into tomorrow so all of today is covered).
+
+Query params:
+  | Field           | Type    | Required | Description                                                                                   |
+  |-----------------|---------|----------|-----------------------------------------------------------------------------------------------|
+  | getOnlyLastLogs | boolean | No       | true returns only the most recent records. Default false                                      |
+  | from            | string  | No       | Start of range, ISO 8601 (e.g. '2026-08-01T00:00:00Z'). Within the last 3 days                |
+  | to              | string  | No       | End of range, ISO 8601. Within the last 3 days                                                |
+  | regexSearch     | string  | No       | Regex/string filter. Returns the match plus nearby lines — THE FASTEST WAY to find a log      |
+
+Filtering with `regexSearch` beats paging a broad window: a wide query can quietly hit the plan's log-request limit or bury the entry. If the first search misses, retry with a MORE specific pattern and a TIGHTER from/to, not a wider one.
+
+Response schema (passthrough from the production log pipeline — read the records from `data.records` when present, otherwise `data` is itself the array):
+  | Field                                    | Type   | Description                                            |
+  |------------------------------------------|--------|--------------------------------------------------------|
+  | data.records                             | array  | The matching request records                           |
+  | data.records[].EventTimestampMs          | number | When the request was served, epoch ms                  |
+  | data.records[].Outcome                   | string | "ok", "exception", "canceled", ...                     |
+  | data.records[].WallTimeMs                | number | Wall-clock duration of the request                     |
+  | data.records[].CPUTimeMs                 | number | CPU time consumed by the request                       |
+  | data.records[].Event.Request.URL         | string | The requested URL                                      |
+  | data.records[].Event.Request.Method      | string | HTTP method                                            |
+  | data.records[].Event.Response.Status     | number | HTTP status returned                                   |
+  | data.records[].Logs                      | array  | Console output produced while serving this request     |
+  | data.records[].Logs[].Level              | string | "log", "info", "warn", "error", "debug"                |
+  | data.records[].Logs[].Message            | array  | The logged values                                      |
+  | data.records[].Logs[].TimestampMs        | number | When the line was written, epoch ms                    |
+  | data.records[].Exceptions                | array  | Uncaught exceptions thrown while serving this request  |
+  | data.records[].Exceptions[].Name         | string | Exception class, e.g. "TypeError"                      |
+  | data.records[].Exceptions[].Message      | string | Exception message                                      |
+  | data.records[].Exceptions[].TimestampMs  | number | When it was thrown, epoch ms                           |
+
+⚠️ TREAT EVERY FIELD AS OPTIONAL. The payload is forwarded verbatim from the log pipeline, so its exact shape is not guaranteed by this API. Accept the records under `data.records` OR as a bare array, and render a record missing fields rather than throwing.
+
+Error responses:
+  | Error Code             | HTTP | Description                                                            |
+  |------------------------|------|------------------------------------------------------------------------|
+  | MISSING_PROJECT_ID     | 400  | projectId is required                                                  |
+  | PROJECT_NOT_FOUND      | 404  | Project does not exist or you don't own it                             |
+  | PLAN_LIMIT_REACHED     | 429  | Your plan's production-log request limit was reached. Wait or upgrade  |
+  | PROD_LOGS_WORKER_ERROR | 400  | The production log pipeline could not serve the query                  |
+
+cURL:
+  curl -H "api-key: tlm_sk_your_key" \
+    "https://api-accounts.totalum.app/api/v1/vcaas/projects/my-app/backend/prod/logs?regexSearch=checkout&from=2026-08-03T00:00:00Z&to=2026-08-04T23:59:59Z"
+
+Response:
+  {
+    "errors": null,
+    "data": {
+      "records": [
+        {
+          "EventTimestampMs": 1785840843120,
+          "Outcome": "ok",
+          "WallTimeMs": 128,
+          "CPUTimeMs": 14,
+          "Event": {
+            "Request": { "URL": "https://my-app.totalum-project.com/api/orders", "Method": "GET" },
+            "Response": { "Status": 500 }
+          },
+          "Logs": [
+            { "Level": "error", "Message": ["Cannot read properties of undefined"], "TimestampMs": 1785840843118 }
+          ],
+          "Exceptions": [
+            { "Name": "TypeError", "Message": "Cannot read properties of undefined", "TimestampMs": 1785840843119 }
+          ]
+        }
+      ]
+    }
   }
 
 ---
@@ -982,6 +1451,215 @@ Response:
 
 ---
 
+### ── PROJECT FILES (Feature F11) ──
+
+⚠️ ADDED IN FEATURE F11. These five are the read/write/rebuild loop over a project's
+code, and they exist so a caller does not have to download and re-upload the whole
+archive to change one line. Feature 12's editor is built on exactly these.
+
+The loop is: `files/tree` → `files/content` (GET) → `files/content` (PUT) →
+`rebuild` → poll `rebuild/status`.
+
+⚠️ A WRITE DOES NOT GO LIVE ON ITS OWN. It lands on the sandbox and is committed as
+a new version, but the running server keeps serving the previous build until a
+rebuild finishes — hence `rebuildRequired: true` on every write response.
+
+### 16b. GET https://api-accounts.totalum.app/api/v1/vcaas/projects/:projectId/files/tree
+**Get Project Tree** — Files and folders, flat and sorted. `node_modules`, `.next`,
+`.git`, `dist` and other build output are never included.
+Cost: Free
+
+Query params:
+  | Param   | Type   | Required | Description                                                   |
+  |---------|--------|----------|---------------------------------------------------------------|
+  | path    | string | No       | Limit to one subfolder, e.g. `src/app`. Default: whole project |
+  | limit   | number | No       | Page size. Default 2000, max 5000                              |
+  | offset  | number | No       | Entries to skip. Default 0                                     |
+
+Response schema:
+  | Field                   | Type              | Description                                    |
+  |-------------------------|-------------------|------------------------------------------------|
+  | data.entries[].path     | string            | Root-relative, e.g. `src/app/page.tsx`         |
+  | data.entries[].name     | string            | File or folder name                            |
+  | data.entries[].type     | 'file' \| 'folder'| What it is                                     |
+  | data.entries[].size     | number \| undefined| Bytes. Files only                             |
+  | data.entries[].depth    | number            | 0 at the project root                          |
+  | data.totalEntries       | number            | Matching entries before paging                 |
+  | data.offset / data.limit| number            | The paging actually applied                    |
+  | data.hasMore            | boolean           | More entries follow                            |
+  | data.commitSha          | string \| null    | Commit the tree was read from                  |
+  | data.filesCount         | number            | Files tracked upstream, before exclusions      |
+
+Sorted folders-before-files, alphabetically, within each parent — render it as-is.
+
+Error responses:
+  | Error Code         | HTTP | Description                                            |
+  |--------------------|------|--------------------------------------------------------|
+  | INVALID_PATH       | 400  | Absolute, contains `..`, or inside an excluded folder  |
+  | PROJECT_NOT_FOUND  | 404  | Project does not exist or you don't own it             |
+  | PROJECT_TOO_LARGE  | 413  | Too large to browse via the API — download it instead  |
+
+cURL:
+  curl -H "api-key: tlm_sk_your_key" \
+    "https://api-accounts.totalum.app/api/v1/vcaas/projects/my-app/files/tree?path=src/app"
+
+Response:
+  {
+    "errors": null,
+    "data": {
+      "entries": [
+        { "path": "src/app", "name": "app", "type": "folder", "depth": 1 },
+        { "path": "src/app/page.tsx", "name": "page.tsx", "type": "file", "size": 3902, "depth": 2 }
+      ],
+      "totalEntries": 2, "offset": 0, "limit": 2000, "hasMore": false,
+      "commitSha": "a1b2c3d", "filesCount": 47
+    }
+  }
+
+---
+
+### 16c. GET https://api-accounts.totalum.app/api/v1/vcaas/projects/:projectId/files/content
+**Get File Content** — One file, in full. Up to 1 MB.
+Cost: Free
+
+Query params:
+  | Param | Type   | Required | Description                                    |
+  |-------|--------|----------|------------------------------------------------|
+  | path  | string | Yes      | Root-relative, e.g. `src/app/page.tsx`         |
+
+Response schema:
+  | Field          | Type               | Description                                          |
+  |----------------|--------------------|------------------------------------------------------|
+  | data.path      | string             | The normalised path                                  |
+  | data.name      | string             | File name                                            |
+  | data.size      | number             | Bytes of the stored file                             |
+  | data.encoding  | 'utf8' \| 'base64' | `base64` for binary (NUL byte in the first 8 KB)     |
+  | data.content   | string             | The content, in `encoding`                           |
+  | data.commitSha | string \| null     | Commit the file was read from                        |
+
+Error responses:
+  | Error Code        | HTTP | Description                                     |
+  |-------------------|------|-------------------------------------------------|
+  | INVALID_PATH      | 400  | Absolute, `..`, or inside an excluded folder    |
+  | FILE_NOT_FOUND    | 404  | No file at that path                            |
+  | FILE_TOO_LARGE    | 413  | Larger than 1 MB — download the archive instead |
+
+cURL:
+  curl -H "api-key: tlm_sk_your_key" \
+    "https://api-accounts.totalum.app/api/v1/vcaas/projects/my-app/files/content?path=src/app/page.tsx"
+
+---
+
+### 16d. PUT https://api-accounts.totalum.app/api/v1/vcaas/projects/:projectId/files/content
+**Write File Content** — Full replace, or create (parent folders included). Up to 512 KB.
+Cost: 1 credit
+
+⚠️ PAID PLANS ONLY: the Free plan is refused upstream with
+`FREE_PLAN_NO_SOURCE_EDITING`. Reads are allowed on every plan.
+
+Every write is committed, snapshotted as a version and pushed to GitHub when the
+project is connected — so a bad edit is always recoverable from Versions.
+
+Body params:
+  | Param    | Type   | Required | Description                                          |
+  |----------|--------|----------|------------------------------------------------------|
+  | path     | string | Yes      | Root-relative path                                   |
+  | content  | string | Yes      | The complete new content (`""` empties the file)     |
+  | encoding | string | No       | 'utf8' (default) or 'base64' for binary              |
+
+Response schema:
+  | Field                | Type                | Description                                   |
+  |----------------------|---------------------|-----------------------------------------------|
+  | data.path            | string              | The normalised path                           |
+  | data.bytesWritten    | number              | Bytes written                                 |
+  | data.created         | boolean             | True when the file did not exist before       |
+  | data.commitSha       | string \| undefined | The commit this write produced                |
+  | data.filesCount      | number \| undefined | Files tracked after the write                 |
+  | data.rebuildRequired | boolean             | Always true — call POST …/rebuild to go live  |
+
+Error responses:
+  | Error Code                  | HTTP | Description                                  |
+  |-----------------------------|------|----------------------------------------------|
+  | INVALID_PATH                | 400  | Absolute, `..`, or inside an excluded folder |
+  | MISSING_CONTENT             | 400  | content is required and must be a string     |
+  | INVALID_ENCODING            | 400  | encoding must be 'utf8' or 'base64'          |
+  | FILE_TOO_LARGE              | 413  | Content larger than 512 KB                   |
+  | INSUFFICIENT_CREDITS        | 402  | Not enough credits                           |
+  | FREE_PLAN_NO_SOURCE_EDITING | 400  | Editing source requires a paid plan          |
+  | AGENT_RUNNING               | 409  | The agent is running — wait                  |
+  | NO_SANDBOX                  | 400  | Run the agent once first                     |
+  | SANDBOX_NOT_ACTIVE          | 400  | Sandbox starting or archived — wait          |
+
+cURL:
+  curl -X PUT -H "api-key: tlm_sk_your_key" -H "Content-Type: application/json" \
+    -d '{"path":"src/app/page.tsx","content":"export default () => <h1>Hi</h1>;\n"}' \
+    https://api-accounts.totalum.app/api/v1/vcaas/projects/my-app/files/content
+
+---
+
+### 16e. POST https://api-accounts.totalum.app/api/v1/vcaas/projects/:projectId/rebuild
+**Rebuild Project** [ASYNC] — Rebuild and reload so written files go live.
+Cost: 1 credit
+
+⚠️ ASYNC, AND IT HAS TO BE. Upstream this is a synchronous cold build
+(`rm -rf .next && npm run build && npm start`) behind a distributed lock that alone
+can wait 60 s; it routinely outruns the 120 s bridge timeout. So this returns
+immediately and the work continues in the background.
+
+HOW TO WAIT: poll GET …/rebuild/status every 10-15 s until `status` is `success` or
+`error`. Typically **1-4 minutes**.
+
+Response schema:
+  | Field           | Type   | Description                        |
+  |-----------------|--------|------------------------------------|
+  | data.projectId  | string | The project id                     |
+  | data.status     | string | Always 'rebuilding'                |
+  | data.startedAt  | Date   | When it started                    |
+  | data.message    | string | Human-readable next step           |
+
+Error responses:
+  | Error Code            | HTTP | Description                                   |
+  |-----------------------|------|-----------------------------------------------|
+  | REBUILD_RUNNING       | 409  | A rebuild is already in progress              |
+  | AGENT_RUNNING         | 409  | The agent is running — wait                   |
+  | DEPLOYMENT_RUNNING    | 409  | A deployment is in progress — wait            |
+  | INSUFFICIENT_CREDITS  | 402  | Not enough credits                            |
+  | REBUILD_LIMIT_REACHED | 400  | Plan rebuild limit reached — wait or upgrade  |
+  | NO_SANDBOX            | 400  | Run the agent once first                      |
+
+---
+
+### 16f. GET https://api-accounts.totalum.app/api/v1/vcaas/projects/:projectId/rebuild/status
+**Get Rebuild Status** — Poll after POST …/rebuild.
+Cost: Free
+
+Response schema:
+  | Field                | Type                 | Description                                     |
+  |----------------------|----------------------|-------------------------------------------------|
+  | data.status          | string               | 'idle' \| 'rebuilding' \| 'success' \| 'error' |
+  | data.startedAt       | Date \| null         | When it started                                 |
+  | data.finishedAt      | Date \| null         | When it ended                                   |
+  | data.elapsedSeconds  | number \| null       | Running time, or total time                     |
+  | data.livePreviewUrl  | string \| undefined  | Preview URL after success                       |
+  | data.errorCode       | string \| undefined  | Present on error                                |
+  | data.errorMessage    | string \| undefined  | Present on error                                |
+
+`idle` = this project has never been rebuilt through the API. A FAILED rebuild is
+reported as `status: 'error'` inside a 200 — the status read succeeded, the rebuild
+did not.
+
+Response:
+  {
+    "errors": null,
+    "data": {
+      "projectId": "my-app", "status": "success",
+      "startedAt": "2026-08-02T09:14:03.120Z", "finishedAt": "2026-08-02T09:16:41.902Z",
+      "elapsedSeconds": 159, "livePreviewUrl": "https://my-app.totalum-project.com"
+    }
+  }
+
+---
+
 ### ── VERSIONS ──
 
 ### 17. GET https://api-accounts.totalum.app/api/v1/vcaas/projects/:projectId/versions
@@ -997,13 +1675,19 @@ Query parameters:
 Response schema:
   | Field                          | Type               | Description                              |
   |--------------------------------|--------------------|------------------------------------------|
-  | data.versions                  | array              | Array of version objects                 |
-  | data.versions[]._id            | string             | Version ID (use for recover)             |
-  | data.versions[].name           | string             | Version display name                     |
-  | data.versions[].commitMessage  | string \| undefined | Git commit message                      |
-  | data.versions[].prompt         | string \| undefined | The prompt that created this version    |
-  | data.versions[].createdAt      | string             | ISO 8601 creation date                   |
-  | data.totalCount                | number             | Total versions available                 |
+  | data.versions                      | array              | Array of version objects                 |
+  | data.versions[]._id                | string             | Version ID — use this for RECOVER         |
+  | data.versions[].name               | string             | Version display name                     |
+  | data.versions[].commitSha          | string \| undefined | Git commit — use this for VERSION DIFF   |
+  | data.versions[].commitMessage      | string \| undefined | Git commit message                      |
+  | data.versions[].prompt             | string \| undefined | The prompt that created this version    |
+  | data.versions[].gcsUploaded        | boolean \| undefined | Whether the snapshot finished uploading to long-term storage |
+  | data.versions[].recoveredVersionId | string \| undefined | Present when this version was produced by recovering another one — the id of the version restored |
+  | data.versions[].createdAt          | string             | ISO 8601 creation date                   |
+  | data.versions[].updatedAt          | string             | ISO 8601 last-modified date              |
+  | data.totalCount                    | number             | Total versions available                 |
+
+⚠️ `_id` AND `commitSha` ARE NOT INTERCHANGEABLE. Recovery takes the `_id`; the diff takes the `commitSha`. Both come from this response and there is no lookup from one to the other.
 
 Error responses:
   | Error Code         | HTTP | Description                                |
@@ -1022,12 +1706,60 @@ Response:
         {
           "_id": "v_abc123",
           "name": "Version 3",
+          "commitSha": "9f2c1ab",
           "commitMessage": "Added contact form",
           "prompt": "Add a contact form to the landing page",
-          "createdAt": "2026-03-11T10:45:00.000Z"
+          "gcsUploaded": true,
+          "createdAt": "2026-03-11T10:45:00.000Z",
+          "updatedAt": "2026-03-11T10:45:00.000Z"
         }
       ],
       "totalCount": 3
+    }
+  }
+
+---
+
+### GET https://api-accounts.totalum.app/api/v1/vcaas/projects/:projectId/version-diff
+**Get Version Diff** — The unified diff a single version introduced, as raw text (the same format `git diff` produces).
+Cost: Free
+
+⚠️ THE SHA IS A QUERY PARAMETER, NOT A PATH SEGMENT — `?commitSha=…`, NOT `/versions/:id/diff`. Every other version route is addressed by the version's `_id`, but a diff can only be produced from its `commitSha` and there is no lookup between the two; putting two different identifiers in the same position on sibling routes is how integrators discover a mismatch via a 404.
+
+⚠️ THE PROJECT MUST BE AWAKE. The diff is computed on the project's sandbox, so a sleeping project answers NO_ACTIVE_SANDBOX. That is a real state, not a transient failure: tell the user to start the project (or call the start-or-restart endpoint) rather than retrying.
+
+Useful because it covers versions the AGENT did not create: until this existed, the only viewable changes were the `gitDiffUrl` on an agent conversation message, so versions produced by a manual file write, a GitHub pull or an import had no visible history at all.
+
+Query params:
+  | Field     | Type   | Required | Description                                                            |
+  |-----------|--------|----------|------------------------------------------------------------------------|
+  | commitSha | string | Yes      | The `commitSha` of the version, from List Versions. 7-40 hex characters |
+
+Response schema:
+  | Field           | Type   | Description                                                      |
+  |-----------------|--------|------------------------------------------------------------------|
+  | data.commitSha  | string | The commit the diff was produced from                            |
+  | data.diff       | string | Raw unified diff text. Empty string when the commit changed nothing tracked |
+
+Error responses:
+  | Error Code         | HTTP | Description                                                     |
+  |--------------------|------|-----------------------------------------------------------------|
+  | MISSING_PROJECT_ID | 400  | projectId is required                                           |
+  | PROJECT_NOT_FOUND  | 404  | Project does not exist or you don't own it                      |
+  | MISSING_COMMIT_SHA | 400  | The commitSha query parameter is required                       |
+  | INVALID_COMMIT_SHA | 400  | commitSha must be 7 to 40 hexadecimal characters                |
+  | NO_ACTIVE_SANDBOX  | 400  | The project's sandbox is not running — start the project and retry |
+
+cURL:
+  curl -H "api-key: tlm_sk_your_key" \
+    "https://api-accounts.totalum.app/api/v1/vcaas/projects/my-app/version-diff?commitSha=9f2c1ab"
+
+Response:
+  {
+    "errors": null,
+    "data": {
+      "commitSha": "9f2c1ab",
+      "diff": "diff --git a/src/app/page.tsx b/src/app/page.tsx\n--- a/src/app/page.tsx\n+++ b/src/app/page.tsx\n@@ -12,6 +12,9 @@\n   return (\n     <main>\n+      <ContactForm />\n     </main>\n   );\n"
     }
   }
 
@@ -1506,6 +2238,144 @@ Response:
 
 ---
 
+### DELETE https://api-accounts.totalum.app/api/v1/vcaas/projects/:projectId/database/records/:recordId
+**Delete Database Record** — Permanently delete one record by its ID.
+Cost: Free
+
+⚠️ `tableName` GOES IN THE QUERY STRING, NOT THE BODY. A DELETE with a request body is awkward for several HTTP clients, so this endpoint takes `?tableName=customers`.
+
+URL parameters:
+  | Field     | Type   | Required | Description                      |
+  |-----------|--------|----------|----------------------------------|
+  | projectId | string | Yes      | The project ID                   |
+  | recordId  | string | Yes      | The `_id` of the record to delete |
+
+Query params:
+  | Field     | Type   | Required | Description                                              |
+  |-----------|--------|----------|----------------------------------------------------------|
+  | tableName | string | Yes      | The table name (use `type` from tables-structure)        |
+
+Response schema:
+  | Field           | Type    | Description                            |
+  |-----------------|---------|----------------------------------------|
+  | data.deleted    | boolean | true on successful deletion            |
+  | data.recordId   | string  | The ID of the record that was deleted  |
+
+Error responses:
+  | Error Code         | HTTP | Description                                |
+  |--------------------|------|--------------------------------------------|
+  | MISSING_PROJECT_ID | 400  | projectId is required                      |
+  | PROJECT_NOT_FOUND  | 404  | Project does not exist or you don't own it |
+  | MISSING_RECORD_ID  | 400  | recordId is required                       |
+  | MISSING_TABLE_NAME | 400  | tableName is required as a query parameter |
+  | TABLE_NOT_FOUND    | 400  | Table doesn't exist in the project         |
+
+cURL:
+  curl -X DELETE -H "api-key: tlm_sk_your_key" \
+    "https://api-accounts.totalum.app/api/v1/vcaas/projects/my-app/database/records/65f1a2b3c4d5e6f7a8b9c0d1?tableName=customers"
+
+Response:
+  {
+    "errors": null,
+    "data": { "deleted": true, "recordId": "65f1a2b3c4d5e6f7a8b9c0d1" }
+  }
+
+---
+
+### POST https://api-accounts.totalum.app/api/v1/vcaas/projects/:projectId/database/records/:recordId/link
+**Link Records** — Link two records across a MANY-TO-MANY relation.
+Cost: Free
+
+⚠️ MANY-TO-MANY ONLY. Totalum owns the junction table for a `manyToMany` relation, so links are made by asking it to add a reference — never by creating a junction row yourself. A `manyToOne` / `oneToMany` link is an ordinary FIELD on one of the two records: set it with the normal record-update endpoint (PATCH .../database/records/:recordId). Routing one of those through here would silently do nothing.
+
+URL parameters:
+  | Field     | Type   | Required | Description                                            |
+  |-----------|--------|----------|--------------------------------------------------------|
+  | projectId | string | Yes      | The project ID                                         |
+  | recordId  | string | Yes      | The `_id` of the record on THIS side of the relation   |
+
+Request body schema:
+  | Field       | Type   | Required | Description                                                          |
+  |-------------|--------|----------|----------------------------------------------------------------------|
+  | tableName   | string | Yes      | The table `recordId` belongs to (use `type` from tables-structure)   |
+  | propertyId  | string | Yes      | The `objectReference` property on `tableName` holding the relation   |
+  | referenceId | string | Yes      | The `_id` of the record on the OTHER side of the relation            |
+
+Response schema:
+  | Field        | Type    | Description                                |
+  |--------------|---------|--------------------------------------------|
+  | data.linked  | boolean | true when the link exists after the call   |
+
+Error responses:
+  | Error Code           | HTTP | Description                                          |
+  |----------------------|------|------------------------------------------------------|
+  | MISSING_PROJECT_ID   | 400  | projectId is required                                |
+  | PROJECT_NOT_FOUND    | 404  | Project does not exist or you don't own it           |
+  | MISSING_RECORD_ID    | 400  | recordId is required                                 |
+  | MISSING_TABLE_NAME   | 400  | tableName is required                                |
+  | MISSING_PROPERTY_ID  | 400  | propertyId is required — the relation field on the table |
+  | MISSING_REFERENCE_ID | 400  | referenceId is required — the `_id` of the record to link |
+  | TABLE_NOT_FOUND      | 400  | Table doesn't exist in the project                   |
+
+cURL:
+  curl -X POST \
+    -H "api-key: tlm_sk_your_key" \
+    -H "Content-Type: application/json" \
+    -d '{"tableName":"customers","propertyId":"tags","referenceId":"65f1a2b3c4d5e6f7a8b9c0d2"}' \
+    https://api-accounts.totalum.app/api/v1/vcaas/projects/my-app/database/records/65f1a2b3c4d5e6f7a8b9c0d1/link
+
+Response:
+  { "errors": null, "data": { "linked": true } }
+
+---
+
+### DELETE https://api-accounts.totalum.app/api/v1/vcaas/projects/:projectId/database/records/:recordId/link
+**Unlink Records** — Remove a MANY-TO-MANY link. The two records are untouched; only the link between them goes.
+Cost: Free
+
+Idempotent: removing a link that is not there succeeds, so there is no need to check first. Same body as Link Records.
+
+URL parameters:
+  | Field     | Type   | Required | Description                                          |
+  |-----------|--------|----------|------------------------------------------------------|
+  | projectId | string | Yes      | The project ID                                       |
+  | recordId  | string | Yes      | The `_id` of the record on THIS side of the relation |
+
+Request body schema:
+  | Field       | Type   | Required | Description                                                        |
+  |-------------|--------|----------|--------------------------------------------------------------------|
+  | tableName   | string | Yes      | The table `recordId` belongs to (use `type` from tables-structure) |
+  | propertyId  | string | Yes      | The `objectReference` property on `tableName` holding the relation |
+  | referenceId | string | Yes      | The `_id` of the record on the OTHER side of the relation          |
+
+Response schema:
+  | Field          | Type    | Description                            |
+  |----------------|---------|----------------------------------------|
+  | data.unlinked  | boolean | true when the link is gone after the call |
+
+Error responses:
+  | Error Code           | HTTP | Description                                          |
+  |----------------------|------|------------------------------------------------------|
+  | MISSING_PROJECT_ID   | 400  | projectId is required                                |
+  | PROJECT_NOT_FOUND    | 404  | Project does not exist or you don't own it           |
+  | MISSING_RECORD_ID    | 400  | recordId is required                                 |
+  | MISSING_TABLE_NAME   | 400  | tableName is required                                |
+  | MISSING_PROPERTY_ID  | 400  | propertyId is required — the relation field on the table |
+  | MISSING_REFERENCE_ID | 400  | referenceId is required — the `_id` of the record to unlink |
+  | TABLE_NOT_FOUND      | 400  | Table doesn't exist in the project                   |
+
+cURL:
+  curl -X DELETE \
+    -H "api-key: tlm_sk_your_key" \
+    -H "Content-Type: application/json" \
+    -d '{"tableName":"customers","propertyId":"tags","referenceId":"65f1a2b3c4d5e6f7a8b9c0d2"}' \
+    https://api-accounts.totalum.app/api/v1/vcaas/projects/my-app/database/records/65f1a2b3c4d5e6f7a8b9c0d1/link
+
+Response:
+  { "errors": null, "data": { "unlinked": true } }
+
+---
+
 ### ── ANALYTICS ──
 
 ### 27. GET https://api-accounts.totalum.app/api/v1/credits/spending-analytics
@@ -1952,6 +2822,24 @@ All errors follow: { "errors": { "errorCode": "CODE", "errorMessage": "..." }, "
 | MISSING_LIMIT_FIELDS         | 400  | At least one credit limit field is required    |
 | INVALID_LIMIT                | 400  | Credit limit must be a positive number         |
 | INVALID_SYNC_DIRECTION       | 400  | syncDirection must be "totalum_to_github" or "github_to_totalum" |
+| GET_CREDIT_COSTS_ERROR       | 400  | Internal error fetching credit costs                             |
+| NOTHING_TO_UPDATE            | 400  | PATCH /projects body had none of label, description or groupId   |
+| UPDATE_PROJECT_ERROR         | 400  | Internal error updating the project                              |
+| INVALID_PROJECT_GROUP        | 400  | The groupId does not exist, is not yours, or the group is full   |
+| PROJECT_GROUP_NOT_FOUND      | 404  | No such project group, malformed id, or not yours                |
+| CREATE_PROJECT_GROUP_ERROR   | 400  | Group name missing/too long, or the 3000-group limit reached     |
+| LIST_PROJECT_GROUPS_ERROR    | 400  | Internal error listing project groups                            |
+| GET_PROJECT_GROUP_ERROR      | 400  | Internal error getting a project group                           |
+| UPDATE_PROJECT_GROUP_ERROR   | 400  | Empty/over-long group name, or an internal error                 |
+| DELETE_PROJECT_GROUP_ERROR   | 400  | Internal error deleting a project group                          |
+| MISSING_COMMIT_SHA           | 400  | commitSha query parameter is required (version diff)             |
+| INVALID_COMMIT_SHA           | 400  | commitSha must be 7 to 40 hexadecimal characters                 |
+| NO_ACTIVE_SANDBOX            | 400  | The project's sandbox is not running — start the project and retry |
+| MISSING_RECORD_ID            | 400  | recordId is required                                             |
+| MISSING_PROPERTY_ID          | 400  | propertyId is required (many-to-many link)                       |
+| MISSING_REFERENCE_ID         | 400  | referenceId is required (many-to-many link)                      |
+| PLAN_LIMIT_REACHED           | 429  | Plan limit reached for this resource (e.g. production-log requests) |
+| PROD_LOGS_WORKER_ERROR       | 400  | The production log pipeline could not serve the query            |
 
 ## Built-in Integrations
 
@@ -2030,6 +2918,103 @@ You can also use any API or npm package simply by mentioning it in your prompt. 
    Body: { "hostname": "app.yourdomain.com" }
    → Configure DNS records from response.
    → Check domain status in GET /projects/:projectId customDomain field until status is "active".
+
+### 37. POST https://api-accounts.totalum.app/api/v1/vcaas/projects/:projectId/figma/connect
+**Connect Figma** — Link a Figma account to your project so the build agent can read your designs and implement them. The token is validated against Figma's API before anything is stored, so a bad token changes nothing and returns a specific reason.
+Cost: Free
+
+How to create a Figma access token:
+1. In Figma, open Settings and go to the Security tab.
+2. Under "Personal access tokens", click "Generate new token".
+3. Set an expiration you are comfortable with.
+4. Select the scopes `current_user:read` and `file_content:read`.
+5. Click "Generate token" and copy it (starts with `figd_`).
+
+Organization/Enterprise plans can use a **plan access token** instead — it is user-agnostic and authenticates the same way, which is usually the better choice for a team.
+
+Body:
+  | Field | Type   | Required | Description                                                    |
+  |-------|--------|----------|----------------------------------------------------------------|
+  | token | string | Yes      | Figma personal access token (or an Organization plan access token) |
+
+Response schema:
+  | Field                | Type    | Description                                        |
+  |----------------------|---------|----------------------------------------------------|
+  | data.connected       | boolean | true on success                                     |
+  | data.account.id      | string  | Figma user id                                       |
+  | data.account.handle  | string  | Figma display name                                  |
+  | data.account.email   | string  | Email on the Figma account                          |
+  | data.account.imgUrl  | string  | Avatar URL                                          |
+
+Error responses:
+  | Error Code             | HTTP | Description                                                          |
+  |------------------------|------|----------------------------------------------------------------------|
+  | MISSING_FIGMA_TOKEN    | 400  | token is required                                                     |
+  | FIGMA_TOKEN_MALFORMED  | 400  | That does not look like a Figma token (whitespace, a URL, too short)  |
+  | FIGMA_TOKEN_INVALID    | 400  | Figma rejected the token — wrong, expired or revoked                  |
+  | FIGMA_TOKEN_FORBIDDEN  | 400  | Valid token, but missing the scopes Totalum needs                     |
+  | FIGMA_RATE_LIMITED     | 400  | Figma is rate-limiting the request; retry shortly                     |
+  | FIGMA_UNREACHABLE      | 400  | Figma could not be reached to validate the token                      |
+
+NOTE: The token is never returned by any endpoint. It is stored encrypted and only ever used by your own project's agent.
+
+cURL:
+  curl -X POST -H "api-key: tlm_sk_your_key" -H "Content-Type: application/json" \
+    -d '{"token":"figd_xxx"}' \
+    https://api-accounts.totalum.app/api/v1/vcaas/projects/my-app/figma/connect
+
+Response:
+  { "errors": null, "data": { "connected": true, "account": { "id": "123456", "handle": "Ada Lovelace", "email": "ada@example.com", "imgUrl": "https://..." } } }
+
+---
+
+### 38. GET https://api-accounts.totalum.app/api/v1/vcaas/projects/:projectId/figma/status
+**Get Figma Status** — Check whether Figma is connected and which account is linked.
+Cost: Free
+
+Query parameters:
+  | Parameter | Type    | Required | Description                                                                                     |
+  |-----------|---------|----------|-------------------------------------------------------------------------------------------------|
+  | verify    | boolean | No       | `true` re-checks the stored token against Figma. Costs a live Figma call — use on open, not on a poll |
+
+Response schema:
+  | Field             | Type    | Description                                                        |
+  |-------------------|---------|--------------------------------------------------------------------|
+  | data.connected    | boolean | Whether Figma is connected                                          |
+  | data.account      | object  | The linked Figma account (id, handle, email, imgUrl)                |
+  | data.connectedAt  | string  | When the connection was made                                        |
+  | data.tokenValid   | boolean | Only present with `verify=true` — whether Figma still accepts it    |
+  | data.tokenError   | string  | Only present with `verify=true` and a failure — the specific reason |
+
+NOTE: A failed re-check never disconnects anything. `tokenValid: false` means "paste a new token"; the existing connection is left alone.
+
+cURL:
+  curl -H "api-key: tlm_sk_your_key" "https://api-accounts.totalum.app/api/v1/vcaas/projects/my-app/figma/status?verify=true"
+
+Response:
+  { "errors": null, "data": { "connected": true, "account": { "id": "123456", "handle": "Ada Lovelace" }, "tokenValid": true } }
+
+---
+
+### 39. DELETE https://api-accounts.totalum.app/api/v1/vcaas/projects/:projectId/figma/connect
+**Disconnect Figma** — Remove the Figma integration. Deletes the stored token. Nothing in your Figma account is affected.
+Cost: Free
+
+Response schema:
+  | Field             | Type    | Description          |
+  |-------------------|---------|----------------------|
+  | data.disconnected | boolean | true on success      |
+  | data.message      | string  | Confirmation message |
+
+NOTE: Idempotent — a project that was never connected also returns 200.
+
+cURL:
+  curl -X DELETE -H "api-key: tlm_sk_your_key" https://api-accounts.totalum.app/api/v1/vcaas/projects/my-app/figma/connect
+
+Response:
+  { "errors": null, "data": { "disconnected": true, "message": "Figma disconnected successfully" } }
+
+---
 
 ## Key Integration Principles
 - Agent and deployment are ASYNCHRONOUS — always poll for status.
