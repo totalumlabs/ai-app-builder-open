@@ -32,7 +32,7 @@ Run it yourself, or drop a first-class AI app builder straight into your own Saa
 
 **AI App Builder Open** is an open-source, no-code AI app builder. A user types what they want — *"a CRM with kanban boards and Stripe billing"* — and the AI builds, previews, and deploys a real, full-stack **Next.js** application. Live preview, code editor, database, logs, versioning and GitHub sync are all included, out of the box.
 
-It's powered by the **[Totalum VCaaS API](https://www.totalum.app)** (Vibe-Coding-as-a-Service), which handles the heavy backend infrastructure — hosting, sandboxes, databases, AI agents, custom domains and GitHub — behind **a single API key**. You bring the front-end (this repo, or your own SaaS); Totalum brings the platform.
+It's powered by the **[Totalum VCaaS API](https://www.totalum.app/en/whitelabel)** (Vibe-Coding-as-a-Service), which handles the heavy backend infrastructure — hosting, sandboxes, databases, AI agents, custom domains and GitHub — behind **a single API key**. You bring the front-end (this repo, or your own SaaS); Totalum brings the platform.
 
 > **In one sentence:** clone this repo, paste one API key, and you have your own AI app builder running in minutes — for yourself, or for your customers.
 
@@ -108,7 +108,7 @@ Open **[http://localhost:3000](http://localhost:3000)**, type what you want to b
 
 The **only** thing this app needs to run is a Totalum VCaaS API key. Getting one is quick and **the first 50 AI credits are free**:
 
-1. **Create an account** at **[www.totalum.app](https://www.totalum.app)**.
+1. **Create an account** at **[totalum.app/whitelabel](https://www.totalum.app/en/whitelabel)**.
 2. During onboarding, choose the **"Use the Totalum API"** option.
 3. **Copy your API key** and paste it into your `.env` file as `TOTALUM_VCAAS_API_KEY`.
 
@@ -235,7 +235,7 @@ src/
 <details>
 <summary><b>Is it really free?</b></summary>
 
-The code is free and open source. Running it needs a Totalum API key, which is **free to start** (your first 50 AI credits are on the house). You only pay as you scale usage. See [pricing on totalum.app](https://www.totalum.app).
+The code is free and open source. Running it needs a Totalum API key, which is **free to start** (your first 50 AI credits are on the house). You only pay as you scale usage. See [pricing on totalum.app](https://www.totalum.app/en/whitelabel#pricing).
 </details>
 
 <details>
@@ -316,6 +316,6 @@ Released under the **MIT License** — free for personal and commercial use. See
 
 **Open-source AI app builder** · self-hosted **v0 / Lovable / Bolt / Replit alternative** · prompt-to-app · full-stack Next.js · multitenant · embeddable AI app builder for your SaaS.
 
-Built with ❤️ on top of the [Totalum VCaaS API](https://www.totalum.app) · [Docs](https://www.totalum.app/docs) · [Get your free API key](https://www.totalum.app)
+Built with ❤️ on top of the [Totalum VCaaS API](https://www.totalum.app/en/whitelabel) · [Docs](https://www.totalum.app/docs) · [Get your free API key](https://www.totalum.app/en/whitelabel)
 
 </div>
