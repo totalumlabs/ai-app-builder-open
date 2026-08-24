@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import type { RefObject } from "react";
 import { Monitor, Loader2, Archive } from "lucide-react";
 
 interface PreviewPanelProps {
@@ -10,11 +11,29 @@ interface PreviewPanelProps {
   mobilePreview?: boolean;
   iframePath?: string;
   cached?: boolean;
+  /**
+   * ═══⭐⭐ THE SAME-ORIGIN PREVIEW, AND WHY IT EXISTS ═══════════════════════
+   *
+   * ⚠️ THE VISUAL EDITOR CANNOT WORK ON A CROSS-ORIGIN FRAME. It selects elements,
+   * reads computed styles and applies live text edits by SCRIPTING the previewed
+   * document, and the browser forbids all of that across origins — no amount of
+   * `sandbox` flags changes it. `/api/preview/{projectId}` re-serves the project
+   * through this app, so the document becomes same-origin and scriptable.
+   *
+   * ⚠️ IT IS USED ONLY WHILE THE EDITOR IS OPEN. Normal viewing keeps the direct
+   * URL: the proxy costs a round trip per asset and rewrites the HTML, and neither
+   * is worth paying for a preview nobody is editing.
+   */
+  proxiedSrc?: string | null;
+  /** The editor needs the element to `postMessage` to its injected agent. */
+  frameRef?: RefObject<HTMLIFrameElement | null>;
 }
 
-export function PreviewPanel({ previewUrl, onRefresh, loading, mobilePreview = false, iframePath = "/", cached = false }: PreviewPanelProps) {
+export function PreviewPanel({ previewUrl, onRefresh, loading, mobilePreview = false, iframePath = "/", cached = false, proxiedSrc, frameRef }: PreviewPanelProps) {
   const [iframeLoading, setIframeLoading] = useState(true);
-  const fullIframeUrl = previewUrl ? `${previewUrl}${iframePath === "/" ? "" : iframePath}` : null;
+  /** ⚠️ The proxy wins when present — see `proxiedSrc`. */
+  const base = (proxiedSrc || previewUrl || "").replace(/\/$/, "");
+  const fullIframeUrl = base ? `${base}${iframePath === "/" ? "" : iframePath}` : null;
 
   return (
     <div className="h-full flex flex-col overflow-hidden">
@@ -53,7 +72,18 @@ export function PreviewPanel({ previewUrl, onRefresh, loading, mobilePreview = f
                 <Loader2 className="w-6 h-6 text-gray-400 animate-spin" />
               </div>
             )}
-            <iframe src={fullIframeUrl || undefined} className="w-full h-full border-0" title="Preview" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals" onLoad={() => setIframeLoading(false)} />
+            <iframe
+              /* ⚠️ REMOUNT WHEN THE ORIGIN CHANGES. Swapping the `src` between the direct
+                 URL and the proxy without a new element leaves the old document (and its
+                 injected agent, or lack of one) in place. */
+              key={proxiedSrc ? "proxy" : "direct"}
+              ref={frameRef}
+              src={fullIframeUrl || undefined}
+              className="w-full h-full border-0"
+              title="Preview"
+              sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
+              onLoad={() => setIframeLoading(false)}
+            />
           </div>
         )}
       </div>

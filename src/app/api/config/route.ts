@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getVcaasApiKey } from "@/lib/vcaas";
+import { getVcaasApiKey } from "@/lib/vcaas-server";
 
 // Reports whether the Totalum VCaaS API key is configured — WITHOUT ever
 // exposing the key itself to the client. The dashboard uses this to show setup

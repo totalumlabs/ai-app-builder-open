@@ -10,15 +10,21 @@ import {
   GitBranch, CheckCircle2, AlertTriangle, Download, Copy, ExternalLink, Info,
 } from "lucide-react";
 import { toast } from "sonner";
+import { t } from "@/i18n";
+import type { ServerWake } from "./use-server-wake";
 import type { GithubStatus, GithubEnv, GithubSyncDirection } from "@/lib/vcaas-types";
 
 interface GithubPanelProps {
   projectId: string;
   /** Reports the current connection state to the parent (drives the header's green bubble). */
   onStatusChange?: (connected: boolean) => void;
+  /** ⭐ Connecting and pulling both need the sandbox — see `use-server-wake.ts`. */
+  wake: ServerWake;
+  /** ⭐ So the workspace can raise its banner — a pull overwrites local source. */
+  onPullStarted?: () => void;
 }
 
-export function GithubPanel({ projectId, onStatusChange }: GithubPanelProps) {
+export function GithubPanel({ projectId, onStatusChange, wake, onPullStarted }: GithubPanelProps) {
   const [status, setStatus] = useState<GithubStatus | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -95,6 +101,17 @@ export function GithubPanel({ projectId, onStatusChange }: GithubPanelProps) {
       repositoryFullName: repo.trim(),
       syncDirection,
     });
+
+    /**
+     * ⚠️ NO REPLAY FOR THIS ONE EVEN IF WE WANTED IT — the token is cleared from state the
+     * moment a connect succeeds, so there is nothing to re-send three minutes later. The
+     * wake says when the server is ready; the user presses Connect again.
+     */
+    if (wake.claim(res, () => toast.success(t("workspace.serverWake.readyFor", { action: t("workspace.serverWake.actionConnect") })))) {
+      setConnecting(false);
+      return;
+    }
+
     if (res.ok && res.data) {
       toast.success("GitHub connected!");
       setToken("");
@@ -127,6 +144,13 @@ export function GithubPanel({ projectId, onStatusChange }: GithubPanelProps) {
   const handlePull = async () => {
     setPulling(true);
     const res = await vcaasApi.github.pull(projectId);
+
+    /** ⭐ A pull rewrites the project's files on the sandbox, so it needs one running. */
+    if (wake.claim(res, () => toast.success(t("workspace.serverWake.readyFor", { action: t("workspace.serverWake.actionPull") })))) {
+      setPulling(false);
+      return;
+    }
+
     if (res.ok && res.data) {
       if (res.data.status === "no_changes") {
         toast.info("No changes to pull");
@@ -136,6 +160,8 @@ export function GithubPanel({ projectId, onStatusChange }: GithubPanelProps) {
           (res.data.filesUpdated ? ` (${res.data.filesUpdated} ${"files"})` : "")
         );
         setRebuilding(true);
+        /* ⭐ The workspace's banner outlives this panel: the user will switch tabs. */
+        onPullStarted?.();
         pollPullStatus();
       }
     } else {

@@ -4,6 +4,10 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import dynamic from "next/dynamic";
 import { unzipSync, gunzipSync } from "fflate";
 import { vcaasApi } from "@/lib/vcaas";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { t } from "@/i18n";
+import type { ServerWake } from "./use-server-wake";
 import {
   Loader2,
   RefreshCw,
@@ -18,6 +22,7 @@ import {
   ImageIcon,
   Download,
   AlertTriangle,
+  Save,
   FileWarning,
   Search,
   Sparkles,
@@ -39,6 +44,19 @@ interface CodePanelProps {
   darkMode?: boolean;
   // Called when the user clicks "Ask AI to edit this file" — receives the file path.
   onAskAiEdit?: (path: string) => void;
+  /**
+   * ⭐ THE WORKSPACE'S SHARED WAKE. Reading files is free and works on a sleeping
+   * project (they come from a snapshot archive); WRITING one needs the sandbox, so a
+   * save on an archived project is refused and starts the server instead.
+   */
+  wake: ServerWake;
+  /**
+   * ⭐ SO THE WORKSPACE CAN SHOW ITS BANNER. A rebuild takes the app down for one to four
+   * minutes, and the Code tab is exactly the place the user is about to navigate away
+   * from — the banner lives above the preview and outlives this panel's mount.
+   */
+  onRebuildStarted?: () => void;
+  onRebuildFinished?: () => void;
 }
 
 // ── In-memory byte cache (survives tab switches within the session) ──────────
@@ -427,7 +445,7 @@ function TreeRow({
 }
 
 // ── Main component ───────────────────────────────────────────────────────────
-export function CodePanel({ projectId, darkMode, onAskAiEdit }: CodePanelProps) {
+export function CodePanel({ projectId, darkMode, onAskAiEdit, wake, onRebuildStarted, onRebuildFinished }: CodePanelProps) {
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -442,6 +460,25 @@ export function CodePanel({ projectId, darkMode, onAskAiEdit }: CodePanelProps) 
   const objectUrlRef = useRef<string | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
 
+  /**
+   * ═══⭐⭐ EDITING — DRAFTS PER PATH, NEVER ONE "current text" ═══════════════
+   *
+   * ⚠️ KEYED BY PATH BECAUSE THE TREE IS ONE CLICK AWAY. A single draft string would
+   * silently discard what the user typed the moment they looked at another file — and
+   * looking at another file is how people write code. Unsaved work survives navigating
+   * the tree, and the dot in the breadcrumb says which files still hold it.
+   *
+   * ⚠️ `drafts[path] === undefined` MEANS CLEAN, and that is why the editor reads
+   * `drafts[selected] ?? textFiles[selected]` rather than seeding drafts on open: an
+   * untouched file has no draft at all, so "is it dirty?" is one lookup and never a
+   * string comparison against the whole file.
+   */
+  const [drafts, setDrafts] = useState<{ [path: string]: string }>({});
+  const [saving, setSaving] = useState(false);
+  /** A written file only reaches the running app after a rebuild — see `handleRebuild`. */
+  const [rebuildNeeded, setRebuildNeeded] = useState(false);
+  const [rebuilding, setRebuilding] = useState(false);
+
   const cacheKey = `${CACHE_PREFIX}${projectId}`;
 
   // Get (or lazily create) the in-memory byte map for this project.
@@ -453,6 +490,126 @@ export function CodePanel({ projectId, darkMode, onAskAiEdit }: CodePanelProps) 
     }
     return m;
   }, [projectId]);
+
+  const dirtyPaths = useMemo(() => Object.keys(drafts), [drafts]);
+  const isDirty = (path: string | null) => !!path && drafts[path] !== undefined;
+
+  /**
+   * ═══⭐⭐⭐ SAVE ═══════════════════════════════════════════════════════════
+   *
+   * ⚠️ THE CONTENT GOES OVER AS BASE64 — the client does that, not this file, and it is
+   * not an optimisation: totalum-backend runs a global HTML sanitiser over every request
+   * body, so source posted as a plain string comes out stripped to a tag allowlist
+   * (`className` gone, `<script>` deleted). See the note on `vcaasApi.files.write`.
+   *
+   * ⚠️ THE LOCAL COPY IS UPDATED ONLY AFTER THE WRITE IS ACCEPTED. Showing the new text
+   * as "saved" while the request is in flight is how a failed save becomes invisible.
+   */
+  const handleSave = useCallback(async () => {
+    if (!selected || saving) return;
+    const draft = drafts[selected];
+    if (draft === undefined) return;
+
+    setSaving(true);
+    const res = await vcaasApi.files.write(projectId, selected, draft);
+    setSaving(false);
+
+    /**
+     * ⭐ THE SANDBOX WAS ASLEEP, SO THE WRITE STARTED IT INSTEAD OF LANDING. Nothing the
+     * user typed is at risk — the draft stays exactly where it is — and the wake tells
+     * them when they can press Save again. It deliberately does not save for them: a file
+     * written minutes later, unattended, is a surprise nobody asked for.
+     */
+    if (
+      wake.claim(res, () =>
+        toast.success(t("workspace.serverWake.readyFor", { action: t("workspace.serverWake.actionSave") }))
+      )
+    )
+      return;
+
+    if (!res.ok) {
+      toast.error(res.error || "Couldn't save this file");
+      return;
+    }
+
+    setTextFiles((prev) => ({ ...prev, [selected]: draft }));
+    setDrafts((prev) => {
+      const next = { ...prev };
+      delete next[selected];
+      return next;
+    });
+    /**
+     * ⚠️ THE TOAST SAYS "SAVED"; THE BAR SAYS "NOT LIVE YET". Both are needed and they are
+     * not the same message — a write lands in the sandbox's filesystem, and the running
+     * dev server keeps serving the build it already has until it is rebuilt.
+     */
+    setRebuildNeeded(true);
+    toast.success(`Saved ${selected.split("/").pop()}`);
+  }, [selected, saving, drafts, projectId, wake]);
+
+  /**
+   * ═══⭐⭐ REBUILD — WHAT MAKES A SAVED FILE ACTUALLY RUN ═══════════════════
+   *
+   * ⚠️ ASYNC UPSTREAM: the POST returns at once and the build takes 1-4 minutes, so the
+   * only way to know it finished is to poll. The poll stops itself on `success`/`error`
+   * and after a bounded number of attempts, so a build that never reports cannot leave a
+   * timer running for the rest of the session.
+   */
+  /**
+   * ⚠️ THE KEYBINDING GOES THROUGH A REF. Monaco captures the command once, at mount, and
+   * would otherwise hold the very first `handleSave` closure — the one that knew about no
+   * file and no draft.
+   */
+  const saveRef = useRef(handleSave);
+  saveRef.current = handleSave;
+
+  const handleRebuild = useCallback(async () => {
+    if (rebuilding) return;
+    setRebuilding(true);
+
+    const res = await vcaasApi.rebuild.start(projectId);
+    if (
+      wake.claim(res, () =>
+        toast.success(t("workspace.serverWake.readyFor", { action: t("workspace.serverWake.actionRebuild") }))
+      )
+    ) {
+      setRebuilding(false);
+      return;
+    }
+    if (!res.ok) {
+      setRebuilding(false);
+      toast.error(res.error || "Couldn't start the rebuild");
+      return;
+    }
+
+    toast.success("Rebuilding your app — this takes 1 to 4 minutes");
+    onRebuildStarted?.();
+
+    let attempts = 0;
+    const poll = async () => {
+      attempts += 1;
+      const status = await vcaasApi.rebuild.status(projectId);
+      if (!status.ok || !status.data) {
+        if (attempts < 40) setTimeout(poll, 8000);
+        else { setRebuilding(false); onRebuildFinished?.(); }
+        return;
+      }
+      if (status.data.status === "rebuilding") {
+        if (attempts < 40) setTimeout(poll, 8000);
+        else { setRebuilding(false); onRebuildFinished?.(); }
+        return;
+      }
+      setRebuilding(false);
+      onRebuildFinished?.();
+      if (status.data.status === "error") {
+        toast.error(status.data.errorMessage || "The rebuild failed");
+        return;
+      }
+      setRebuildNeeded(false);
+      toast.success("Your app is running the new code");
+    };
+    setTimeout(poll, 8000);
+  }, [projectId, rebuilding, wake, onRebuildStarted, onRebuildFinished]);
 
   // Apply an unzipped byte map into state + memory + localStorage cache.
   const applyUnzipped = useCallback(
@@ -822,11 +979,54 @@ export function CodePanel({ projectId, darkMode, onAskAiEdit }: CodePanelProps) 
             </div>
           ) : (
             <>
-              {/* Breadcrumb */}
+              {/* Breadcrumb + the save control */}
               <div className="px-3 py-1.5 border-b border-gray-100 dark:border-gray-800 flex items-center gap-2 shrink-0">
                 <code className="text-xs font-mono text-gray-600 dark:text-gray-300 truncate">{selected}</code>
+                {/* ⭐ The dot is the whole "unsaved" signal — see the `drafts` note. */}
+                {isDirty(selected) && (
+                  <span className="shrink-0 text-[10px] font-medium text-amber-600 dark:text-amber-400">
+                    ● unsaved
+                  </span>
+                )}
                 <span className="text-[10px] text-gray-400 shrink-0">{humanSize(selectedSize)}</span>
+                <div className="flex-1" />
+                {selectedKind === "text" && (
+                  <Button
+                    size="sm"
+                    variant={isDirty(selected) ? "default" : "outline"}
+                    className="h-6 px-2 text-[11px]"
+                    disabled={!isDirty(selected) || saving}
+                    onClick={() => void handleSave()}
+                  >
+                    {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
+                    <span className="ml-1">Save</span>
+                  </Button>
+                )}
               </div>
+
+              {/*
+                ⭐⭐ SAVED IS NOT LIVE. A write lands in the sandbox's filesystem; the dev
+                server keeps serving the build it already has until it is rebuilt. Saying
+                "saved" and leaving it there is how someone concludes their edit did
+                nothing — so the bar states the fact and offers the action that fixes it.
+              */}
+              {rebuildNeeded && (
+                <div className="flex flex-wrap items-center gap-2 border-b border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300 shrink-0">
+                  <AlertTriangle className="w-3 h-3 shrink-0" />
+                  <span className="min-w-0 flex-1">
+                    Your changes are saved but the running app still serves the previous build.
+                  </span>
+                  <Button
+                    size="sm"
+                    className="h-6 px-2 text-[11px]"
+                    disabled={rebuilding}
+                    onClick={() => void handleRebuild()}
+                  >
+                    {rebuilding ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                    <span className="ml-1">{rebuilding ? "Rebuilding…" : "Rebuild now"}</span>
+                  </Button>
+                </div>
+              )}
 
               {/* Content by kind */}
               <div className="flex-1 min-h-0 relative">
@@ -836,10 +1036,33 @@ export function CodePanel({ projectId, darkMode, onAskAiEdit }: CodePanelProps) 
                       key={selected}
                       height="100%"
                       language={langFromExt(selected)}
-                      value={textFiles[selected]}
+                      /* ⚠️ THE DRAFT WINS, and `?? textFiles[...]` is what makes an
+                         untouched file need no draft at all — see the `drafts` note. */
+                      value={drafts[selected] ?? textFiles[selected]}
+                      onChange={value => {
+                        const next = value ?? "";
+                        setDrafts(prev => {
+                          // Typing it back to the saved text is not an edit any more.
+                          if (next === textFiles[selected]) {
+                            const clean = { ...prev };
+                            delete clean[selected];
+                            return clean;
+                          }
+                          return { ...prev, [selected]: next };
+                        });
+                      }}
+                      onMount={(editor, monaco) => {
+                        /* ⌘S / Ctrl+S. Monaco owns the keystroke while focused, so the
+                           command has to be registered on the editor itself — a window
+                           listener never sees it. `saveRef` keeps it pointing at a current
+                           closure rather than the one that existed at mount. */
+                        editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
+                          void saveRef.current();
+                        });
+                      }}
                       theme={darkMode ? "vs-dark" : "light"}
                       options={{
-                        readOnly: true,
+                        readOnly: false,
                         minimap: { enabled: true },
                         fontSize: 13,
                         scrollBeyondLastLine: false,

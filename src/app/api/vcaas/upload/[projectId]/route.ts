@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { vcaasUploadRequest } from "@/lib/vcaas";
+import { vcaasUploadRequest } from "@/lib/vcaas-server";
 
 export async function POST(
   req: NextRequest,

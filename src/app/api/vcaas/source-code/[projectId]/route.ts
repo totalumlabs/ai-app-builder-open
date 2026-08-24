@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { vcaasRequest } from "@/lib/vcaas";
+import { vcaasRequest } from "@/lib/vcaas-server";
 
 // Binary source-code proxy. Fetches the VCaaS source-code signed URL, then
 // downloads the ZIP archive SERVER-SIDE (avoids browser CORS on the storage

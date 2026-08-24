@@ -7,14 +7,23 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { GitBranch, RotateCcw, Loader2, RefreshCw, Clock, MessageSquare } from "lucide-react";
 import { toast } from "sonner";
+import { t } from "@/i18n";
+import type { ServerWake } from "./use-server-wake";
 import type { ProjectVersion } from "@/lib/vcaas-types";
 
 interface VersionsPanelProps {
   projectId: string;
   onVersionRestored: () => void;
+  /**
+   * ⭐ THE WORKSPACE'S SHARED WAKE. A restore needs the sandbox, so on a sleeping project
+   * VCaaS starts the server and refuses — see `use-server-wake.ts`.
+   */
+  wake: ServerWake;
+  /** ⭐ So the workspace can raise its banner — a restore replaces the whole project. */
+  onRestoreStarted?: () => void;
 }
 
-export function VersionsPanel({ projectId, onVersionRestored }: VersionsPanelProps) {
+export function VersionsPanel({ projectId, onVersionRestored, wake, onRestoreStarted }: VersionsPanelProps) {
   const [versions, setVersions] = useState<ProjectVersion[]>([]);
   const [loading, setLoading] = useState(true);
   const [recovering, setRecovering] = useState<string | null>(null);
@@ -32,7 +41,19 @@ export function VersionsPanel({ projectId, onVersionRestored }: VersionsPanelPro
     if (!confirm("Restore this version? Current changes will be overwritten.")) return;
     setRecovering(versionId);
     const res = await vcaasApi.versions.recover(projectId, versionId);
-    if (res.ok) { toast.success("Version recovery started..."); onVersionRestored(); }
+
+    /**
+     * ⚠️⚠️ THE SERVER WAS ASLEEP — AND THIS IS THE ACTION THAT MUST NEVER REPLAY ITSELF.
+     * A restore overwrites the project's files, and the confirm() that authorised it is
+     * long gone by the time the server answers three minutes later. The wake tells the
+     * user when they can press it again; pressing it stays their decision.
+     */
+    if (wake.claim(res, () => toast.success(t("workspace.serverWake.readyFor", { action: t("workspace.serverWake.actionRestore") })))) {
+      setRecovering(null);
+      return;
+    }
+
+    if (res.ok) { toast.success("Version recovery started..."); onRestoreStarted?.(); onVersionRestored(); }
     else toast.error(res.error || "Failed to start recovery");
     setRecovering(null);
   };

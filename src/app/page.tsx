@@ -4,13 +4,18 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { vcaasApi } from "@/lib/vcaas";
+import {
+  CloneProjectDialog,
+  ExportProjectDialog,
+  ImportProjectDialog,
+} from "@/components/workspace/ProjectTransferDialogs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Sparkles, Plus, Loader2, Trash2, Send, Paperclip, X, ArrowRight,
+  Sparkles, Plus, Loader2, Trash2, Send, Paperclip, X, ArrowRight, Copy, Upload, Download,
   Search, LayoutGrid, Table as TableIcon, ArrowUpDown, ChevronLeft, ChevronRight,
   AlertCircle, MoreVertical, AlertTriangle,
 } from "lucide-react";
@@ -40,91 +45,85 @@ function gradientFor(id: string): [string, string] {
   for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
   return GRADIENTS[h % GRADIENTS.length];
 }
-function initialsFor(id: string): string {
-  const clean = id.replace(/[^a-zA-Z0-9]+/g, " ").trim();
-  const parts = clean.split(/\s+/).filter(Boolean);
-  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
-  return clean.slice(0, 2).toUpperCase() || "AP";
-}
-
-// A project only serves content at `projectId.totalum-project.com` once it has
-// been PUBLISHED (a successful production deployment). Until then that URL is
-// dead, so we must show the placeholder instead of an empty/broken iframe.
-function detailIsPublished(d: VcaasProject | null | undefined): boolean {
-  return d?.deployment?.status === "success";
-}
-
 /**
- * ProjectThumbnail — lazy, performance-friendly preview.
+ * ═══⭐⭐⭐ THE PROJECT TILE — A SCREENSHOT, NOT A LIVE APP ═══════════════════
  *
- * To keep the dashboard fast even with many projects, the live iframe (and the
- * detail request that decides whether a preview exists) only runs once the card
- * scrolls into view (IntersectionObserver). Until then — and when a project has
- * no live URL — we render a lightweight gradient placeholder instead of an
- * iframe. The preview always points at the stable `projectId.totalum-project.com`
- * domain rather than the temporal development link.
+ * ⚠️⚠️ THIS USED TO BE AN `<iframe>` PER PROJECT, scaled down to thumbnail size, plus a
+ * `GET /projects/{id}` per tile to decide whether to render it. On a dashboard with
+ * twenty projects that is twenty extra API calls and twenty third-party documents booted
+ * in the background — each one running its own JavaScript, fonts and network requests —
+ * to produce a picture. It also showed nothing at all for any project that had never been
+ * published, because an unpublished project has no production URL to frame.
+ *
+ * ⭐ THE LIST ALREADY CARRIES THE PICTURE. `GET /projects` returns `previewImageUrl` on
+ * every item: a screenshot of the project's home page that upstream retakes whenever a
+ * prompt finishes. One request, already made, and it reflects the DEVELOPMENT state — so
+ * a project that has never been published still shows what it looks like.
+ *
+ * ⚠️ IT IS ABSENT UNTIL THE FIRST PROMPT COMPLETES, and that is the fallback below: the
+ * project's own name on a coloured plate. Not initials — the name, because on a dashboard
+ * the thing you are looking for is what you called it.
+ *
+ * ⚠️ LOADING IS CONFIRMED WITH `decode()`, NOT WITH `onLoad`. In React 19 an `<img>` that
+ * is already in the browser cache can commit with the load event long since fired, and
+ * the handler never runs — the tile would sit on its placeholder for ever. `decode()`
+ * resolves either way and rejects on a broken image, which is exactly the question here.
  */
 function ProjectThumbnail({
-  projectId, getDetail, variant = "card",
+  project, variant = "card",
 }: {
-  projectId: string;
-  getDetail: (id: string) => Promise<VcaasProject | null>;
+  project: { projectId: string; label?: string; previewImageUrl?: string | null };
   variant?: "card" | "row";
 }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const [visible, setVisible] = useState(false);
-  const [status, setStatus] = useState<"loading" | "ready" | "none">("loading");
-
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const obs = new IntersectionObserver((entries) => {
-      if (entries[0]?.isIntersecting) { setVisible(true); obs.disconnect(); }
-    }, { rootMargin: "250px" });
-    obs.observe(el);
-    return () => obs.disconnect();
-  }, []);
-
-  useEffect(() => {
-    if (!visible) return;
-    let cancelled = false;
-    getDetail(projectId).then((d) => {
-      if (cancelled) return;
-      setStatus(detailIsPublished(d) ? "ready" : "none");
-    });
-    return () => { cancelled = true; };
-  }, [visible, projectId, getDetail]);
-
-  const previewUrl = `https://${projectId}.totalum-project.com`;
+  const { projectId, previewImageUrl } = project;
+  const name = project.label || projectId;
+  const [state, setState] = useState<"idle" | "ready" | "failed">("idle");
   const [c1, c2] = gradientFor(projectId);
   const isRow = variant === "row";
 
+  useEffect(() => {
+    setState("idle");
+    if (!previewImageUrl) return;
+    let cancelled = false;
+    const img = new Image();
+    img.src = previewImageUrl;
+    img
+      .decode()
+      .then(() => { if (!cancelled) setState("ready"); })
+      .catch(() => { if (!cancelled) setState("failed"); });
+    return () => { cancelled = true; };
+  }, [previewImageUrl]);
+
   const placeholder = (
-    <div className="w-full h-full flex items-center justify-center relative overflow-hidden" style={{ background: `linear-gradient(135deg, ${c1}, ${c2})` }}>
-      <span className={`font-bold text-white/95 tracking-tight ${isRow ? "text-sm" : "text-2xl"}`}>{initialsFor(projectId)}</span>
+    <div
+      className="w-full h-full flex items-center justify-center relative overflow-hidden px-1.5"
+      style={{ background: `linear-gradient(135deg, ${c1}, ${c2})` }}
+    >
+      <span
+        className={`font-semibold text-white/95 tracking-tight text-center leading-tight break-words ${isRow ? "text-[9px] line-clamp-2" : "text-[11px] line-clamp-3"}`}
+        title={name}
+      >
+        {name}
+      </span>
       <Sparkles className={`absolute text-white/20 ${isRow ? "w-4 h-4 -right-0.5 -bottom-0.5" : "w-10 h-10 -right-1 -bottom-1"}`} />
     </div>
   );
 
   return (
-    <div ref={ref} className="w-full h-full relative overflow-hidden bg-gray-100 dark:bg-gray-800">
-      {status === "ready" && visible ? (
+    <div className="w-full h-full relative overflow-hidden bg-gray-100 dark:bg-gray-800">
+      {previewImageUrl && state !== "failed" ? (
         <>
-          <iframe
-            src={previewUrl}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={previewImageUrl}
+            alt={name}
             loading="lazy"
-            className={isRow ? "w-[400%] h-[400%] border-0 pointer-events-none origin-top-left" : "w-[200%] h-[200%] border-0 pointer-events-none origin-top-left"}
-            style={{ transform: isRow ? "scale(0.25)" : "scale(0.5)" }}
-            title={projectId}
-            sandbox="allow-scripts allow-same-origin"
-            tabIndex={-1}
+            decoding="async"
+            className={`w-full h-full object-cover object-top transition-opacity duration-300 ${state === "ready" ? "opacity-100" : "opacity-0"}`}
           />
-          <div className="absolute inset-0" />
+          {/* Until the bytes are decoded the plate stands in, so the tile never flashes empty. */}
+          {state !== "ready" && <div className="absolute inset-0">{placeholder}</div>}
         </>
-      ) : status === "loading" && visible ? (
-        <div className="w-full h-full flex items-center justify-center" style={{ background: `linear-gradient(135deg, ${c1}22, ${c2}22)` }}>
-          <Loader2 className={`animate-spin text-gray-300 ${isRow ? "w-4 h-4" : "w-5 h-5"}`} />
-        </div>
       ) : (
         placeholder
       )}
@@ -173,21 +172,40 @@ export default function DashboardPage() {
     });
   }, []);
 
-  // Lazy per-project detail cache (used only by visible thumbnails).
-  const detailCache = useRef<Map<string, VcaasProject | null>>(new Map());
-  const inflight = useRef<Map<string, Promise<VcaasProject | null>>>(new Map());
-  const getDetail = useCallback(async (id: string): Promise<VcaasProject | null> => {
-    if (detailCache.current.has(id)) return detailCache.current.get(id)!;
-    if (inflight.current.has(id)) return inflight.current.get(id)!;
-    const p = vcaasApi.projects.get(id).then((r) => {
-      const d = r.ok && r.data ? r.data : null;
-      detailCache.current.set(id, d);
-      inflight.current.delete(id);
-      return d;
-    });
-    inflight.current.set(id, p);
-    return p;
-  }, []);
+  /*
+    ⚠️ THE PER-TILE `GET /projects/{id}` CACHE THAT LIVED HERE IS GONE. It existed only to
+    ask "has this been published?" before framing its production URL — a question the
+    dashboard no longer needs to ask, because `GET /projects` already returns
+    `previewImageUrl` for every project. One list request now does what one list request
+    plus N detail requests used to.
+  */
+
+  /**
+   * ═══⭐⭐ MOVING A PROJECT AROUND — EXPORT · IMPORT · DUPLICATE ════════════
+   *
+   * The three dialogs are totalum-platform's, copied whole, and so is the model behind
+   * them (`src/lib/project-transfer.ts`):
+   *
+   *  · EXPORT packages the database and a source reference into a secret `importCode`.
+   *    The code never expires — but it dies with its source project, because what it
+   *    points at is that project's files.
+   *  · IMPORT restores a code INTO a project, and is DESTRUCTIVE: whatever is in the
+   *    target is dropped first, and upstream refuses a target that is not nearly empty.
+   *    So the dialog creates a fresh project and imports into that.
+   *  · DUPLICATE is those two behind one button — export, create, import — which is why
+   *    it shows three steps and costs the sum of both.
+   *
+   * ⚠️ THEY COST CREDITS AND ARE RATE-LIMITED (1 per minute, 5 per hour, per account).
+   * A retry loop without a backoff turns one failure into an hour of them.
+   */
+  const [exportTarget, setExportTarget] = useState<string | null>(null);
+  const [cloneTarget, setCloneTarget] = useState<string | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
+  /** The availability check the dialogs run before creating: names already in use here. */
+  const takenNames = useMemo(
+    () => new Set(projects.map((p) => p.projectId)),
+    [projects]
+  );
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -290,25 +308,74 @@ export default function DashboardPage() {
     if (id.length < 3) { setBuildError("Project name must be at least 3 characters (lowercase, hyphens allowed)."); return; }
     setBuildCreating(true);
     setBuildError(null);
+
+    /**
+     * ═══⭐⭐⭐ ONE CALL: CREATE THE PROJECT AND START BUILDING ═════════════════
+     *
+     * `POST /projects/launch` does what this flow used to do in three steps — create,
+     * navigate, auto-submit the prompt from `sessionStorage` — and closes the window in
+     * which a project existed with nothing happening inside it.
+     *
+     * ⚠️ A TAKEN NAME IS NO LONGER AN ERROR. Upstream resolves it (`my-app` → `my-app-x7`)
+     * and tells us which id it actually used, so the old "this name is probably already
+     * taken, choose another" dead end is gone. We navigate to `data.projectId`, never to
+     * the slug we asked for.
+     *
+     * ⚠️ ATTACHMENTS STILL TAKE THE LONG ROAD, and they have to: `launch` accepts files by
+     * URL, and a `blob:` URL from this browser means nothing to the agent. Uploading needs
+     * a project to exist, so with attachments we create first, upload, and let the
+     * workspace send the prompt — the path this flow always used.
+     */
+    if (attachedFiles.length === 0) {
+      const launched = await vcaasApi.projects.launch({
+        projectId: id,
+        prompt: firstPrompt.trim(),
+        description: firstPrompt.trim().slice(0, 200),
+      });
+
+      if (!launched.ok || !launched.data) {
+        setBuildError(launched.error || `Could not create "${id}". Please try a different name.`);
+        setBuildCreating(false);
+        return;
+      }
+
+      const created = launched.data.projectId;
+      if (launched.data.requestedProjectId && launched.data.requestedProjectId !== created) {
+        toast.info(`"${launched.data.requestedProjectId}" was taken — your project is "${created}".`);
+      }
+      /**
+       * ⚠️ THE PROJECT CAN EXIST WITHOUT THE RUN HAVING STARTED — that is what
+       * `agent.started === false` and the `warnings` array are for. Stashing the prompt
+       * then lets the workspace send it on arrival, so the user still ends up where they
+       * expected instead of in an empty project with no explanation.
+       */
+      if (!launched.data.agent?.started) {
+        launched.data.warnings?.forEach(w => w?.message && toast.warning(w.message));
+        try {
+          sessionStorage.setItem(`vibebuild:pendingPrompt:${created}`, firstPrompt.trim());
+        } catch { /* ignore */ }
+      }
+      router.push(`/project/${created}`);
+      return;
+    }
+
     const res = await vcaasApi.projects.create({ projectId: id, description: firstPrompt.trim().slice(0, 200) });
     if (!res.ok) {
       setBuildError(`Could not create "${id}". This name is probably already taken — please choose a different project name.`);
       setBuildCreating(false);
       return;
     }
-    // Upload any attached files to the freshly-created project so the agent gets
-    // real, publicly-fetchable URLs (blob URLs from the browser can't be read by the
-    // agent and don't survive navigation). The upload endpoint needs the project to
-    // exist first, which is why this runs after creation.
+    // Upload the attachments so the agent gets real, publicly-fetchable URLs (blob URLs
+    // from the browser can't be read by the agent and don't survive navigation). The
+    // upload endpoint needs the project to exist first, which is why this runs after
+    // creation.
     let uploadedFiles: { name: string; url: string; imageDescription: string }[] = [];
-    if (attachedFiles.length > 0) {
-      setUploading(true);
-      // Retries built in — a just-created project's storage can need a moment.
-      uploadedFiles = await uploadFilesToProjectHelper(id, attachedFiles.map((f) => f.file));
-      setUploading(false);
-      if (uploadedFiles.length < attachedFiles.length) {
-        toast.error("Some attachments could not be uploaded. The agent may not see them.");
-      }
+    setUploading(true);
+    // Retries built in — a just-created project's storage can need a moment.
+    uploadedFiles = await uploadFilesToProjectHelper(id, attachedFiles.map((f) => f.file));
+    setUploading(false);
+    if (uploadedFiles.length < attachedFiles.length) {
+      toast.error("Some attachments could not be uploaded. The agent may not see them.");
     }
     // Stash the first prompt (and uploaded files, with real URLs) so the workspace auto-submits it.
     try {
@@ -333,7 +400,6 @@ export default function DashboardPage() {
     const projectId = deleteTarget;
     if (!projectId) return;
     setDeleting(true);
-    detailCache.current.delete(projectId);
     const res = await vcaasApi.projects.remove(projectId);
     if (res.ok) {
       toast.success("Project deleted");
@@ -481,6 +547,19 @@ export default function DashboardPage() {
                   </button>
                 </div>
 
+                {/*
+                  ⭐ IMPORT — the other half of Export. It creates a fresh project and
+                  restores the code INTO it, because an import always drops whatever is in
+                  the target first and upstream refuses a target that is not nearly empty.
+                */}
+                <button
+                  onClick={() => setImportOpen(true)}
+                  className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 h-8 px-2.5 rounded-lg border border-gray-200 bg-white/70 hover:bg-white transition-colors"
+                  title="Import a project from a code"
+                >
+                  <Download className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Import</span>
+                </button>
+
                 {/* Manual create */}
                 <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
                   <DialogTrigger asChild>
@@ -521,7 +600,7 @@ export default function DashboardPage() {
                   <Link key={p.projectId} href={`/project/${p.projectId}`}>
                     <div className="bg-white/70 backdrop-blur-sm border border-gray-200/50 rounded-xl overflow-hidden hover:shadow-lg hover:bg-white/90 transition-all cursor-pointer group h-full">
                       <div className="h-32 relative overflow-hidden">
-                        <ProjectThumbnail projectId={p.projectId} getDetail={getDetail} />
+                        <ProjectThumbnail project={p} />
                         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors pointer-events-none" />
                       </div>
                       <div className="p-4">
@@ -537,7 +616,20 @@ export default function DashboardPage() {
                                 <MoreVertical className="w-3.5 h-3.5" />
                               </button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-40" onClick={(e) => e.stopPropagation()}>
+                            <DropdownMenuContent align="end" className="w-48" onClick={(e) => e.stopPropagation()}>
+                              {/* ⭐ Duplicate = export + create + import behind one action. */}
+                              <DropdownMenuItem
+                                className="cursor-pointer"
+                                onSelect={(e) => { e.preventDefault(); setCloneTarget(p.projectId); }}
+                              >
+                                <Copy className="w-3.5 h-3.5 mr-2" /> Duplicate
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                className="cursor-pointer"
+                                onSelect={(e) => { e.preventDefault(); setExportTarget(p.projectId); }}
+                              >
+                                <Upload className="w-3.5 h-3.5 mr-2" /> Export…
+                              </DropdownMenuItem>
                               <DropdownMenuItem
                                 className="text-red-600 focus:text-red-600 focus:bg-red-50 cursor-pointer"
                                 onSelect={(e) => { e.preventDefault(); setDeleteTarget(p.projectId); }}
@@ -580,7 +672,7 @@ export default function DashboardPage() {
                         >
                           <td className="px-4 py-2">
                             <div className="w-11 h-8 rounded-md overflow-hidden border border-gray-200/60">
-                              <ProjectThumbnail projectId={p.projectId} getDetail={getDetail} variant="row" />
+                              <ProjectThumbnail project={p} variant="row" />
                             </div>
                           </td>
                           <td className="px-2 py-2">
@@ -603,7 +695,19 @@ export default function DashboardPage() {
                                   <MoreVertical className="w-3.5 h-3.5" />
                                 </button>
                               </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="w-40" onClick={(e) => e.stopPropagation()}>
+                              <DropdownMenuContent align="end" className="w-48" onClick={(e) => e.stopPropagation()}>
+                                <DropdownMenuItem
+                                  className="cursor-pointer"
+                                  onSelect={(e) => { e.preventDefault(); setCloneTarget(p.projectId); }}
+                                >
+                                  <Copy className="w-3.5 h-3.5 mr-2" /> Duplicate
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  className="cursor-pointer"
+                                  onSelect={(e) => { e.preventDefault(); setExportTarget(p.projectId); }}
+                                >
+                                  <Upload className="w-3.5 h-3.5 mr-2" /> Export…
+                                </DropdownMenuItem>
                                 <DropdownMenuItem
                                   className="text-red-600 focus:text-red-600 focus:bg-red-50 cursor-pointer"
                                   onSelect={(e) => { e.preventDefault(); setDeleteTarget(p.projectId); }}
@@ -729,6 +833,30 @@ export default function DashboardPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* ═══ EXPORT · IMPORT · DUPLICATE — totalum-platform's dialogs, unchanged ═══ */}
+      <ExportProjectDialog
+        open={exportTarget !== null}
+        onOpenChange={open => {
+          if (!open) setExportTarget(null);
+        }}
+        projectId={exportTarget ?? ""}
+      />
+      <ImportProjectDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        takenNames={takenNames}
+        onImported={fetchData}
+      />
+      <CloneProjectDialog
+        open={cloneTarget !== null}
+        onOpenChange={open => {
+          if (!open) setCloneTarget(null);
+        }}
+        projectId={cloneTarget ?? ""}
+        takenNames={takenNames}
+        onCloned={fetchData}
+      />
     </div>
   );
 }

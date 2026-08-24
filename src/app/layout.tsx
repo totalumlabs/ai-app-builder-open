@@ -6,6 +6,7 @@ import "./globals.css";
 import { ScriptExecutor } from "@/components/ScriptExecutor";
 import { GlobalErrorCatcher } from "@/components/GlobalErrorCatcher";
 import { Toaster } from "@/components/ui/sonner";
+import { InsufficientCreditsModal } from "@/components/workspace/InsufficientCreditsModal";
 
 const dmSans = DM_Sans({ variable: "--font-dm-sans", subsets: ["latin"], weight: ["300", "400", "500", "600", "700"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
@@ -26,6 +27,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <GlobalErrorCatcher />
         <ScriptExecutor />
         <Toaster position="top-right" richColors />
+        {/*
+          ⭐ MOUNTED ONCE FOR THE WHOLE APP. Running out of credits can happen on any
+          screen — the dashboard creating a project, the workspace publishing one — and
+          the modal listens for the event the VCaaS client raises rather than being wired
+          per page. See `InsufficientCreditsModal`.
+        */}
+        <InsufficientCreditsModal />
         <div className="min-h-screen flex flex-col">
           <main className="flex-1">{children}</main>
         </div>

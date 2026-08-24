@@ -9,7 +9,7 @@ import {
   Rocket, Loader2, Eye, Database, Key, Globe, Terminal,
   RefreshCw, Server, PanelLeftClose, PanelLeft, Monitor, Smartphone,
   ExternalLink, Sparkles, ChevronDown, FolderOpen, Plus, AlertTriangle,
-  Clock, X, Github, Code2, ArrowLeft,
+  Clock, X, Github, Code2, ArrowLeft, Figma, MousePointerClick,
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -23,6 +23,18 @@ import { LogsPanel } from "@/components/workspace/LogsPanel";
 import { GithubPanel } from "@/components/workspace/GithubPanel";
 import { CodePanel } from "@/components/workspace/CodePanel";
 import type { VcaasProject, ConversationMessage } from "@/lib/vcaas-types";
+import { useServerWake } from "@/components/workspace/use-server-wake";
+import { ServerWakeNotice } from "@/components/workspace/ServerWakeNotice";
+import { ServerBlockedDialog, useServerBlocked } from "@/components/workspace/ServerBlockedDialog";
+import { FigmaModal } from "@/components/workspace/FigmaModal";
+import { OperationBanner } from "@/components/workspace/OperationBanner";
+import { PublishedModal } from "@/components/workspace/PublishedModal";
+import { useProjectOperation } from "@/components/workspace/use-project-operation";
+import { getPublishedHost, getPreviewUrlField } from "@/lib/project-status";
+import { useVisualEditor } from "@/components/workspace/visual-editor/use-visual-editor";
+import { VisualEditorPanel } from "@/components/workspace/visual-editor/VisualEditorPanel";
+import { VisualChangesBar } from "@/components/workspace/visual-editor/VisualChangesBar";
+import { t as translate } from "@/i18n";
 
 // Pick the correct development preview URL following the VCaaS docs:
 // use `developmentUrlFieldToUse` to decide between the live server URL and the
@@ -53,6 +65,70 @@ export default function WorkspacePage() {
   const params = useParams();
   const router = useRouter();
   const projectId = params.projectId as string;
+
+  /**
+   * ═══⭐⭐ THE SLEEPING SANDBOX, AND THE ONE PLACE THAT EXPLAINS IT ═════════
+   *
+   * A project whose sandbox has been archived cannot be written to, rebuilt, published,
+   * synced or restored: VCaaS starts the server itself and refuses the action with
+   * `SERVER_NOT_READY`. `useServerWake` turns that refusal into a wait with a clock, and
+   * `useServerBlocked` + `<ServerBlockedDialog>` turn it into a sentence the user can act
+   * on. Both are lifted from totalum-platform unchanged — see the notes in those files.
+   */
+  const serverWake = useServerWake(projectId);
+  const [figmaOpen, setFigmaOpen] = useState(false);
+  const [figmaConnected, setFigmaConnected] = useState(false);
+
+  /**
+   * ═══⭐⭐ THE LONG OPERATIONS, AND THE BANNER THAT OWNS THEM ═══════════════
+   *
+   * Publish, rebuild, GitHub pull, restore-a-version and restart-the-server all take
+   * minutes, all take the app down or replace it while they run, and all used to be
+   * invisible the moment the toast faded. `useProjectOperation` records the one in flight
+   * (persisted, so a reload does not lose it) and `<OperationBanner>` renders it with a
+   * clock and an honest progress estimate. Copied from totalum-platform unchanged.
+   *
+   * ⚠️ ONE SLOT, DELIBERATELY. Two of these at once would be two builds racing on the
+   * same sandbox, so starting one while another runs is refused rather than queued.
+   */
+  const operation = useProjectOperation(projectId);
+  const [publishedHost, setPublishedHost] = useState<string | null>(null);
+
+  /**
+   * ═══⭐⭐⭐ THE VISUAL EDITOR ═══════════════════════════════════════════════
+   *
+   * Copied from totalum-platform whole — the hook, the inspector panel, the changes bar
+   * and the two routes behind them (`/api/preview/*` re-serves the project same-origin so
+   * the page can be scripted; `/api/visual-edit/[projectId]/apply` matches each change back
+   * to the source file and writes it).
+   *
+   * ⚠️ IT ONLY WORKS AGAINST THE LIVE DEV SERVER. Everything it does — select an element,
+   * read its computed styles, type into it — happens in a document the sandbox is
+   * serving. On a sleeping project the frame is showing a STATIC ARCHIVE SNAPSHOT, and an
+   * editor opened over that lets people retype headings that can never be applied: the
+   * edits are computed against a copy of the app, and there is no server to write to. So
+   * the toggle is refused until `liveReady` — see `visualEditBlockedReason`.
+   */
+  /**
+   * ⚠️⚠️ ONE FRAME OWNS THIS REF, AND IT MUST BE THE VISIBLE ONE. This page renders the
+   * desktop layout and the mobile layout at the same time and hides one with CSS, so BOTH
+   * `<PreviewPanel>`s are mounted. Handing the ref to both makes the last one to mount win
+   * — the hidden mobile frame — and then every message the editor posts goes to a document
+   * nobody is looking at: the agent reports `ready` (so the panel looks connected) but
+   * never receives `setActive`, and clicking the visible preview selects nothing. Only the
+   * desktop instance gets `frameRef` and `proxiedSrc`; the visual editor is a desktop
+   * feature here, exactly as its inspector column implies.
+   */
+  const previewFrameRef = useRef<HTMLIFrameElement | null>(null);
+  const [visualEditorOpen, setVisualEditorOpen] = useState(false);
+  const visual = useVisualEditor({
+    projectId,
+    iframeRef: previewFrameRef,
+    enabled: visualEditorOpen,
+  });
+  /** An apply outlives the panel: the frame must stay proxied until it settles. */
+  const visualLocked = visual.phase === "applying" || visual.phase === "rebuilding";
+  const blocked = useServerBlocked();
 
   const TABS = [
     { id: "preview", label: "Preview", icon: Eye },
@@ -231,8 +307,15 @@ export default function WorkspacePage() {
     if (res.ok && res.data) {
       if (res.data.status === "success") {
         setDeploying(false);
+        operation.end("publish");
         toast.success("Published successfully!");
         const proj = await fetchProject();
+        /**
+         * ⭐ THE ONE OPERATION THAT EARNS A DIALOG. The whole point of publishing is the
+         * ADDRESS — to click, to copy, to send to somebody — and a toast that disappears
+         * in four seconds is the wrong place for it.
+         */
+        setPublishedHost(getPublishedHost(proj, projectId));
         // Surface the deploy result in the chat and pull the latest conversation.
         const liveUrl = proj?.productionProjectUrl || project?.productionProjectUrl || `${projectId}.totalum-project.com`;
         setMessages((prev) => [...prev, {
@@ -244,7 +327,7 @@ export default function WorkspacePage() {
         fetchConversation();
         return;
       }
-      if (res.data.status === "error") { setDeploying(false); toast.error("Deployment failed"); return; }
+      if (res.data.status === "error") { setDeploying(false); operation.end("publish"); toast.error("Deployment failed"); return; }
     }
     setTimeout(pollDeployOnce, 10000);
   }
@@ -308,6 +391,122 @@ export default function WorkspacePage() {
     sessionStorage.removeItem(filesKey);
     sendPromptText(pending, files);
   }, [loading, project, projectId, sendPromptText]);
+  /**
+   * ═══⭐⭐⭐ THE ONE PLACE A LONG OPERATION FINISHES ═════════════════════════
+   *
+   * ⚠️ EVERY ONE OF THESE ENDS SOMEWHERE ELSE THAN IT STARTED — a restart finishes when
+   * the sandbox says `Active`, a pull when GitHub's sync reports done, a restore when the
+   * project stops reporting a recovery. Watching them in the component that fired the
+   * request would mean the watch dies whenever that panel unmounts, which is precisely
+   * what people do while they wait. One watcher on the page, keyed on the slot, survives
+   * tab switches and (because the record is persisted) page reloads.
+   *
+   * ⚠️ IT IS BOUNDED. A job that stops reporting must not leave the banner up for the rest
+   * of the session, so the watch gives up after `MAX_WATCH_ATTEMPTS` and says it stopped
+   * watching rather than claiming a failure it did not observe.
+   *
+   * ⚠️ `publish` AND `rebuild` ARE NOT HERE. Both already have a poll that owns them (the
+   * deploy poll below, and the Code panel's rebuild poll), and two watchers on one job is
+   * how a banner gets cleared while the work is still running.
+   */
+  useEffect(() => {
+    const kind = operation.kind;
+    if (!kind || kind === "publish" || kind === "rebuild") return;
+
+    const MAX_WATCH_ATTEMPTS = 60; // 60 × 8s = 8 minutes
+    let cancelled = false;
+    let attempts = 0;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    const finish = (message?: string) => {
+      operation.end(kind);
+      if (message) toast.success(message);
+      fetchProject();
+      setPreviewKey((k) => k + 1);
+    };
+
+    const tick = async () => {
+      if (cancelled) return;
+      attempts += 1;
+
+      if (kind === "restartServer") {
+        const detail = await vcaasApi.projects.get(projectId);
+        if (cancelled) return;
+        if (detail.ok && detail.data?.agentServerStatus === "Active") return finish("Your server is back");
+      }
+
+      if (kind === "githubPull") {
+        const status = await vcaasApi.github.pullStatus(projectId);
+        if (cancelled) return;
+        if (status.ok && status.data && status.data.status !== "pulling") {
+          return finish(status.data.status === "error" ? undefined : "Pulled from GitHub");
+        }
+      }
+
+      if (kind === "restoreVersion") {
+        const detail = await vcaasApi.projects.get(projectId);
+        if (cancelled) return;
+        // `versionRecovery` is present only while one is running; `error` is terminal too.
+        const recovery = detail.data?.versionRecovery;
+        if (detail.ok && (!recovery || recovery.status === "error")) {
+          return finish(recovery?.status === "error" ? undefined : "Version restored");
+        }
+      }
+
+      if (attempts >= MAX_WATCH_ATTEMPTS) {
+        operation.end(kind);
+        toast.warning("We stopped watching this — it may still be finishing. Refresh in a moment.");
+        return;
+      }
+      timer = setTimeout(tick, 8000);
+    };
+
+    timer = setTimeout(tick, 8000);
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [operation.kind, projectId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /**
+   * ⭐ IS THE LIVE APP ACTUALLY THERE? Both halves are required: the machine has to be up,
+   * and the project has to be RECOMMENDING the live url — which upstream only does once
+   * it has fetched that url and seen a real page. `Active` on its own is a server with
+   * nothing served on it yet, and that window is minutes wide.
+   */
+  const liveReady =
+    project?.agentServerStatus === "Active" &&
+    getPreviewUrlField(project) === "temporalDevelopmentProjectUrl" &&
+    !!project?.temporalDevelopmentProjectUrl;
+
+  /**
+   * ⚠️ NOTHING MAY BE EDITED VISUALLY WHILE THE PROJECT IS CHANGING UNDER IT. A prompt, a
+   * publish, a rebuild, a pull and a restore all rewrite the files or the running server,
+   * and the editor is a live document editor pointed at that server: opening it during one
+   * means selecting elements in a page that is about to be replaced, then applying edits
+   * computed against source that no longer exists.
+   *
+   * ⚠️ IT BLOCKS ENTERING, NEVER LEAVING — trapping someone inside the panel is worse than
+   * the conflict this prevents.
+   */
+  const visualEditBlockedReason: "busy" | "starting" | null =
+    project?.agentProcessStatus === "init" || operation.kind !== null
+    ? "busy"
+    : !liveReady
+      ? "starting"
+      : null;
+
+  /**
+   * ⭐⭐ APPLY — and the reason it is here rather than in the bar: closing the inspector
+   * is part of applying (the page is about to be rebuilt underneath it), while the FRAME
+   * must stay proxied until the phase settles, or the user's preview-only edits vanish
+   * from the screen for the whole rebuild.
+   */
+  const handleVisualApply = useCallback(() => {
+    setVisualEditorOpen(false);
+    void visual.apply();
+  }, [visual]);
+
   const handleStopAgent = async () => { await vcaasApi.agent.stop(projectId); toast.info("Stop signal sent"); };
   // Autofill the chat prompt with an edit instruction for the given file, then focus the chat.
   const handleAskAiEdit = useCallback((path: string) => {
@@ -323,12 +522,48 @@ export default function WorkspacePage() {
   const handleDeploy = async () => {
     if (deploying) return; setDeploying(true);
     const res = await vcaasApi.deployments.deploy(projectId);
-    if (res.ok) { toast.success("Deploying… this takes ~3 minutes"); pollDeployOnce(); }
+
+    /**
+     * ⭐ THE SERVER WAS ASLEEP, SO VCaaS STARTED IT AND REFUSED THE PUBLISH. Not a
+     * failure: the strip shows the wait and the dialog explains it. `claim` also tells
+     * the user when it is ready — it deliberately does NOT publish for them, because an
+     * action that fires minutes later, unattended, is one nobody consented to at the
+     * moment it happened.
+     */
+    if (serverWake.claim(res, () => toast.success(translate("workspace.serverWake.readyFor", { action: translate("workspace.serverWake.actionPublish") })))) {
+      setDeploying(false);
+      return;
+    }
+
+    /**
+     * ⭐ THE APP ITSELF IS NOT SERVING A PAGE, so upstream refuses to ship it — publishing
+     * would put that broken page online. The two halves of `SANDBOX_NOT_REACHABLE` need
+     * opposite advice, and totalum-backend says which one it saw.
+     */
+    if (res.upstreamCode === "SANDBOX_NOT_REACHABLE") {
+      blocked.show(res.details?.reason === "app_error" ? "appError" : "starting");
+      setDeploying(false);
+      return;
+    }
+
+    if (res.ok) {
+      toast.success("Deploying… this takes ~3 minutes");
+      operation.begin("publish");
+      pollDeployOnce();
+    }
     else { toast.error(res.error || "Failed to deploy"); setDeploying(false); }
   };
   const handleRestartServer = async () => {
     const res = await vcaasApi.agent.restartServer(projectId);
-    if (res.ok) toast.success("Server restarting...");
+    if (res.ok) {
+      toast.success("Server restarting...");
+      /**
+       * ⚠️ THE WORK HAS NOT FINISHED — it has barely started. `begin` only RECORDS the
+       * operation; the banner's clock and its estimate come from the profile, and the
+       * record is persisted so a reload mid-restart still shows it.
+       */
+      operation.begin("restartServer");
+    }
     else toast.error(res.error || "Failed");
   };
 
@@ -455,6 +690,38 @@ export default function WorkspacePage() {
             <button onClick={() => setActiveTab("secrets")} className={`h-7 w-7 flex items-center justify-center rounded-lg transition-colors shrink-0 border ${btnBorder} ${activeTab === "secrets" ? "bg-gray-900 dark:bg-white text-white dark:text-gray-900" : "text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-black/5 dark:hover:bg-white/10"}`} title={"Secrets"}>
               <Key className="w-3.5 h-3.5" />
             </button>
+            {/*
+              ⭐⭐ EDIT VISUALLY. Refused — with the reason — rather than opened over a
+              document it cannot edit; see `visualEditBlockedReason`.
+            */}
+            <button
+              onClick={() => {
+                if (visualEditorOpen) { setVisualEditorOpen(false); return; }
+                if (visualEditBlockedReason === "busy") {
+                  toast.info("Your project is changing right now — try again when it settles.");
+                  return;
+                }
+                if (visualEditBlockedReason === "starting") {
+                  blocked.show("starting");
+                  return;
+                }
+                setActiveTab("preview");
+                setVisualEditorOpen(true);
+              }}
+              className={`relative h-7 w-7 flex items-center justify-center rounded-lg transition-colors shrink-0 border ${btnBorder} ${visualEditorOpen ? "bg-gray-900 dark:bg-white text-white dark:text-gray-900" : "text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-black/5 dark:hover:bg-white/10"}`}
+              title={visualEditorOpen ? "Close the visual editor" : "Edit visually"}
+            >
+              <MousePointerClick className="w-3.5 h-3.5" />
+            </button>
+            {/*
+              ⭐ FIGMA — A MODAL, NOT A TAB, and deliberately so: connecting is a
+              once-per-project errand with a token in it, not a place you work. The panel
+              itself is the platform's, copied unchanged.
+            */}
+            <button onClick={() => setFigmaOpen(true)} className={`relative h-7 w-7 flex items-center justify-center rounded-lg transition-colors shrink-0 border ${btnBorder} text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-black/5 dark:hover:bg-white/10`} title={figmaConnected ? "Figma connected" : "Figma"}>
+              <Figma className="w-3.5 h-3.5" />
+              {figmaConnected && <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-[#1e1e1e]" />}
+            </button>
             <button onClick={() => setActiveTab("github")} className={`relative h-7 w-7 flex items-center justify-center rounded-lg transition-colors shrink-0 border ${btnBorder} ${activeTab === "github" ? "bg-gray-900 dark:bg-white text-white dark:text-gray-900" : "text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-black/5 dark:hover:bg-white/10"}`} title={githubConnected ? ("GitHub connected") : "GitHub"}>
               <Github className="w-3.5 h-3.5" />
               {githubConnected && <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-[#1e1e1e]" />}
@@ -543,17 +810,87 @@ export default function WorkspacePage() {
             </div>
           )}
           <div className="flex-1 flex flex-col min-w-0">
+            {/*
+              ⭐ THE WAKE STRIP, ABOVE THE PANEL THAT OWNS THE ACTION. Publish, rebuild, a
+              file save and a version restore all land here. It is a strip in the panel
+              column, never an overlay, so the rest of the workspace stays usable while the
+              server comes up — the dialog is the interruption, this is the progress.
+            */}
+            {/*
+              ⭐ THE OPERATION BANNER, ABOVE EVERYTHING IT AFFECTS. Publish, rebuild, pull,
+              restore and restart all replace or take down the app the panel below is
+              showing, so the explanation belongs above that panel and not in a toast that
+              is gone before the work is.
+            */}
+            {operation.kind && (
+              <div className="px-2 pt-2 sm:px-3">
+                <OperationBanner kind={operation.kind} elapsedMs={operation.elapsedMs} />
+              </div>
+            )}
+            {(serverWake.waking || serverWake.failed) && (
+              <div className="px-2 pt-2 sm:px-3">
+                <ServerWakeNotice wake={serverWake} manualRetry={!serverWake.willRetry} />
+              </div>
+            )}
             <div className={`flex-1 overflow-hidden ${activeTab === "preview" ? "rounded-none" : "m-2 sm:m-3 rounded-xl shadow-sm"}`} style={{ background: cardBg }}>
-              {activeTab === "preview" && <PreviewPanel key={previewKey} previewUrl={previewUrl} cached={previewCached} onRefresh={() => { fetchProject(); setPreviewKey((k) => k + 1); }} loading={isBuilding} mobilePreview={mobilePreview} iframePath={iframePath} />}
-              {activeTab === "code" && <CodePanel projectId={projectId} darkMode={darkMode} onAskAiEdit={handleAskAiEdit} />}
+              {activeTab === "preview" && <PreviewPanel key={previewKey} previewUrl={previewUrl} cached={previewCached} onRefresh={() => { fetchProject(); setPreviewKey((k) => k + 1); }} loading={isBuilding} mobilePreview={mobilePreview} iframePath={iframePath} frameRef={previewFrameRef} /* ⭐ Same-origin ONLY while the editor is open — and for the length of an apply, which outlives the panel: dropping the proxy mid-apply would reload the frame and throw away the preview-only edits the user is watching. */ proxiedSrc={visualEditorOpen || visualLocked ? `/api/preview/${encodeURIComponent(projectId)}` : null} />}
+              {activeTab === "code" && <CodePanel projectId={projectId} darkMode={darkMode} onAskAiEdit={handleAskAiEdit} wake={serverWake} onRebuildStarted={() => operation.begin("rebuild")} onRebuildFinished={() => operation.end("rebuild")} />}
               {activeTab === "database" && <DatabasePanel projectId={projectId} />}
-              {activeTab === "versions" && <VersionsPanel projectId={projectId} onVersionRestored={() => fetchProject()} />}
+              {activeTab === "versions" && <VersionsPanel projectId={projectId} wake={serverWake} onVersionRestored={() => fetchProject()} onRestoreStarted={() => operation.begin("restoreVersion")} />}
               {activeTab === "secrets" && <SecretsPanel projectId={projectId} secrets={project.secrets || []} onSecretsChanged={() => fetchProject()} />}
               {activeTab === "domain" && <DomainPanel projectId={projectId} domain={project.customDomain} productionUrl={project.productionProjectUrl} onDomainChanged={() => fetchProject()} />}
-              {activeTab === "github" && <GithubPanel projectId={projectId} onStatusChange={setGithubConnected} />}
+              {activeTab === "github" && <GithubPanel projectId={projectId} wake={serverWake} onStatusChange={setGithubConnected} onPullStarted={() => operation.begin("githubPull")} />}
               {activeTab === "logs" && <LogsPanel projectId={projectId} />}
             </div>
+            {/* F12 — the bar owns the whole batch: count, undo, discard and apply. */}
+            <VisualChangesBar
+              changes={visual.changes}
+              phase={visual.phase}
+              outcome={visual.outcome}
+              error={visual.error}
+              onUndo={visual.undoChange}
+              onDiscardAll={visual.discardAll}
+              onApply={handleVisualApply}
+              onDismissOutcome={visual.reset}
+            />
           </div>
+          {/*
+            ⚠️ A COLUMN, NOT AN OVERLAY — the inspector must never cover the element being
+            edited, which is the one thing the user is looking at.
+          */}
+          {visualEditorOpen && (
+            <div className="w-[19rem] shrink-0 xl:w-[21rem] overflow-hidden border-l border-gray-200 dark:border-gray-800">
+              <VisualEditorPanel
+                projectId={projectId}
+                selected={visual.selected}
+                ready={visual.ready}
+                locked={visualLocked}
+                palette={visual.palette}
+                onChange={(kind, before, after, options) => {
+                  if (!visual.selected) return;
+                  visual.pushChange(kind, before, after, visual.selected.signature, options);
+                }}
+                onAskAi={seed => {
+                  setPrompt(seed);
+                  setChatCollapsed(false);
+                  setMobileTab("chat");
+                  requestAnimationFrame(() => {
+                    document.querySelector<HTMLTextAreaElement>("[data-chat-input]")?.focus();
+                  });
+                }}
+                /**
+                 * ⚠️ CLOSING DISCARDS THE BATCH, and that is the honest reading of
+                 * "nothing is saved until you apply": the frame swaps back to the direct
+                 * preview where none of these edits exist, so leaving them in the bar
+                 * would let someone apply changes they can no longer see.
+                 */
+                onClose={() => {
+                  visual.discardAll();
+                  setVisualEditorOpen(false);
+                }}
+              />
+            </div>
+          )}
         </div>
       </div>
 
@@ -584,12 +921,12 @@ export default function WorkspacePage() {
           ) : (
             <div className="h-full overflow-hidden">
               {activeTab === "preview" && <PreviewPanel key={previewKey} previewUrl={previewUrl} cached={previewCached} onRefresh={() => { fetchProject(); setPreviewKey((k) => k + 1); }} loading={isBuilding} mobilePreview={false} iframePath={iframePath} />}
-              {activeTab === "code" && <CodePanel projectId={projectId} darkMode={darkMode} onAskAiEdit={handleAskAiEdit} />}
+              {activeTab === "code" && <CodePanel projectId={projectId} darkMode={darkMode} onAskAiEdit={handleAskAiEdit} wake={serverWake} onRebuildStarted={() => operation.begin("rebuild")} onRebuildFinished={() => operation.end("rebuild")} />}
               {activeTab === "database" && <DatabasePanel projectId={projectId} />}
-              {activeTab === "versions" && <VersionsPanel projectId={projectId} onVersionRestored={() => fetchProject()} />}
+              {activeTab === "versions" && <VersionsPanel projectId={projectId} wake={serverWake} onVersionRestored={() => fetchProject()} onRestoreStarted={() => operation.begin("restoreVersion")} />}
               {activeTab === "secrets" && <SecretsPanel projectId={projectId} secrets={project.secrets || []} onSecretsChanged={() => fetchProject()} />}
               {activeTab === "domain" && <DomainPanel projectId={projectId} domain={project.customDomain} productionUrl={project.productionProjectUrl} onDomainChanged={() => fetchProject()} />}
-              {activeTab === "github" && <GithubPanel projectId={projectId} onStatusChange={setGithubConnected} />}
+              {activeTab === "github" && <GithubPanel projectId={projectId} wake={serverWake} onStatusChange={setGithubConnected} onPullStarted={() => operation.begin("githubPull")} />}
               {activeTab === "logs" && <LogsPanel projectId={projectId} />}
             </div>
           )}
@@ -603,6 +940,31 @@ export default function WorkspacePage() {
           </div>
         </div>
       </div>
+
+      {/*
+        ⭐ MOUNTED ONCE FOR THE WHOLE WORKSPACE. It listens for the wake's own event, so a
+        refusal raised inside any panel — the code editor, the GitHub panel, the versions
+        list — is answered here without a single prop being threaded through.
+      */}
+      <ServerBlockedDialog reason={blocked.reason} onDismiss={blocked.dismiss} wake={serverWake} />
+      <PublishedModal
+        open={publishedHost !== null}
+        onOpenChange={open => {
+          if (!open) setPublishedHost(null);
+        }}
+        host={publishedHost ?? ""}
+        hasCustomDomain={domainActive}
+        onOpenDomain={() => {
+          setPublishedHost(null);
+          setActiveTab("domain");
+        }}
+      />
+      <FigmaModal
+        open={figmaOpen}
+        onOpenChange={setFigmaOpen}
+        projectId={projectId}
+        onStatusChange={setFigmaConnected}
+      />
     </div>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { vcaasApi } from "@/lib/vcaas";
+import { labelForTable, resolveLinkedTable } from "@/lib/totalum-schema";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -701,10 +702,19 @@ export function DatabasePanel({ projectId }: DatabasePanelProps) {
                     <div key={prop.id} className="flex items-center gap-2 py-1 px-2 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
                       <span className="text-xs text-gray-700 dark:text-gray-300 font-mono flex-1 truncate">{prop.name}</span>
                       <Badge className={`text-[9px] h-4 border-0 shrink-0 font-medium ${getPropertyTypeColor(prop.propertyType)}`}>{prop.propertyType}</Badge>
-                      {prop.propertyType === "objectReference" && prop.objectReference?.tableTo && (
+                      {/*
+                        ⚠️ THIS LINE WAS DEAD. It read `objectReference.tableTo`, a field
+                        the API has never sent, so the link target was never shown for ANY
+                        relation. The real shape is `{ objectReferenceTypeId,
+                        objectReferenceRelation }`, where the id is the target table's
+                        `_id` — which is why resolving it into a name needs the table list.
+                      */}
+                      {prop.propertyType === "objectReference" && (
                         <span className="flex items-center gap-0.5 text-violet-500 shrink-0">
                           <ArrowRight className="w-2.5 h-2.5" />
-                          <span className="font-mono text-[9px]">{prop.objectReference.tableTo}</span>
+                          <span className="font-mono text-[9px]">
+                            {labelForTable(resolveLinkedTable(tables, prop)) || "?"}
+                          </span>
                         </span>
                       )}
                     </div>

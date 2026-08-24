@@ -2,7 +2,7 @@
 
 # 🪄 Open-Source AI App Builder
 
-### Turn a prompt into a full-stack **Next.js** web app — with hosting, sandbox, database, auth, AI, GitHub sync, multitenancy & custom domains built in.
+### Turn a prompt into a full-stack **Next.js** web app — with hosting, sandbox, database, auth, AI, a visual editor, GitHub sync, Figma, multitenancy & custom domains built in.
 
 **A free, self-hosted, white-label alternative to [v0](https://v0.dev), [Lovable](https://lovable.dev), [Bolt](https://bolt.new) and [Replit](https://replit.com).**
 Run it yourself, or drop a first-class AI app builder straight into your own SaaS.
@@ -30,7 +30,7 @@ Run it yourself, or drop a first-class AI app builder straight into your own Saa
 
 ## What is this?
 
-**AI App Builder Open** is an open-source, no-code AI app builder. A user types what they want — *"a CRM with kanban boards and Stripe billing"* — and the AI builds, previews, and deploys a real, full-stack **Next.js** application. Live preview, code editor, database, logs, versioning and GitHub sync are all included, out of the box.
+**AI App Builder Open** is an open-source, no-code AI app builder. A user types what they want — *"a CRM with kanban boards and Stripe billing"* — and the AI builds, previews, and deploys a real, full-stack **Next.js** application. Live preview, a visual editor, a real code editor, database, logs, versioning, GitHub sync, Figma and custom domains are all included, out of the box.
 
 It's powered by the **[Totalum VCaaS API](https://www.totalum.app/en/whitelabel)** (Vibe-Coding-as-a-Service), which handles the heavy backend infrastructure — hosting, sandboxes, databases, AI agents, custom domains and GitHub — behind **a single API key**. You bring the front-end (this repo, or your own SaaS); Totalum brings the platform.
 
@@ -55,15 +55,18 @@ Everything below works with **one API key** — no separate cloud accounts, no g
 
 - 🤖 **Prompt → full-stack app** — describe an app in plain English, the AI agent builds a complete Next.js project.
 - 👀 **Live preview** — see the running app update in real time as the agent works.
-- 🧑‍💻 **Built-in code editor** — Monaco (VS Code) editor to read and inspect every generated file.
+- 🖱️ **Visual editor** — click any element in the live preview and change its text, size, colours or image, then apply it to the real source code. Edits are matched back to the exact file and line, and the app rebuilds itself.
+- 🧑‍💻 **Built-in code editor** — Monaco (VS Code) editor to read *and edit* every generated file: ⌘S to save, then rebuild so the running app picks it up.
 - 🗄️ **Managed database** — each app gets a real database; browse, query, and edit records in the UI.
 - 🔐 **Secrets & env vars** — manage API keys and environment variables per project, per environment.
 - 🚀 **One-click hosting & deploy** — every project gets a live URL; publish to production instantly.
-- 🌐 **Custom domains** — attach your own domain with guided DNS setup.
-- 🔗 **Bidirectional GitHub sync** — connect a repo and push/pull changes both ways.
+- 🌐 **Custom domains** — attach your own domain with guided DNS setup, and watch its status until it goes live.
+- 🔗 **Bidirectional GitHub sync** — connect a repo with a token and push/pull changes both ways.
+- 🎨 **Figma connect** — link a Figma account, paste a frame link in the chat, and the agent builds from your design's layout, spacing, colours and text.
+- 📦 **Export, import & duplicate projects** — package a project (database, pages, configuration) into a secret import code, restore it into a fresh project, or duplicate one in a single action.
 - 🕓 **Version history** — every AI build is a restorable checkpoint; roll back anytime.
 - 📜 **Live server logs** — inspect runtime logs from preview *and* production.
-- 🧱 **Sandboxes** — each project runs in an isolated sandbox environment.
+- 🧱 **Sandboxes** — each project runs in an isolated sandbox environment; a sleeping one wakes on demand, and the UI says so instead of failing silently.
 - 🏢 **Multitenant-ready** — spin up isolated projects per user or per customer, no extra work.
 - 🎁 **Pretty git-diff viewer** — review exactly what the AI changed, file by file.
 - 🌍 **Deploy anywhere** — Vercel, a container, or any Node.js host. Fully deployment-agnostic.
@@ -205,7 +208,8 @@ Add a provider by dropping in its SDK and configuring a secret in the **Secrets*
 ```
 
 - The **browser never sees your API key.** Client code calls same-origin `/api/vcaas/*` proxy routes; the server attaches the credential and forwards the request to Totalum.
-- **One service file** (`src/lib/vcaas.ts`) documents every Totalum endpoint the app uses — easy to read, extend, and audit.
+- **One service file** (`src/lib/vcaas.ts`) documents every Totalum endpoint the app uses — easy to read, extend, and audit. Its key-holding half lives in `src/lib/vcaas-server.ts`, which never reaches the browser.
+- **Credits are the operator's.** Every action runs on the one API key in your environment, so when that Totalum account runs out of credits the app says so once, wherever it happens, and links to the billing page. ⚠️ That modal is for **you**, not for your users — tell the AI to remove it before you publish a project built with this.
 - Totalum handles the hard parts (compute, storage, deploys, AI orchestration), so this repo stays a clean, hackable Next.js app.
 
 ---
@@ -215,18 +219,29 @@ Add a provider by dropping in its SDK and configuring a secret in the **Secrets*
 ```
 src/
 ├─ app/
-│  ├─ page.tsx                 # Dashboard — prompt box + your projects
+│  ├─ page.tsx                 # Dashboard — prompt box, your projects, import/duplicate
 │  ├─ project/[projectId]/     # The workspace (chat, preview, code, DB, …)
 │  └─ api/
 │     ├─ vcaas/[...path]/      # Proxy to the Totalum VCaaS API
+│     ├─ preview/[projectId]/  # Same-origin proxy of a project — the visual editor needs it
+│     ├─ visual-edit/…/apply   # Turns visual changes into real source edits
 │     └─ config/               # Reports whether the API key is configured
 ├─ components/
-│  └─ workspace/               # Chat, Preview, Code, Database, GitHub, Logs…
+│  └─ workspace/               # Chat, Preview, Code, Database, GitHub, Figma, Logs…
+│     └─ visual-editor/        # Inspector panel, changes bar, the editor's own hook
+├─ i18n/                       # One English dictionary + `useT()`
 ├─ lib/
-│  ├─ vcaas.ts                 # 🧠 The single VCaaS service (client + server)
+│  ├─ vcaas.ts                 # 🧠 The VCaaS client (browser side)
+│  ├─ vcaas-server.ts          # The half that holds the API key — server only
+│  ├─ visual-edit*.ts          # Matching a clicked element back to its source
 │  └─ vcaas-types.ts           # Shared API types
 └─ proxy.ts                    # CORS / CSP boundary
 ```
+
+> ⚠️ **`src/app/api/vcaas/_shared.ts` is a no-op on purpose.** This app runs on **one**
+> API key, so "who is asking?" and "may they touch this project?" have no meaning here and
+> both guards return "yes". If you put real users behind this builder, that file is the one
+> that has to stop being a no-op — the routes delegate the decision to it.
 
 ---
 
