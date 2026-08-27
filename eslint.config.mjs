@@ -1,16 +1,9 @@
-import { dirname } from "path";
-import { fileURLToPath } from "url";
-import { FlatCompat } from "@eslint/eslintrc";
+import nextLint from "eslint-config-next";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-const compat = new FlatCompat({
-  baseDirectory: __dirname,
-});
-
+// Next.js 16 ships eslint-config-next as a native flat config — no FlatCompat
+// bridge needed (the legacy bridge hits a config-validator bug on this stack).
 const eslintConfig = [
-  ...compat.extends("next/core-web-vitals", "next/typescript"),
+  ...nextLint,
   {
     rules: {
       // Make ESLint very permissive - only catch syntax errors
@@ -44,9 +37,9 @@ const eslintConfig = [
       "no-debugger": "off",
       "no-undef": "off",
       "no-empty": "off",
-      "no-unreachable": "off"
-    }
-  }
+      "no-unreachable": "off",
+    },
+  },
 ];
 
 export default eslintConfig;

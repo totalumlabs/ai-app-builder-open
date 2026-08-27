@@ -54,13 +54,16 @@ export function ConfirmDialog({
   const [pending, setPending] = React.useState(false);
   const inputId = React.useId();
 
-  // Reset the typed guard every time the dialog opens.
-  React.useEffect(() => {
+  // Reset the typed guard whenever `open` flips — done during render with a
+  // prev-value tracker (the sanctioned pattern; effects must not set state here).
+  const [prevOpen, setPrevOpen] = React.useState(open);
+  if (prevOpen !== open) {
+    setPrevOpen(open);
     if (open) {
       setTyped("");
       setPending(false);
     }
-  }, [open]);
+  }
 
   const phraseSatisfied = !confirmPhrase || typed.trim() === confirmPhrase;
 

@@ -1,19 +1,19 @@
 // src/app/layout.tsx
 import React from "react";
 import type { Metadata } from "next";
-import { DM_Sans, Geist_Mono } from "next/font/google";
+import { Inter, Space_Grotesk, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
-import { ScriptExecutor } from "@/components/ScriptExecutor";
 import { GlobalErrorCatcher } from "@/components/GlobalErrorCatcher";
 import { Toaster } from "@/components/ui/sonner";
-import { InsufficientCreditsModal } from "@/components/workspace/InsufficientCreditsModal";
+import { ThemeProvider } from "@/components/theme-provider";
 
-const dmSans = DM_Sans({ variable: "--font-dm-sans", subsets: ["latin"], weight: ["300", "400", "500", "600", "700"] });
-const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
+const inter = Inter({ variable: "--font-inter", subsets: ["latin"] });
+const spaceGrotesk = Space_Grotesk({ variable: "--font-space-grotesk", subsets: ["latin"] });
+const jetbrainsMono = JetBrains_Mono({ variable: "--font-jetbrains", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "VibeBuild — AI App Builder",
-  description: "Build apps with AI. Describe what you want, preview in real-time, deploy with one click.",
+  title: "FORGE — AI Full-Stack App Builder",
+  description: "Describe your app. Watch an agent design, code, run and deploy it — with a real IDE, terminal, database and live preview.",
 };
 
 // SUPER IMPORTANT: NOT EDIT THE FOLLOWING 2 LINES TO FORCE NEXT.JS TO RENDER DYNAMICALLY
@@ -23,20 +23,14 @@ export const revalidate = 0;
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${dmSans.variable} ${geistMono.variable} antialiased`}>
-        <GlobalErrorCatcher />
-        <ScriptExecutor />
-        <Toaster position="top-right" richColors />
-        {/*
-          ⭐ MOUNTED ONCE FOR THE WHOLE APP. Running out of credits can happen on any
-          screen — the dashboard creating a project, the workspace publishing one — and
-          the modal listens for the event the VCaaS client raises rather than being wired
-          per page. See `InsufficientCreditsModal`.
-        */}
-        <InsufficientCreditsModal />
-        <div className="min-h-screen flex flex-col">
-          <main className="flex-1">{children}</main>
-        </div>
+      <body className={`${inter.variable} ${spaceGrotesk.variable} ${jetbrainsMono.variable} antialiased`}>
+        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
+          <GlobalErrorCatcher />
+          <Toaster position="top-right" richColors />
+          <div className="min-h-screen flex flex-col">
+            <main className="flex-1">{children}</main>
+          </div>
+        </ThemeProvider>
       </body>
     </html>
   );
