@@ -23,6 +23,12 @@ import type { Dictionary, Translate } from "./types";
 
 export type { Dictionary, Translate, TranslationKey, TranslationVars } from "./types";
 
+/**
+ * The platform's locale union, kept so `src/lib/format.ts` (copied verbatim) and the
+ * components that call `useLocale()` compile. Only `en` is ever active here.
+ */
+export type Locale = "en" | "es";
+
 const dictionary = en as unknown as Dictionary;
 
 /** The translator. Identical signature to the platform's, so callers are portable. */
@@ -31,4 +37,9 @@ export const t: Translate = translateWith(dictionary);
 /** The hook every copied component uses for copy: `const t = useT()`. */
 export function useT(): Translate {
   return t;
+}
+
+/** The platform's locale hook, frozen to English — this app ships one dictionary. */
+export function useLocale(): { locale: Locale; t: Translate } {
+  return { locale: "en", t };
 }

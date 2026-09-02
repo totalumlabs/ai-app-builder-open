@@ -5,4 +5,4 @@
  * frozen dictionary. Keeping the module path alive is what lets a file be copied
  * across without touching its imports.
  */
-export { useT, t } from "./index";
+export { useT, useLocale, t } from "./index";

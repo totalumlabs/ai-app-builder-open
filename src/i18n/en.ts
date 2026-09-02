@@ -2145,7 +2145,7 @@ export const en = {
 
     // ── Composing ─────────────────────────────────────────────────────────
     /**
-     * ⚠️⚠️ THERE ARE FOUR DRAFTS AND ONE IS PICKED AT RANDOM — ON PURPOSE.
+     * ⚠️⚠️ THERE ARE FORTY DRAFTS AND ONE IS PICKED AT RANDOM — ON PURPOSE.
      *
      * There used to be one. Which means the day this feature works is the day
      * LinkedIn's feed carries the same paragraph, word for word, under a hundred
@@ -2153,17 +2153,42 @@ export const en = {
      * as astroturf, and it burns the person who posted it more than it burns us.
      *
      * ⚠️ EACH ONE IS WRITTEN AS A PERSON TALKING, NOT AS MARKETING. First person,
-     * one concrete detail, a bit of doubt or surprise, no adjectives we would use
-     * about ourselves ("powerful", "seamless"). The point is that someone can post
-     * it unedited without sounding like they were paid to — and edit it without
-     * having to start from scratch.
+     * one concrete detail (what it replaced, what day it was, how long it was
+     * supposed to take), a bit of doubt or surprise, and none of the adjectives we
+     * would use about ourselves ("powerful", "seamless", "effortless"). The point is
+     * that someone can post it unedited without sounding like they were paid to, and
+     * edit it without having to start from scratch.
      *
-     * ⚠️ EVERY DRAFT ENDS ON A COLON. `www.totalum.app` is appended after it by
-     * `SocialShareDialog`, so the last character has to hand off to a link.
+     * ⚠️ NO TWO OF THEM TELL THE SAME STORY. They are deliberately spread across
+     * different people: the agency owner, the teacher, the shop owner, the ops
+     * person, the sceptic who came to complain. Forty variations on "it was fast"
+     * would collide in tone even while passing the uniqueness check.
      *
-     * ⚠️ KEEP THEM UNDER ~250 CHARACTERS. X counts the link as 23 and cuts at 280,
-     * and a draft that arrives in the composer already over the limit is a draft
-     * nobody posts. `social-share.test.ts` enforces this in both languages.
+     * ⚠️ THE FORBIDDEN TELLS, all pinned by `social-share.test.ts`: the em dash
+     * (the single most recognisable "written by an AI" mark in a social post), a
+     * link to any Totalum profile, and anything that reads as a headline rather
+     * than a sentence someone typed.
+     *
+     * ⚠️ EVERY DRAFT ENDS ON THE LINK, and hands off to it with a colon or a full
+     * stop. Nothing appends the URL any more (that published it twice on X), so the
+     * address lives in the copy itself and must appear EXACTLY ONCE. The trailing
+     * position is also what lets `stripTargetUrl` lift it out for Reddit's title
+     * field without leaving half a sentence behind.
+     *
+     * ⚠️ THE LENGTH BAND IS 200 TO 278 CHARACTERS, link included, and it is NARROW
+     * on purpose. The ceiling is X's real limit: it cuts at 280 and counts any link
+     * as 23, so a draft of length L costs L - 1 weighted, and 278 leaves a couple of
+     * characters of slack and nothing more. The floor is the rule that actually
+     * matters. A short draft reads as an advert and gets scrolled past; these are
+     * written to sit near the ceiling, because the room is what lets a draft carry a
+     * situation, a concrete detail and a last line worth reading.
+     *
+     * ⚠️⚠️ AND THE BAND IS NOT THE QUALITY BAR. Forty unique strings is not forty
+     * different posts: forty rewordings of "I described an app and it was live" pass
+     * every automated check and still read, in a feed, as one template with the nouns
+     * swapped. So `social-share.test.ts` also pins that NO DRAFT REUSES ANOTHER
+     * DRAFT'S SENTENCE, and that at most half of them open on "I". If you add one,
+     * give it a situation nobody else here has.
      */
     compose: {
       title: "Need something to say?",
@@ -2179,65 +2204,85 @@ export const en = {
         "If you can, attach a screenshot or a short screen recording of what you built. A post that shows the actual app gets far more attention than one that only describes it, and it makes your request obvious to approve.",
       drafts: {
         d1:
-          "Kept putting off an internal tool because it needed a dev, a database and a week I did not have. Described it in one paragraph instead and it was running before lunch. Still slightly suspicious of how that went: https://www.totalum.app",
+          "I spent two years telling people I was building an internal tool. I was not building anything, I was avoiding the setup. Last week I described it in one paragraph and it was live by lunchtime. Real database, real logins, a URL I could send round the office. The prompt box I typed into is the first thing on the homepage: https://www.totalum.app",
         d2:
-          "I have tried a lot of AI builds your app tools and most stop at a nice looking screen. This one gave me a real database, real users and a URL I could send to a client the same afternoon. That is a different product: https://www.totalum.app",
+          "Most AI app builders hand you a beautiful screen with nothing behind it. I went in trying to make this one fail. I asked for real logins, a real database and a page a client could use without me explaining it. It gave me all three, plus a working URL, in one afternoon. Put your own idea in the box and judge it in a minute: https://www.totalum.app",
         d3:
-          "Typed what I wanted in plain English and got back a working app. Database, screens, deployed, all of it. The part that normally eats a week of setup took me an afternoon. If your idea is stuck in a spreadsheet, try https://www.totalum.app",
+          "What kills a side project is never the idea. It is the first evening: logins, a database, deployment, four config files. All of that before you write one line that actually interests you. That evening does not exist any more and I have shipped twice since January. If your idea has been parked for months, this is where I would start: https://www.totalum.app",
         d4:
-          "Small thing that made my week. I described an app, it got built with the database and all, live on a URL. No boilerplate, no picking a stack, no half finished side project sitting in a folder. https://www.totalum.app",
+          "There is a folder on my laptop called old, with eleven dead projects in it. Every one of them died at setup, not at the idea. I started something new on Sunday afternoon and it was live that night. By Monday morning three people were putting real data into it. Same me, same ideas, and a completely different starting point: https://www.totalum.app",
         d5:
-          "The bit nobody warns you about with side projects is the two days of setup before you write anything interesting. I skipped every minute of that this weekend and actually shipped the thing. https://www.totalum.app",
+          "A client rang on a Thursday afternoon asking for a small booking system. I sent her a working link at nine the next morning. She asked whether I had been up all night, but I watched a film and went to bed at eleven. I am not taking the credit for this one. Here is the thing that actually did the work while I was asleep: https://www.totalum.app",
         d6:
-          "A client asked for a small booking system on Thursday. I sent them a working link on Friday morning. I am not going to pretend that was me being fast, it was https://www.totalum.app",
+          "Honest review after two weeks of real use. I expected a toy and I have something sitting in front of paying customers. Real logins, a real database, hosting, and our own domain on it. I have not opened a config file once, which I still cannot explain. If an AI builder has burned you before, test this one properly: https://www.totalum.app",
         d7:
-          "I have been quietly replacing three spreadsheets with a proper app. Wrote a description, got a database and an admin panel back, moved the data across in an evening. Genuinely did not expect that: https://www.totalum.app",
+          "I am not a developer, and my team opens an app I built every morning at nine. I told it in plain words what the app had to do. Then I argued with it in the chat for an hour and published it. Nobody has ever asked who built the thing, they just use it. That is the highest praise an internal tool is ever going to get: https://www.totalum.app",
         d8:
-          "Honest review after two weeks of using it: I expected a demo and got something I put in front of real users. Auth, database, hosting, custom domain, all handled without me touching config. https://www.totalum.app",
+          "Three spreadsheets, four people, and one column somebody overwrote every week. I described that entire mess in a single paragraph. What came back was a real app, with proper records, permissions and a login each. Nobody has emailed me about that column since. If that is what your Monday morning looks like, read on: https://www.totalum.app",
         d9:
-          "Told it what the app should do, went to make coffee, came back to a deployed URL that worked. I keep opening the code to check it is real code. It is, and it is readable. https://www.totalum.app",
+          "This was the moment I stopped being sceptical. I asked for a change using completely ordinary words. It edited the code, redeployed itself, and the live site changed while I read the reply. No pipeline, no build to babysit, nothing at all to wait for. Ask for one change on something of your own and watch it: https://www.totalum.app",
         d10:
-          "For anyone who keeps starting projects and never finishing the boring twenty percent: the boring twenty percent is already done for you here. That was the whole reason I never shipped anything. https://www.totalum.app",
+          "We asked for a quote on an internal dashboard and it came back at four weeks. The number was one I did not want to show my boss. That evening I described what we actually needed and had it running, database and all. The quote is still sitting in my inbox, unanswered. Ten minutes is enough to see whether this fits you: https://www.totalum.app",
         d11:
-          "I am not a developer and I now have an internal tool my team opens every single day. I described it, adjusted it in the chat until it felt right, then published it. That is the whole story: https://www.totalum.app",
+          "The thing that convinced me was not the speed. It was that the database underneath it is real. Not a mock, not local storage, not something that quietly resets overnight. I can query it, back it up and hand it to somebody else without apologising. That combination is still genuinely rare in this category of tool: https://www.totalum.app",
         d12:
-          "Shipped more this month than in the previous six, and the only thing that changed is that I stopped hand rolling CRUD screens at eleven at night. Worth a look if that sounds familiar: https://www.totalum.app",
+          "I run a small agency and this quietly changed the way we quote. Small internal tools were never worth a project plan, so for years we said no. Now they take an afternoon and we say yes instead. Two clients noticed the difference before we mentioned anything. If you sell client work, this is worth an hour of it: https://www.totalum.app",
         d13:
-          "The demo that sold me: I asked for a change in plain language, it edited the code, redeployed itself, and the live site updated while I watched. No pipeline, no config file, no waiting. https://www.totalum.app",
+          "My card was already out for another no code subscription. I decided to try one thing first and described the app in a paragraph. It came back with the screens, the data model and a working URL. So I closed the other tab and cancelled the trial that evening. The prompt box on the homepage costs nothing to try: https://www.totalum.app",
         d14:
-          "If your idea has been sitting in a notes app for a year because the setup felt like too much, this is the shortcut. Took me one sitting and I now have something real to show people. https://www.totalum.app",
+          "My idea sat in a notes app for fourteen months. The setup always felt like a weekend I never quite had. In the end the whole thing took a single sitting on a Sunday afternoon. The idea was fine all along, the wall was everything standing in front of it. Go and describe yours in one paragraph tonight and see what you get back: https://www.totalum.app",
         d15:
-          "Built and published a full CRM for a client while on a train with bad wifi. Real database, their own domain, their branding on it. I am still processing how normal that felt. https://www.totalum.app",
+          "I built and published a full CRM for a client from a train with dreadful wifi. Real database, their own domain, their colours, a login for each member of staff. What I cannot get over is how ordinary it felt while it was happening. No heroics and no long night. If you build for clients, start with a small job: https://www.totalum.app",
         d16:
-          "Every AI builder I tried gave me a prototype I would have had to rewrite from scratch. This one gave me code I was happy to keep and a URL that already worked in front of a customer. https://www.totalum.app",
+          "Every builder I tried before this handed me a prototype I would have rewritten from scratch. This one gave me code I was happy to sit down and read. It also gave me a URL that already worked in front of a paying customer. That is the whole difference between a demo and a tool. I am still using mine two months later: https://www.totalum.app",
         d17:
-          "Spent years telling people their idea needed a developer, a designer and three months. Described one of my own in a paragraph this week and had it live the same day. Slightly humbling: https://www.totalum.app",
+          "For years I told people their idea needed a developer, a designer and three months. This week I described one of my own in a single paragraph. It was online the same day, with a real database behind it. Humbling, and much more useful than being right. Try it on the idea you keep talking about and never start: https://www.totalum.app",
         d18:
-          "My favourite part is not that it builds the app, it is that I can ask for a change in one sentence and the live site updates. Feedback on Monday, fixed by Monday afternoon, no ceremony. https://www.totalum.app",
+          "My favourite part is not that it builds the app for you. It is that feedback from Monday morning is fixed by Monday afternoon. One sentence, no ceremony, and no meeting about the ceremony. That changes what you are willing to try, which changes what you actually ship. Ten minutes on an idea of your own will show you: https://www.totalum.app",
         d19:
-          "We needed an internal dashboard and the quote we got back was four weeks. I described what we actually wanted and had a working version the same evening, database included. https://www.totalum.app",
+          "I teach, and working out who had handed in what was eating my Sunday evenings. I described the problem during a break on a Tuesday morning. That same night I tidied it up and sent it round the department. Everyone uses it now and I have my Sunday evenings back. If your job contains one of these jobs, here is the way out: https://www.totalum.app",
         d20:
-          "Two months in and the thing I still cannot get over is the database. Not a mock, not local storage, a real one I can query, back up and hand to whoever takes this over from me. https://www.totalum.app",
+          "My shop ran on paper and a group chat for six years. I described the ordering process exactly the way I explain it to new staff. What came back was an app that does it, on our own domain. Two weeks later the clipboard lives in a drawer and nobody misses it. If you run a small business on paper, start here: https://www.totalum.app",
         d21:
-          "I run a small agency and this quietly changed how we quote. Small internal tools that were never worth a project plan now take an afternoon, so we actually say yes to them. https://www.totalum.app",
+          "No more specs that nobody reads. I describe the thing, get a working version, and send that round instead of a document. It turns out people have far better opinions when they can click something. They will also tell you they were wrong out loud. If you work in product, give this ten minutes this afternoon: https://www.totalum.app",
         d22:
-          "Was about to pay for another no code subscription and ended up describing the app instead. It came back with the screens, the data model and a URL. I cancelled the other one. https://www.totalum.app",
+          "Freelance advice I wish somebody had given me two years ago. Quote the app, then build it in the first week rather than the last. Spend all the time you save on what the client actually wants changed. My last three projects went out early and calm instead of late. This is the one thing that made the difference: https://www.totalum.app",
         d23:
-          "Nobody tells you that the hardest part of a side project is the first evening. Auth, database, deploy, all before a single interesting line. That evening is gone now: https://www.totalum.app",
+          "I asked for a change I was completely certain would break the whole thing. It made the change, rebuilt itself, and the site stayed up throughout. I have broken more by hand on a Friday afternoon than this has in a month. And I was genuinely trying to catch it out. Bring something fragile of your own and have a go: https://www.totalum.app",
         d24:
-          "I gave it a messy paragraph full of half formed requirements and it asked nothing, it just built something reasonable that I then corrected in chat. Faster than writing a spec. https://www.totalum.app",
+          "Operations is my job, not code, and I have built four internal apps this quarter. Nobody had to find room for me in a sprint to get any of them done. Our developers appreciate that more than anything I have actually shipped. It is a strange sort of compliment. If you are the person holding all the spreadsheets, look: https://www.totalum.app",
         d25:
-          "Replaced a shared spreadsheet that four people were fighting over with a real app that has proper records and permissions. Took an evening and nobody has emailed me about it since. https://www.totalum.app",
+          "Real deadline, no engineer free, and a room full of people looking at me. I described the app on the Monday and we tested it on the Tuesday. On the Wednesday it went live on our own domain, very quietly. Nobody outside the team noticed anything unusual at all. That is the only reason I am posting about a tool: https://www.totalum.app",
         d26:
-          "The part I did not expect: the code is mine. I can read it, download it, push it to GitHub and keep going in my own editor if I ever want to. That is what made me stay: https://www.totalum.app",
+          "It is not magic and it does get things wrong sometimes. The difference is that I say what is wrong in one sentence and it fixes it. The alternative was an hour of documentation to find a comma in the wrong place. That is an easy trade to make on a Tuesday night. Judge the whole thing yourself in a few minutes: https://www.totalum.app",
         d27:
-          "Showed a client a working prototype in the first meeting instead of a slide deck. We spent the rest of the hour on what it should actually do. Best meeting I have had in months. https://www.totalum.app",
+          "My cofounder and I stopped arguing about the stack this month. Mostly because there was nothing left for us to argue about. We described the product, it got built, and the rest of the week freed up. We spent it talking to people who might actually pay us. Best week since we started, and no code review at midnight: https://www.totalum.app",
         d28:
-          "I have a folder of abandoned projects that all died at the setup stage. Started one on Sunday and it is already live with users. Same idea, different starting point: https://www.totalum.app",
+          "I finally have a habit tracker that works the way my head actually works. That is because I described my head, rather than settling for somebody else's. It took one evening and I have opened it every single day since then. Nobody else was ever going to build this app for me. Build the small selfish app you want: https://www.totalum.app",
         d29:
-          "Genuinely useful for the unglamorous stuff. Order tracking, a booking form, an admin panel nobody will ever tweet about but three people rely on daily. All built in one sitting: https://www.totalum.app",
+          "The code it writes is mine. That is the thing I did not expect and the thing that made me stay. I can read it, download it, push it to GitHub and carry on in my own editor. No lock in, nothing held hostage, and no export button that quietly fails halfway. If a tool has held your work hostage before, this is the difference: https://www.totalum.app",
         d30:
-          "Tried it expecting to write a snarky post about AI builders. Instead I have a deployed app with a real database that my team started using this week, so here we are: https://www.totalum.app",
+          "Last week a client saw a working prototype in our very first meeting. Not a slide deck, not a wireframe, the actual working thing. We spent the other fifty minutes arguing about what it should really do. That is the argument I have wanted to have for about six years. If you sell projects, this changes everything: https://www.totalum.app",
+        d31:
+          "It is quietly brilliant at all the unglamorous stuff. Order tracking, a booking form, an admin panel nobody will ever post about. Three people depend on mine every single day of the working week. All of it built in one sitting after dinner, on a real database. The boring apps are where the time comes back: https://www.totalum.app",
+        d32:
+          "I opened it fully intending to write something cutting about AI app builders. Two weeks later I have a deployed app with a real database. My team uses it daily and nobody has complained once. So this is the post I ended up writing instead of that one. Go in as sceptical as I was and see how long it lasts: https://www.totalum.app",
+        d33:
+          "I gave it a messy paragraph, full of half formed requirements. Two of the things I asked for flatly contradicted each other. No interrogation, no wizard, no form with twelve fields to fill in first. It built something sensible and I corrected the rest by talking to it. Faster than the spec I would have written: https://www.totalum.app",
+        d34:
+          "I have shipped more this month than in the whole six months before it. The only thing that changed is that I stopped hand writing the same four screens. Usually at about eleven at night, and usually rather badly. If that sentence hurt to read, you are who I am writing this for. Ten minutes will tell you enough: https://www.totalum.app",
+        d35:
+          "The setup that normally eats my entire first week took one afternoon. Database, screens, deployed, custom domain, the whole lot of it. All from a description I typed out in plain English on my phone. If your idea is stuck in a spreadsheet, that is where I would start. Writing the paragraph costs you nothing: https://www.totalum.app",
+        d36:
+          "Small thing that quietly made my week. I described an app and it got built with a real database behind it. Then it went live on a URL I can send to other people. No boilerplate, no stack decisions, and no half finished folder I quietly abandon in March. Describe yours and see what comes back in about ten minutes: https://www.totalum.app",
+        d37:
+          "I run our warehouse and I have wanted a decent stock screen since 2019. Every quote we got was too expensive to take to the owner. Every no code tool wanted me to assemble the thing out of little blocks. I described it in plain words instead and it took one evening. If you still count stock on paper, read this: https://www.totalum.app",
+        d38:
+          "Two months in and my only real complaint is that I have run out of excuses. Every small idea I used to park needed a week of setup first. Now each of them is an evening of work, which is a completely different decision. My list of parked ideas is getting embarrassing. Pick the one you have put off longest: https://www.totalum.app",
+        d39:
+          "A friend who writes software for a living got the link from me. I fully expected him to pick the whole thing apart within ten minutes. He read the code, said it was fine, and asked what I was building next. That is the only review I actually cared about. If you have a sceptical developer friend, send them this: https://www.totalum.app",
+        d40:
+          "Nobody is ever going to post about an internal tool. But my Tuesday is forty minutes shorter because one of them exists now. It cost me one evening and a paragraph of plain English on a laptop. Not a project plan, not a budget, and not a meeting about the budget. That piece of maths is hard to argue with: https://www.totalum.app",
       },
       exampleBadge: "Example",
       copyDraft: "Copy the draft",
@@ -2245,6 +2290,7 @@ export const en = {
       shuffle: "Try another",
       openOn: "Post on {network}",
       prefilled: "Opens with the draft ready",
+      prefilledShort: "Opens with a shorter version, to fit X",
       manual: "Opens the composer — paste the draft in",
     },
 
@@ -3681,6 +3727,24 @@ export const en = {
     runFailedBody: "{project} hit a problem.",
 
     chat: {
+      /** Model / effort / fast-mode picker in the composer tray — see `RunOptionsMenu`. */
+      runOptions: {
+        button: "Run options",
+        model: "Model",
+        modelOpus: "Opus",
+        modelOpusHint: "Default. Best quality for building features.",
+        modelSonnet: "Sonnet",
+        modelSonnetHint: "Faster and cheaper. Good for questions and small changes.",
+        effort: "Effort",
+        effortDefault: "Default",
+        effort_low: "Low",
+        effort_medium: "Medium",
+        effort_high: "High",
+        effort_xhigh: "Extra high",
+        fastMode: "Fast mode",
+        fastModeHint: "Same Opus quality, up to 2.5× faster, higher cost per token.",
+        fastModeOpusOnly: "Only available with Opus.",
+      },
       promptLabel: "Message the agent",
       placeholder: "Describe what to change…",
       placeholderRunning: "The agent is working…",

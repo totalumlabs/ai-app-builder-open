@@ -12,7 +12,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { FigmaModal } from "@/components/workspace/FigmaModal";
+import { FigmaPromptButton } from "@/components/prompt/FigmaPromptButton";
+import { t } from "@/i18n";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Sparkles, Plus, Loader2, Trash2, Send, Paperclip, X, ArrowRight, Copy, Upload, Download,
@@ -26,7 +29,7 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { uploadFilesToProject as uploadFilesToProjectHelper } from "@/lib/upload";
 import { SetupBanners } from "@/components/SetupBanners";
-import type { VcaasProject, VcaasProjectSummary } from "@/lib/vcaas-types";
+import type { VcaasProjectSummary } from "@/lib/vcaas-types";
 
 type ViewMode = "cards" | "table";
 type SortKey = "date-desc" | "date-asc" | "name-asc" | "name-desc";
@@ -136,16 +139,59 @@ export default function DashboardPage() {
   const [projects, setProjects] = useState<VcaasProjectSummary[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Manual create dialog
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [creating, setCreating] = useState(false);
-  const [newProjectId, setNewProjectId] = useState("");
-  const [newProjectDesc, setNewProjectDesc] = useState("");
-
   // First-prompt "Build" flow
   const [firstPrompt, setFirstPrompt] = useState("");
   const [attachedFiles, setAttachedFiles] = useState<{ name: string; imageDescription: string; file: File }[]>([]);
   const [uploading, setUploading] = useState(false);
+  const heroTextareaRef = useRef<HTMLTextAreaElement>(null);
+
+  /**
+   * ═══⭐ "NEW PROJECT" FOCUSES THE BOX — IT DOES NOT OPEN A FORM ═══════════════
+   *
+   * The hero composer IS the create form: what you type there becomes the project's
+   * first prompt, and the name is asked for on submit. A second "Create project" dialog
+   * with an id and a description field made an empty project that then sat there with
+   * nothing happening inside it. So the button does what the platform's "New project"
+   * tile does: puts the caret in the textarea and scrolls it into view.
+   */
+  const focusComposer = useCallback(() => {
+    const el = heroTextareaRef.current;
+    if (!el) return;
+    el.focus({ preventScroll: true });
+    el.scrollIntoView({
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+      block: "center",
+    });
+  }, []);
+
+  /**
+   * ═══⭐ FIGMA BEFORE THE PROJECT EXISTS — "PENDING MODE" ═══════════════════════
+   *
+   * The Figma button sits in the hero's tool tray, exactly as in totalum-platform, but
+   * there is no project to store a token on yet. So `FigmaModal` (with no `projectId`)
+   * only asks Figma whether the token is good and hands it back; it is held HERE, in
+   * memory, and connected the moment the project exists — before the first prompt runs,
+   * because a design link in that prompt would otherwise be read by an agent that cannot
+   * reach Figma.
+   *
+   * ⚠️ A LIVE CREDENTIAL IN COMPONENT STATE. Used once, then dropped: never a store, never
+   * a cookie, never a log. "Forgetting" it is the only disconnect there can be at this
+   * point, and that is what the popover's disconnect does.
+   */
+  const [figmaToken, setFigmaToken] = useState<string | null>(null);
+  const [figmaModalOpen, setFigmaModalOpen] = useState(false);
+
+  /** A Figma link from the popover lands in the box, appended to whatever is there. */
+  const appendToPrompt = useCallback((text: string) => {
+    setFirstPrompt((current) => {
+      const separator = current.length === 0 || /\s$/.test(current) ? "" : " ";
+      return current + separator + text;
+    });
+    requestAnimationFrame(() => {
+      const el = heroTextareaRef.current;
+      if (el) { el.focus(); const len = el.value.length; el.setSelectionRange(len, len); }
+    });
+  }, []);
 
   // Name modal (opened after clicking Build)
   const [nameModalOpen, setNameModalOpen] = useState(false);
@@ -281,18 +327,6 @@ export default function DashboardPage() {
     return normalizeId(base) || "my-app";
   };
 
-  const handleManualCreate = async () => {
-    const id = normalizeId(newProjectId);
-    if (!id) return;
-    setCreating(true);
-    const res = await vcaasApi.projects.create({ projectId: id, description: newProjectDesc.trim() });
-    if (res.ok) {
-      toast.success("Project created!"); setDialogOpen(false); setNewProjectId(""); setNewProjectDesc("");
-      router.push(`/project/${id}`);
-    } else toast.error(res.error || "Failed to create project");
-    setCreating(false);
-  };
-
   // Step 1 of the Build flow: open the name modal so the user picks a project name.
   const openBuildModal = () => {
     if (!firstPrompt.trim() && attachedFiles.length === 0) return;
@@ -327,11 +361,19 @@ export default function DashboardPage() {
      * workspace send the prompt — the path this flow always used.
      */
     if (attachedFiles.length === 0) {
+      /**
+       * ⭐ FIGMA RIDES ALONG. `launch` connects the account BEFORE the first prompt runs,
+       * which is the whole point of holding the token until now. A failed connect does
+       * not fail the launch — it comes back as a `figma` warning, surfaced below.
+       */
       const launched = await vcaasApi.projects.launch({
         projectId: id,
         prompt: firstPrompt.trim(),
         description: firstPrompt.trim().slice(0, 200),
+        ...(figmaToken ? { figma: { token: figmaToken } } : {}),
       });
+      // Used once, then gone — see the note on the state.
+      setFigmaToken(null);
 
       if (!launched.ok || !launched.data) {
         setBuildError(launched.error || `Could not create "${id}". Please try a different name.`);
@@ -350,10 +392,13 @@ export default function DashboardPage() {
        * expected instead of in an empty project with no explanation.
        */
       if (!launched.data.agent?.started) {
-        launched.data.warnings?.forEach(w => w?.message && toast.warning(w.message));
+        launched.data.warnings?.forEach(w => w?.step !== "figma" && w?.message && toast.warning(w.message));
         try {
           sessionStorage.setItem(`vibebuild:pendingPrompt:${created}`, firstPrompt.trim());
         } catch { /* ignore */ }
+      }
+      if (launched.data.warnings?.some(w => w?.step === "figma")) {
+        toast.warning(t("workspace.figma.pendingConnectFailed"));
       }
       router.push(`/project/${created}`);
       return;
@@ -364,6 +409,16 @@ export default function DashboardPage() {
       setBuildError(`Could not create "${id}". This name is probably already taken — please choose a different project name.`);
       setBuildCreating(false);
       return;
+    }
+    /**
+     * ⭐ CONNECT FIGMA NOW THAT THERE IS A PROJECT — before the prompt is stashed, since
+     * the workspace runs it on arrival. A failure here does not fail the creation: the
+     * project exists and has been paid for, so say Figma did not connect and move on.
+     */
+    if (figmaToken) {
+      const figma = await vcaasApi.figma.connect(id, { token: figmaToken });
+      setFigmaToken(null);
+      if (!figma.ok) toast.warning(t("workspace.figma.pendingConnectFailed"), { description: figma.error || undefined });
     }
     // Upload the attachments so the agent gets real, publicly-fetchable URLs (blob URLs
     // from the browser can't be read by the agent and don't survive navigation). The
@@ -452,6 +507,7 @@ export default function DashboardPage() {
               </div>
               <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg shadow-gray-200/50 border border-gray-200/60 overflow-hidden">
                 <textarea
+                  ref={heroTextareaRef}
                   value={firstPrompt}
                   onChange={(e) => setFirstPrompt(e.target.value)}
                   placeholder="Describe your app... e.g. 'A project management tool with kanban boards'"
@@ -469,11 +525,25 @@ export default function DashboardPage() {
                   </div>
                 )}
                 <div className="flex items-center justify-between px-4 py-2.5 border-t border-gray-100/80">
-                  <label className="cursor-pointer flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 transition-colors px-1.5 py-1 rounded-lg hover:bg-gray-50">
-                    <input type="file" multiple className="hidden" onChange={handleFileSelect} accept="image/*,.pdf,.svg" />
-                    {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Paperclip className="w-4 h-4" />}
-                    <span className="hidden sm:inline">Attach</span>
-                  </label>
+                  <div className="flex items-center gap-1">
+                    <label className="cursor-pointer flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 transition-colors px-1.5 py-1 rounded-lg hover:bg-gray-50">
+                      <input type="file" multiple className="hidden" onChange={handleFileSelect} accept="image/*,.pdf,.svg" />
+                      {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Paperclip className="w-4 h-4" />}
+                      <span className="hidden sm:inline">Attach</span>
+                    </label>
+                    {/* ⭐ Figma in the hero tray — pending mode, see `figmaToken`. */}
+                    <FigmaPromptButton
+                      onAdd={appendToPrompt}
+                      hasText={firstPrompt.trim().length > 0}
+                      onConnect={() => setFigmaModalOpen(true)}
+                      connected={!!figmaToken}
+                      onDisconnect={() => {
+                        setFigmaToken(null);
+                        toast.success(t("workspace.figma.pendingForgotten"));
+                      }}
+                      disconnectConfirm={t("workspace.figma.disconnectPendingConfirm")}
+                    />
+                  </div>
                   <button onClick={openBuildModal} disabled={!firstPrompt.trim() && attachedFiles.length === 0}
                     className="flex items-center gap-1.5 bg-gray-900 hover:bg-gray-800 disabled:bg-gray-300 text-white text-xs font-medium px-4 h-8 rounded-xl transition-colors">
                     <Send className="w-3.5 h-3.5" /><span>Build</span>
@@ -560,31 +630,14 @@ export default function DashboardPage() {
                   <Download className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Import</span>
                 </button>
 
-                {/* Manual create */}
-                <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-                  <DialogTrigger asChild>
-                    <button className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 h-8 px-2.5 rounded-lg border border-gray-200 bg-white/70 hover:bg-white transition-colors">
-                      <Plus className="w-3.5 h-3.5" /> <span className="hidden sm:inline">New</span>
-                    </button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader><DialogTitle>Create Project</DialogTitle></DialogHeader>
-                    <div className="space-y-4 mt-4">
-                      <div>
-                        <Label>Project ID</Label>
-                        <Input placeholder="my-app" value={newProjectId} onChange={(e) => setNewProjectId(e.target.value)} className="mt-1.5" />
-                        <p className="text-xs text-gray-400 mt-1">4-35 chars, lowercase, hyphens ok</p>
-                      </div>
-                      <div>
-                        <Label>Description</Label>
-                        <Input placeholder="Brief description" value={newProjectDesc} onChange={(e) => setNewProjectDesc(e.target.value)} className="mt-1.5" />
-                      </div>
-                      <Button className="w-full bg-gray-900 hover:bg-gray-800" onClick={handleManualCreate} disabled={creating || !newProjectId.trim()}>
-                        {creating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Plus className="w-4 h-4 mr-2" />} Create
-                      </Button>
-                    </div>
-                  </DialogContent>
-                </Dialog>
+                {/* ⭐ New project = focus the composer. See `focusComposer`. */}
+                <button
+                  onClick={focusComposer}
+                  className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 h-8 px-2.5 rounded-lg border border-gray-200 bg-white/70 hover:bg-white transition-colors"
+                  title="New project"
+                >
+                  <Plus className="w-3.5 h-3.5" /> <span className="hidden sm:inline">New</span>
+                </button>
               </div>
             </div>
 
@@ -833,6 +886,19 @@ export default function DashboardPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/*
+        ⭐ FIGMA, PENDING MODE — no `projectId`. The modal validates the token against Figma
+        and hands it back; nothing is stored until `confirmBuild` connects it to the project
+        it just made. Reusing the modal is deliberate: the how-to steps, the scopes and the
+        security note are the reason people trust pasting a token.
+      */}
+      <FigmaModal
+        open={figmaModalOpen}
+        onOpenChange={setFigmaModalOpen}
+        onStatusChange={() => { /* no project yet — `figmaToken` drives the tint */ }}
+        onPendingToken={token => setFigmaToken(token)}
+      />
 
       {/* ═══ EXPORT · IMPORT · DUPLICATE — totalum-platform's dialogs, unchanged ═══ */}
       <ExportProjectDialog

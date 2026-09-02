@@ -3,12 +3,18 @@
 import { useRef, useEffect, useState, useCallback } from "react";
 import { Badge } from "@/components/ui/badge";
 import {
-  Send, Square, Loader2, Bot, AlertCircle, CheckCircle2,
+  Send, Square, Loader2, Bot, AlertCircle,
   Key, FileDiff, ChevronDown, ChevronRight, ChevronUp, Paperclip, X, Check,
-  Plus, Eye, EyeOff, CheckCircle, ArrowRight,
+  Plus, Eye, EyeOff, CheckCircle, ArrowRight, PencilIcon,
 } from "lucide-react";
 import { vcaasApi } from "@/lib/vcaas";
 import { DiffViewer } from "@/components/workspace/DiffViewer";
+import { GithubPromptButton } from "@/components/prompt/GithubPromptButton";
+import { FigmaPromptButton } from "@/components/prompt/FigmaPromptButton";
+import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { useT } from "@/i18n";
+import { cn } from "@/lib/utils";
 import { uploadFilesToProject } from "@/lib/upload";
 import type { ConversationMessage, VcaasSecret, AgentInputFile } from "@/lib/vcaas-types";
 
@@ -27,6 +33,33 @@ interface ChatPanelProps {
   sending: boolean;
   projectId: string;
   projectSecrets?: VcaasSecret[];
+
+  /**
+   * ═══⭐ THE TOOL TRAY — GitHub, Figma and the visual editor live IN THE COMPOSER ═══
+   *
+   * Mirrors totalum-platform's `PromptComposer`: the row under the textarea is
+   * `attach · Figma · GitHub · edit visually`, and the header keeps only the tabs and
+   * Publish. Everything below is optional so the panel still renders on a surface that
+   * has none of it (the mobile chat, for instance, has no visual editor).
+   */
+  /** Opens the Figma modal (connect / manage). */
+  onOpenFigma?: () => void;
+  /** Tints the Figma button green and switches its popover to "add a design link". */
+  figmaConnected?: boolean;
+  /** Disconnect from the popover, without the modal. Must REJECT on failure. */
+  onDisconnectFigma?: () => void | Promise<void>;
+  /** Opens the GitHub modal (connect / manage / .env). Absent ⇒ no GitHub button. */
+  onOpenGithub?: () => void;
+  /** The button fetches its own status; this reports it up for the header. */
+  onGithubStatusChange?: (connected: boolean) => void;
+  /** "Pull from GitHub" from the popover — the workspace owns the operation. */
+  onGithubPull?: () => void;
+  githubPulling?: boolean;
+  /** Absent ⇒ no pencil. The visual editor is a desktop surface. */
+  visualEditAvailable?: boolean;
+  visualEditActive?: boolean;
+  visualEditBusy?: boolean;
+  onToggleVisualEdit?: () => void;
 }
 
 interface MessageGroup {
@@ -482,10 +515,15 @@ function BuildGroup({ group, projectId, onTellAi, projectSecrets }: { group: Mes
               >
                 <FileDiff className="w-2.5 h-2.5" /> {"View changes"}
               </button>
+              {/*
+                ⭐ BOTH ROUTES, NOT THE URL ALONE — see `DiffSource` in `DiffViewer.tsx`.
+                The stored patch gets deleted and the sandbox goes to sleep, so the viewer
+                falls back to rebuilding the diff from the version's commit when it has to.
+              */}
               <DiffViewer
                 open={diffOpen}
                 onOpenChange={setDiffOpen}
-                diffUrl={group.finishMsg.gitDiffUrl}
+                source={diffOpen ? { projectId, url: group.finishMsg.gitDiffUrl, versionId: group.finishMsg.versionId } : null}
               />
             </>
           )}
@@ -498,7 +536,13 @@ function BuildGroup({ group, projectId, onTellAi, projectSecrets }: { group: Mes
   );
 }
 
-export function ChatPanel({ messages, isBuilding, prompt, setPrompt, onSend, onStop, sending, projectId, projectSecrets }: ChatPanelProps) {
+export function ChatPanel({
+  messages, isBuilding, prompt, setPrompt, onSend, onStop, sending, projectId, projectSecrets,
+  onOpenFigma, figmaConnected = false, onDisconnectFigma,
+  onOpenGithub, onGithubStatusChange, onGithubPull, githubPulling = false,
+  visualEditAvailable = false, visualEditActive = false, visualEditBusy = false, onToggleVisualEdit,
+}: ChatPanelProps) {
+  const t = useT();
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [attachedFiles, setAttachedFiles] = useState<{ name: string; url: string; imageDescription: string }[]>([]);
@@ -523,6 +567,22 @@ export function ChatPanel({ messages, isBuilding, prompt, setPrompt, onSend, onS
     // Auto-send after a tiny delay so the prompt is set
     setTimeout(() => { onSend(); }, 100);
   }, [setPrompt, onSend]);
+
+  /**
+   * ⭐ A FIGMA LINK LANDS IN THE BOX, NOT IN A SEND. The popover hands us either the
+   * bare url (when the user has already written something) or a full instruction (when
+   * the box is empty) — see `FigmaPromptButton.add()`. Either way it is appended, the
+   * user's own words are never rewritten, and the caret goes to the end.
+   */
+  const appendToPrompt = useCallback((text: string) => {
+    const current = prompt;
+    const separator = current.length === 0 || /\s$/.test(current) ? "" : " ";
+    setPrompt(current + separator + text);
+    requestAnimationFrame(() => {
+      const el = textareaRef.current;
+      if (el) { el.focus(); const len = el.value.length; el.setSelectionRange(len, len); }
+    });
+  }, [prompt, setPrompt]);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files ? Array.from(e.target.files) : [];
@@ -616,11 +676,63 @@ export function ChatPanel({ messages, isBuilding, prompt, setPrompt, onSend, onS
             placeholder={isBuilding ? "Agent is working..." : "Ask anything..."}
             className="w-full bg-transparent border-0 resize-none text-base outline-none placeholder:text-gray-400 min-h-[48px] max-h-[200px] px-4 pt-3.5 pb-1 leading-relaxed dark:text-gray-200"
             disabled={isBuilding} rows={1} />
-          <div className="flex items-center justify-between px-3 pb-2.5">
-            <label className="cursor-pointer p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition-colors">
-              <input type="file" multiple className="hidden" onChange={handleFileUpload} accept="image/*,.pdf,.svg" />
-              {uploading ? <Loader2 className="w-4 h-4 text-gray-400 animate-spin" /> : <Paperclip className="w-4 h-4 text-gray-400" />}
-            </label>
+          <div className="flex items-center justify-between px-2 pb-2">
+            {/*
+              ⭐ THE TOOL TRAY, in the platform's order: attach · Figma · GitHub · edit
+              visually. Same footprint for every button (`size-8`) so a connection changing
+              state — a tint, a spinner — never reflows the row.
+            */}
+            <div className="flex items-center gap-0.5">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <label className="cursor-pointer size-8 inline-flex items-center justify-center rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition-colors">
+                    <input type="file" multiple className="hidden" onChange={handleFileUpload} accept="image/*,.pdf,.svg" disabled={isBuilding} />
+                    {uploading ? <Loader2 className="w-4 h-4 text-gray-400 animate-spin" /> : <Paperclip className="w-4 h-4 text-gray-400" />}
+                    <span className="sr-only">{t("prompt.attachments.attach")}</span>
+                  </label>
+                </TooltipTrigger>
+                <TooltipContent>{t("prompt.attachments.attach")}</TooltipContent>
+              </Tooltip>
+              {onOpenFigma && (
+                <FigmaPromptButton
+                  onAdd={appendToPrompt}
+                  hasText={prompt.trim().length > 0}
+                  disabled={isBuilding}
+                  onConnect={onOpenFigma}
+                  connected={figmaConnected}
+                  onDisconnect={onDisconnectFigma}
+                />
+              )}
+              {onOpenGithub && (
+                <GithubPromptButton
+                  projectId={projectId}
+                  onOpenModal={onOpenGithub}
+                  onStatusChange={onGithubStatusChange}
+                  onPull={onGithubPull}
+                  pulling={githubPulling}
+                  disabled={isBuilding}
+                />
+              )}
+              {visualEditAvailable && onToggleVisualEdit && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      type="button"
+                      variant={visualEditActive ? "secondary" : "ghost"}
+                      size="icon"
+                      className={cn("size-8 shrink-0", visualEditActive && "ring-primary/40 text-primary ring-1")}
+                      disabled={visualEditBusy}
+                      aria-pressed={visualEditActive}
+                      onClick={onToggleVisualEdit}
+                    >
+                      <PencilIcon className="size-4" />
+                      <span className="sr-only">{t(visualEditActive ? "workspace.visualEditor.close" : "workspace.visualEditor.open")}</span>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>{t(visualEditActive ? "workspace.visualEditor.close" : "workspace.visualEditor.open")}</TooltipContent>
+                </Tooltip>
+              )}
+            </div>
             {isBuilding ? (
               <button onClick={onStop} className="w-8 h-8 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center transition-colors"><Square className="w-3 h-3 text-white" /></button>
             ) : (
