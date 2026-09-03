@@ -1,4 +1,8 @@
 /**
+ * Response and request types for the Totalum API, as consumed by `vcaas.ts`.
+ * 📖 The authoritative field-by-field reference: https://www.totalum.app/totalum-api.md
+ */
+/**
  * VCaaS wire types — copied verbatim from `ai-app-builder-open/src/lib/vcaas-types.ts`
  * so the shapes cannot drift from the API they describe.
  *

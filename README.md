@@ -174,6 +174,15 @@ This is not only a standalone tool. It is a drop-in AI app-builder layer for a S
 
 > ⚠️ **Before you put real users behind it, read `src/app/api/vcaas/_shared.ts`.** This app runs on one API key, so "who is asking?" and "may they touch this project?" are answered with "yes" by default. That file is where you add your own auth and ownership checks. The API routes already delegate the decision to it.
 
+### Two ways to integrate
+
+- **Run it beside your product.** Deploy this app on a subdomain, put your login in front, rebrand it, and link or iframe to it. Hours, not weeks.
+- **Port the flow into your stack.** Keep the contract, not the UI: a server-side proxy that adds the `api-key` header, then `launch` → poll agent status → show the preview URL → follow-up prompts → deploy. One Totalum project per customer, ownership checked on every proxied call. The step-by-step version, with the exact files to mirror, is in [`AGENTS.md`](AGENTS.md#adding-an-ai-app-builder-to-an-existing-product-any-stack).
+
+### Use it as a boilerplate: login + payments
+
+Want to ship this as your own product? Add **Supabase** for login (a `profiles` and a `projects` table, make the two guards in `_shared.ts` real, protect the pages in `src/proxy.ts`) and **Stripe** for payments (checkout for credit packs or a plan, a webhook that tops up `profiles.credits`, a 402 on spend-shaped calls when the balance is empty, which the UI already turns into a "buy credits" dialog). The concrete checklist is in [`AGENTS.md`](AGENTS.md#boilerplate-mode-login-with-supabase-payments-with-stripe).
+
 ---
 
 ## 🔐 Auth, database and third-party providers
@@ -219,10 +228,13 @@ Three things worth knowing:
 
 ## 📚 API reference
 
-The Totalum API is documented in two places:
+Everything this app calls is documented in one Markdown file, written to be read by people and by AI coding assistants alike:
 
-- **Online:** **[www.totalum.app/docs](https://www.totalum.app/docs)**, plus the [quickstart](https://www.totalum.app/docs/quickstart) and the [OpenAPI spec](https://www.totalum.app/openapi.json).
-- **In this repo:** [`project-docs/totalum-api-docs.md`](project-docs/totalum-api-docs.md) is the core reference in one file: account and credits, projects, the AI agent, deployments, server and logs, versions, secrets, custom domains and analytics. It links to the optional areas (GitHub, Figma, database, webhooks, files, project transfer, project groups). Keep it next to the code so an AI coding assistant working in this repo has the API in context.
+### 👉 **[www.totalum.app/totalum-api.md](https://www.totalum.app/totalum-api.md)**
+
+It covers the whole core API (account and credits, projects, the AI agent, deployments, server and logs, versions, secrets, custom domains, analytics) and links to the optional areas (GitHub, Figma, database, webhooks, files, project transfer, project groups). The browsable docs are at [www.totalum.app/docs](https://www.totalum.app/docs), with the [quickstart](https://www.totalum.app/docs/quickstart) and the [OpenAPI spec](https://www.totalum.app/openapi.json).
+
+Working on this repo with an AI agent? Start from [`AGENTS.md`](AGENTS.md). It is the short, agent-oriented map of the project: commands, architecture, where each feature lives, the rules that are not obvious from the code, and how to take the next steps.
 
 ---
 
@@ -247,9 +259,8 @@ src/
 │  ├─ vcaas-server.ts          # The half that holds the API key, server only
 │  ├─ vcaas-types.ts           # Shared API types
 │  └─ visual-edit*.ts          # Matching a clicked element back to its source
-├─ proxy.ts                    # CORS / CSP boundary
-project-docs/
-└─ totalum-api-docs.md         # The Totalum API core reference
+└─ proxy.ts                    # CORS / CSP boundary
+AGENTS.md                      # The map for AI coding agents working on this repo
 ```
 
 ---
@@ -313,7 +324,7 @@ Yes. `npm run build && npm start` runs on any Node.js host: a VM, Docker, Railwa
 Contributions are welcome, whether a bug fix, a new panel, docs or a feature idea:
 
 1. Fork the repo and create a branch: `git checkout -b my-feature`
-2. Make your changes and run `npm run build` to check them.
+2. Read [`AGENTS.md`](AGENTS.md) for the layout and the rules, make your changes, and run `npm run build` to check them.
 3. Open a pull request describing what you changed and why.
 
 Found a bug or have an idea? [Open an issue](https://github.com/totalumlabs/ai-app-builder-open/issues).

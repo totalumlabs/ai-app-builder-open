@@ -1,3 +1,9 @@
+/**
+ * Catch-all proxy: `/api/vcaas/<path>` → `https://api-accounts.totalum.app/api/v1/vcaas/<path>`
+ * with the operator's `api-key` header added server-side.
+ *
+ * 📖 What each forwarded path accepts and returns: https://www.totalum.app/totalum-api.md
+ */
 import { vcaasRequest } from "@/lib/vcaas-server";
 import { normalizeVcaasError, toErrorEnvelope } from "@/lib/vcaas-errors";
 import { NextRequest, NextResponse } from "next/server";

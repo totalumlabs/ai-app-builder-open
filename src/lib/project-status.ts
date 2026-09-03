@@ -188,7 +188,7 @@ function resolve(detail: VcaasProject | null | undefined): ProjectStatus {
  * preferring the live URL. Fixed in Phase 08; the dashboard thumbnail and the
  * workspace preview now share this one implementation.
  *
- * The rule, quoted from `project-docs/totalum-api-docs.md`:
+ * The rule, quoted from the API reference (https://www.totalum.app/totalum-api.md):
  *
  *   "Use `data.developmentUrlFieldToUse` to decide which development URL to
  *    display. It returns the NAME of the response field containing the best URL

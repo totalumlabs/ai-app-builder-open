@@ -1,6 +1,12 @@
 /**
- * Totalum VCaaS — the CLIENT CATALOG: one documented function per endpoint, each
+ * Totalum API — the CLIENT CATALOG: one documented function per endpoint, each
  * mapped to a same-origin `/api/vcaas/*` proxy route.
+ *
+ * 📖 THE API REFERENCE FOR EVERY ENDPOINT IN THIS FILE:
+ *    https://www.totalum.app/totalum-api.md
+ *    (one Markdown file with the whole core API; it links to the optional areas —
+ *    GitHub, Figma, database, webhooks, files, project transfer, project groups).
+ *    Read it before adding or changing a function here. Do not vendor a copy.
  *
  * Ported from `ai-app-builder-open/src/lib/vcaas.ts`, which keeps both layers in
  * one module. We split them:

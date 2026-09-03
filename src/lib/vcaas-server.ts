@@ -9,7 +9,10 @@
  *
  * ⚠️ NEVER IMPORT THIS FROM A CLIENT COMPONENT. It reads the API key.
  */
-/** Base URL for every Totalum VCaaS API endpoint. Single source of truth. */
+/**
+ * Base URL for every Totalum API endpoint. Single source of truth.
+ * 📖 API reference: https://www.totalum.app/totalum-api.md
+ */
 const VCAAS_BASE_URL = "https://api-accounts.totalum.app/api/v1/vcaas";
 
 // ═══════════════════════════════════════════════════════════════════════════
