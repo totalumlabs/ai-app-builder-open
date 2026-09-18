@@ -149,6 +149,22 @@ function decodeAttachments(files: AgentInputFile[] | undefined): AgentInputFile[
   return decoded.length ? decoded : undefined;
 }
 
+/**
+ * Resolves once the project's dev app is served again (not the sandbox placeholder),
+ * or after ~2 minutes regardless — the caller reloads the frame either way.
+ */
+async function waitForPreview(projectId: string): Promise<void> {
+  for (let attempt = 0; attempt < 40; attempt++) {
+    try {
+      const response = await fetch(`/api/preview/${encodeURIComponent(projectId)}/`, { cache: "no-store" });
+      if (response.ok && !looksLikePlaceholder(await response.text())) return;
+    } catch {
+      // Not up yet.
+    }
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+  }
+}
+
 export default function WorkspacePage() {
   const params = useParams();
   const router = useRouter();
@@ -517,11 +533,24 @@ export default function WorkspacePage() {
     }
     pollingRef.current = setTimeout(pollAgentOnce, 10000);
   }
+  /**
+   * ⚠️ A PUBLISH TAKES THE DEV PREVIEW DOWN: the backend stops `npm start` for the
+   * production build and restarts it at the end (success AND failure), so the frame was
+   * left on a dead page until a browser refresh. Once the app answers, do what that did.
+   */
+  function reloadPreviewAfterPublish() {
+    void waitForPreview(projectId).then(() => {
+      if (!mountedRef.current) return;
+      void fetchProject();
+      setPreviewKey((k) => k + 1);
+    });
+  }
   async function pollDeployOnce() {
     if (!mountedRef.current) return;
     const res = await vcaasApi.deployments.status(projectId);
     if (!mountedRef.current) return;
     if (res.ok && res.data) {
+      if (res.data.status === "success" || res.data.status === "error") reloadPreviewAfterPublish();
       if (res.data.status === "success") {
         setDeploying(false);
         operation.end("publish");
