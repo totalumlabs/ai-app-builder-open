@@ -9,11 +9,9 @@ import {
 } from "lucide-react";
 import { vcaasApi } from "@/lib/vcaas";
 import { DiffViewer } from "@/components/workspace/DiffViewer";
-import { GithubPromptButton } from "@/components/prompt/GithubPromptButton";
 import { RunOptionsMenu, RunOptionsChips, useRunOptions } from "@/components/workspace/RunOptionsMenu";
 import { AttachmentPreviews } from "@/components/workspace/AttachmentPreview";
 import { filesFromClipboard } from "@/lib/attachments";
-import { FigmaPromptButton } from "@/components/prompt/FigmaPromptButton";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ConfirmDialog } from "@/components/primitives";
@@ -53,14 +51,7 @@ interface ChatPanelProps {
   attachedFiles: AgentInputFile[];
   setAttachedFiles: React.Dispatch<React.SetStateAction<AgentInputFile[]>>;
 
-  /**
-   * ═══⭐ THE TOOL TRAY — GitHub, Figma and the visual editor live IN THE COMPOSER ═══
-   *
-   * Mirrors totalum-platform's `PromptComposer`: the row under the textarea is
-   * `attach · Figma · GitHub · edit visually`, and the header keeps only the tabs and
-   * Publish. Everything below is optional so the panel still renders on a surface that
-   * has none of it (the mobile chat, for instance, has no visual editor).
-   */
+  /** Optional workspace actions. Integration management remains available elsewhere. */
   /** Opens the Figma modal (connect / manage). */
   onOpenFigma?: () => void;
   /** Tints the Figma button green and switches its popover to "add a design link". */
@@ -596,22 +587,6 @@ export function ChatPanel({
   }, [setPrompt, onSend]);
 
   /**
-   * ⭐ A FIGMA LINK LANDS IN THE BOX, NOT IN A SEND. The popover hands us either the
-   * bare url (when the user has already written something) or a full instruction (when
-   * the box is empty) — see `FigmaPromptButton.add()`. Either way it is appended, the
-   * user's own words are never rewritten, and the caret goes to the end.
-   */
-  const appendToPrompt = useCallback((text: string) => {
-    const current = prompt;
-    const separator = current.length === 0 || /\s$/.test(current) ? "" : " ";
-    setPrompt(current + separator + text);
-    requestAnimationFrame(() => {
-      const el = textareaRef.current;
-      if (el) { el.focus(); const len = el.value.length; el.setSelectionRange(len, len); }
-    });
-  }, [prompt, setPrompt]);
-
-  /**
    * One path for the picker and the paste, so both behave identically.
    *
    * ⚠️ A FILE THAT DID NOT UPLOAD IS SAID OUT LOUD. Selecting several photos used to
@@ -755,11 +730,7 @@ export function ChatPanel({
             className="w-full bg-transparent border-0 resize-none text-base outline-none placeholder:text-gray-400 min-h-[48px] max-h-[200px] px-4 pt-3.5 pb-1 leading-relaxed dark:text-gray-200"
             disabled={isBuilding} rows={1} />
           <div className="flex items-center justify-between px-2 pb-2">
-            {/*
-              ⭐ THE TOOL TRAY, in the platform's order: attach · Figma · GitHub · edit
-              visually. Same footprint for every button (`size-8`) so a connection changing
-              state — a tint, a spinner — never reflows the row.
-            */}
+            {/* Keep the composer actions compact and aligned. */}
             <div className="flex items-center gap-0.5">
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -771,26 +742,6 @@ export function ChatPanel({
                 </TooltipTrigger>
                 <TooltipContent>{t("prompt.attachments.attach")}</TooltipContent>
               </Tooltip>
-              {onOpenFigma && (
-                <FigmaPromptButton
-                  onAdd={appendToPrompt}
-                  hasText={prompt.trim().length > 0}
-                  disabled={isBuilding}
-                  onConnect={onOpenFigma}
-                  connected={figmaConnected}
-                  onDisconnect={onDisconnectFigma}
-                />
-              )}
-              {onOpenGithub && (
-                <GithubPromptButton
-                  projectId={projectId}
-                  onOpenModal={onOpenGithub}
-                  onStatusChange={onGithubStatusChange}
-                  onPull={onGithubPull}
-                  pulling={githubPulling}
-                  disabled={isBuilding}
-                />
-              )}
               {/* ⭐ MODEL · EFFORT · FAST MODE for the NEXT prompt — the platform's menu. */}
               <RunOptionsMenu value={runOptions} onChange={setRunOptions} disabled={isBuilding} />
               {visualEditAvailable && onToggleVisualEdit && (
