@@ -37,9 +37,12 @@
 
 // Type-only import: erased at compile time, so it creates NO runtime dependency on
 // the `"use client"` `@/lib/api` module.
+import type { SiteAnalyticsAnswer } from "./site-analytics";
 import { toBase64 } from "@/lib/base64";
 import type { ApiResponse } from "@/lib/api";
 import type { VcaasErrorCode, VcaasErrorDetails } from "@/lib/vcaas-errors";
+import type { PaymentsMode, PaymentsStatus, ProjectWebhook } from "@/lib/v2-payments";
+import type { DbRestorePoint } from "@/lib/undo-db-change";
 import type {
   ProjectGroup,
   VcaasProject,
@@ -53,7 +56,6 @@ import type {
   FileTree,
   FileContent,
   FileWriteResult,
-  DbTable,
   GithubStatus,
   GithubPullStatus,
   GithubConnectResult,
@@ -67,6 +69,34 @@ import type {
   FigmaValidateResult,
   VcaasWebhook,
   ProjectLaunchResult,
+  VcaasDeployError,
+  AccountDomain,
+  DomainDnsRecord,
+  DomainDnsRecordInput,
+  DomainForward,
+  CronJob,
+  CronRun,
+  DbBackup,
+  DbBackupSchedule,
+  DbEnv,
+  DomainSearchResult,
+  FeatureKey,
+  FeatureLimit,
+  McpServer,
+  MobileBuild,
+  MobileSettings,
+  OwnBuildKey,
+  MobileStores,
+  StoreUpload,
+  ProjectApiKey,
+  ProjectLimits,
+  ProjectCreditLimits,
+  AtLimitAnswer,
+  SqlAskResult,
+  SqlRows,
+  SqlSchema,
+  DbUsage,
+  V2Usage,
 } from "@/lib/vcaas-types";
 
 /**
@@ -103,6 +133,29 @@ export interface VcaasResponse<T> extends ApiResponse<T> {
    * before the user is told. Absent everywhere else, where the caller decides.
    */
   retryable?: boolean;
+  /** The HTTP status of a failed call (absent on success and on a transport failure). */
+  status?: number;
+}
+
+/**
+ * `GET …/deployments/status`. A new-engine project adds `deploymentId`, `step`, `liveUrl` and, on a failed publish,
+ * `errorDetails` (why it failed and what to do); a legacy one carries `versionId` instead.
+ */
+export interface DeploymentStatus {
+  status: string | null;
+  createdAt?: string | null;
+  deploymentId?: string;
+  step?: string;
+  liveUrl?: string;
+  errorDetails?: VcaasDeployError;
+}
+
+/** A custom MCP server as the user types it (header values are write-only). */
+export interface McpServerDraft {
+  name: string;
+  transport: "http" | "sse";
+  url: string;
+  headers?: Record<string, string>;
 }
 
 /**
@@ -143,7 +196,8 @@ async function proxyRequest<T>(url: string, init?: RequestInit): Promise<VcaasRe
       signalInsufficientCredits();
     }
 
-    return payload;
+    // A failure says its HTTP status, so a caller can tell a refusal (4xx) from an outage.
+    return payload?.ok === false ? { ...payload, status: res.status } : payload;
   } catch (err) {
     // A transport failure never reached our route, so there is no upstream code.
     return {
@@ -284,6 +338,10 @@ export const vcaasApi = {
       description: string;
       label?: string;
       groupId?: string;
+      /** `"v2"` requires the current engine (refused, nothing created, when the account cannot get it). Omitted: the account's default. */
+      engineVersion?: "v2" | "legacy";
+      /** An export code this new project is about to receive: it is created on that code's engine. */
+      sourceImportCode?: string;
     }): Promise<VcaasResponse<VcaasProject>> =>
       proxy.post<VcaasProject>(`${API}/projects`, body),
 
@@ -325,6 +383,10 @@ export const vcaasApi = {
         maxInfrastructureCreditsPerMonth?: number;
       };
       figma?: { token: string };
+      /** `"v2"` = the current engine (what this app creates); `"legacy"` only for the legacy database endpoints. */
+      engineVersion?: "v2" | "legacy";
+      /** Agent tier of the first prompt on the current engine: `"auto"` (default), `"cheap"`, `"normal"`, `"expensive"`. */
+      model?: string;
     }): Promise<VcaasResponse<ProjectLaunchResult>> =>
       proxy.post<ProjectLaunchResult>(`${API}/projects/launch`, body),
 
@@ -434,6 +496,10 @@ export const vcaasApi = {
     ): Promise<VcaasResponse<unknown>> =>
       proxy.post(`${project(projectId)}/agent/start`, body),
 
+    /** POST …/agent/clear-context — the next prompt starts a fresh agent session. Free. */
+    clearContext: (projectId: string): Promise<VcaasResponse<{ message: string }>> =>
+      proxy.post(`${project(projectId)}/agent/clear-context`, {}),
+
     /** POST …/agent/stop — request the current run to stop. */
     stop: (projectId: string): Promise<VcaasResponse<unknown>> =>
       proxy.post(`${project(projectId)}/agent/stop`, {}),
@@ -455,16 +521,17 @@ export const vcaasApi = {
      * caller checking only for `"success"`/`"error"` polled a null for ever without
      * the type ever hinting that "no deployment at all" was a possible answer.
      */
-    status: (
-      projectId: string
-    ): Promise<VcaasResponse<{ status: string | null; createdAt?: string | null }>> =>
-      proxy.get<{ status: string | null; createdAt?: string | null }>(
-        `${project(projectId)}/deployments/status`
-      ),
+    status: (projectId: string): Promise<VcaasResponse<DeploymentStatus>> =>
+      proxy.get<DeploymentStatus>(`${project(projectId)}/deployments/status`),
 
-    /** POST …/deployments/deploy — publish the project to production. */
-    deploy: (projectId: string): Promise<VcaasResponse<unknown>> =>
-      proxy.post(`${project(projectId)}/deployments/deploy`, {}),
+    /**
+     * POST …/deployments/deploy — publish the project to production.
+     *
+     * `confirmDestructive` (new engine): run pending migrations that drop data or delete/overwrite rows. Without it
+     * such a publish ends `error` with `DESTRUCTIVE_MIGRATION_NEEDS_CONFIRMATION` and nothing changes on live.
+     */
+    deploy: (projectId: string, confirmDestructive = false): Promise<VcaasResponse<unknown>> =>
+      proxy.post(`${project(projectId)}/deployments/deploy`, confirmDestructive ? { confirmDestructive: true } : {}),
   },
 
   // ──────────────────────────── GitHub ────────────────────────────
@@ -545,79 +612,6 @@ export const vcaasApi = {
      */
     validate: (body: { token: string }): Promise<VcaasResponse<FigmaValidateResult>> =>
       proxy.post<FigmaValidateResult>(`${API}/figma/validate`, body),
-  },
-
-  // ─────────────────────────── Database ───────────────────────────
-  // Final VCaaS endpoints: /vcaas/projects/{id}/database/*
-  database: {
-    /** GET …/database/tables-structure — every table and its property schema. */
-    tablesStructure: (projectId: string): Promise<VcaasResponse<{ tables: DbTable[] }>> =>
-      proxy.get<{ tables: DbTable[] }>(`${project(projectId)}/database/tables-structure`),
-
-    /**
-     * POST …/database/query — read records from a table.
-     * `queryOptions` uses the Totalum query DSL (`_limit`, `_offset`, `_sort`,
-     * `_filter`, `_count`, …).
-     */
-    query: (
-      projectId: string,
-      body: { tableName: string; queryOptions: Record<string, unknown> }
-    ): Promise<VcaasResponse<{ results: Record<string, unknown>[] }>> =>
-      proxy.post<{ results: Record<string, unknown>[] }>(`${project(projectId)}/database/query`, body),
-
-    /** POST …/database/records — create one record in `tableName`. */
-    createRecord: (
-      projectId: string,
-      body: { tableName: string; data: Record<string, unknown> }
-    ): Promise<VcaasResponse<unknown>> =>
-      proxy.post(`${project(projectId)}/database/records`, body),
-
-    /** PATCH …/database/records/{recordId} — update one record. */
-    updateRecord: (
-      projectId: string,
-      recordId: string,
-      body: { tableName: string; data: Record<string, unknown> }
-    ): Promise<VcaasResponse<unknown>> =>
-      proxy.patch(`${project(projectId)}/database/records/${encodeURIComponent(recordId)}`, body),
-
-    /**
-     * DELETE …/database/records/{recordId}?tableName=… — delete one record.
-     * `tableName` is a required query param (which table the id belongs to).
-     */
-    deleteRecord: (projectId: string, recordId: string, tableName: string): Promise<VcaasResponse<unknown>> =>
-      proxy.delete(
-        `${project(projectId)}/database/records/${encodeURIComponent(recordId)}?tableName=${encodeURIComponent(tableName)}`
-      ),
-
-    /**
-     * POST …/database/records/{recordId}/link — link two records (Feature H3).
-     *
-     * ⚠️ MANY-TO-MANY ONLY. Totalum owns the junction table for a `manyToMany`
-     * relation, so a link is made by reference rather than by writing an id onto
-     * a record — and a junction table must NEVER be created by hand. A
-     * `manyToOne` / `oneToOne` link is an ordinary field, so it goes through
-     * `updateRecord`; routing one here silently does nothing.
-     */
-    linkRecord: (
-      projectId: string,
-      recordId: string,
-      body: { tableName: string; propertyId: string; referenceId: string }
-    ): Promise<VcaasResponse<{ linked: boolean }>> =>
-      proxy.post<{ linked: boolean }>(
-        `${project(projectId)}/database/records/${encodeURIComponent(recordId)}/link`,
-        body
-      ),
-
-    /** DELETE …/database/records/{recordId}/link — drop a many-to-many link. */
-    unlinkRecord: (
-      projectId: string,
-      recordId: string,
-      body: { tableName: string; propertyId: string; referenceId: string }
-    ): Promise<VcaasResponse<{ unlinked: boolean }>> =>
-      proxy.deleteWithBody<{ unlinked: boolean }>(
-        `${project(projectId)}/database/records/${encodeURIComponent(recordId)}/link`,
-        body
-      ),
   },
 
   // ──────────────────────────── Secrets ───────────────────────────
@@ -892,6 +886,221 @@ export const vcaasApi = {
     remove: (webhookId: string): Promise<VcaasResponse<{ deleted: boolean }>> =>
       proxy.delete<{ deleted: boolean }>(`${API}/webhooks/${encodeURIComponent(webhookId)}`),
   },
+
+  /**
+   * ═══ v2 PROJECTS ONLY (plan 15 §4, §11) ═══ — every path below exists only for a project whose
+   * `engineVersion` is `'v2'`; callers are gated by `isV2Project`. The two database routes of A7.12
+   * (`database/sql`, `database/ask`) live here and nowhere else, so a path change (A3.15) is a
+   * one-file edit.
+   */
+  v2: {
+    /** PGM's project state (plan 03 §3.2.2); the visual editor reads `preview.versionId`, the version the frame shows. */
+    state: (projectId: string) => proxy.get<{ preview?: { versionId?: string } }>(`${project(projectId)}/state`),
+    /** The chat's live run timeline, raw: always pass it through `sanitizeRunProgress` before rendering. */
+    agentProgress: (projectId: string) => proxy.get<unknown>(`${project(projectId)}/agent/progress`),
+    pause: (projectId: string) => proxy.post<{ operation?: { id: string } }>(`${project(projectId)}/pause`, {}),
+    resume: (projectId: string) => proxy.post<{ operation?: { id: string } }>(`${project(projectId)}/resume`, {}),
+    /** Lifts the emergency stop's pause (free); `released: false` = it was not paused. */
+    releaseRunaway: (projectId: string) => proxy.post<{ released: boolean }>(`${project(projectId)}/runaway/release`, {}),
+    setLiveHostSuffix: (projectId: string, liveHostSuffix: "totalum-project.com" | "webapp-project.com") =>
+      proxy.patch<VcaasProject>(project(projectId), { liveHostSuffix }),
+
+    schema: (projectId: string, env: DbEnv) =>
+      proxy.get<SqlSchema>(`${project(projectId)}/database/schema?env=${env}`),
+    /** The database Settings view: usage in credits, statistics, the Turso recommendation and tips (free, read-only). */
+    databaseUsage: (projectId: string) => proxy.get<DbUsage>(`${project(projectId)}/database/usage`),
+    /** A3.19: the one-way D1 → Turso move (fixed credits, a paid plan); PGM refuses during a run or another operation. */
+    migrateProvider: (projectId: string) =>
+      proxy.post<{ operation: { id: string; estimateSec: number } }>(`${project(projectId)}/database/migrate-provider`, { to: "turso", confirm: projectId }),
+    rows: (projectId: string, body: { env: DbEnv; table: string; page: { limit: number; offset?: number }; sort?: { column: string; dir: "asc" | "desc" }[]; search?: string; count?: boolean }) =>
+      proxy.post<SqlRows>(`${project(projectId)}/database/rows`, body),
+    /**
+     * SQL, the question and the system prompt go as base64, like `files.write` above: account-backend's body sanitiser
+     * turns `a > 5` into `a &gt; 5` and drops anything shaped like a tag in a plain string.
+     */
+    sql: (projectId: string, { sql, ...body }: { env: DbEnv; sql: string; params?: (string | number | null)[]; allowWrites?: boolean; confirmLive?: boolean }) =>
+      proxy.post<SqlRows>(`${project(projectId)}/database/sql`, { ...body, sql }),
+    ask: (projectId: string, { question, ...body }: { env: DbEnv; question: string }) =>
+      proxy.post<SqlAskResult>(`${project(projectId)}/database/ask`, { ...body, questionBase64: toBase64(question) }),
+    /** Restore points, newest first (A10.7 (3)); `runId` narrows them to one run. */
+    bookmarks: (projectId: string, runId?: string) =>
+      proxy.get<{ items: DbRestorePoint[] }>(`${project(projectId)}/database/bookmarks${runId ? `?runId=${encodeURIComponent(runId)}` : ""}`),
+    /** A10.7 (4): the backups of one database and the 30-day window a time restore may target. */
+    backups: (projectId: string, env: DbEnv) =>
+      proxy.get<{ backups: DbBackup[]; timeTravel: { availableFrom: string; availableTo: string }; schedule: DbBackupSchedule }>(`${project(projectId)}/database/backups?env=${env}`),
+    /** 1 credit; one per 10 minutes (429 `BACKUP_RATE_LIMITED`). */
+    createBackup: (projectId: string, env: DbEnv) =>
+      proxy.post<{ backupId: string; status: "running" }>(`${project(projectId)}/database/backups`, { env }),
+    /** A signed URL to the dump (`.sql`, or `.sql.gz` for a scheduled backup), valid 15 minutes. */
+    backupDownload: (projectId: string, backupId: string) =>
+      proxy.get<{ url: string; fileName: string }>(`${project(projectId)}/database/backups/${encodeURIComponent(backupId)}/download`),
+    /** A10.30, priced as the restore to a time: the backup's dump back into its own database (a backup is taken first). */
+    restoreBackup: (projectId: string, backupId: string) =>
+      proxy.post<{ operation: { id: string } }>(`${project(projectId)}/database/backups/${encodeURIComponent(backupId)}/restore`, { confirm: projectId }),
+    deleteBackup: (projectId: string, backupId: string) =>
+      proxy.delete(`${project(projectId)}/database/backups/${encodeURIComponent(backupId)}`),
+    /** Free: back to a recorded restore point. Both restores take a restore point first, so another restore undoes them. */
+    restoreDatabase: (projectId: string, env: DbEnv, bookmark: string) =>
+      proxy.post<{ operation: { id: string } }>(`${project(projectId)}/database/restore`, { env, bookmark, confirm: projectId }),
+    /** 2 credits: any minute of the last 30 days. */
+    restoreDatabaseToTime: (projectId: string, env: DbEnv, timestamp: string) =>
+      proxy.post<{ operation: { id: string } }>(`${project(projectId)}/database/time-travel/restore`, { env, timestamp, confirm: projectId }),
+    /** Research 50 P-50.1 (free): the database back to the run's first restore point, then its code without its migrations. */
+    undoRun: (projectId: string, runId: string) =>
+      proxy.post<{ operation: { id: string }; codeVersionId: string | null }>(`${project(projectId)}/database/undo-run`, { runId, confirm: projectId }),
+
+    /** A6.16, free: one site-analytics read (the query from `analyticsQuery` in `@/lib/site-analytics`). */
+    siteAnalytics: (projectId: string, query: string) => proxy.get<SiteAnalyticsAnswer>(`${project(projectId)}/analytics/site?${query}`),
+
+    cronJobs: (projectId: string) => proxy.get<{ items: CronJob[] }>(`${project(projectId)}/cron-jobs`),
+    createCronJob: (projectId: string, body: Pick<CronJob, "name" | "schedule" | "request" | "timezone" | "pauseAfterFailures">) =>
+      proxy.post<CronJob>(`${project(projectId)}/cron-jobs`, body),
+    updateCronJob: (projectId: string, jobId: string, patch: { enabled: boolean } | { pauseAfterFailures: number | null }) =>
+      proxy.patch<CronJob>(`${project(projectId)}/cron-jobs/${encodeURIComponent(jobId)}`, patch),
+    runCronJob: (projectId: string, jobId: string) =>
+      proxy.post<{ executionId: string }>(`${project(projectId)}/cron-jobs/${encodeURIComponent(jobId)}/run`, {}),
+    deleteCronJob: (projectId: string, jobId: string) =>
+      proxy.delete(`${project(projectId)}/cron-jobs/${encodeURIComponent(jobId)}`),
+    /** The job's last runs (30 days), newest first. */
+    cronJobRuns: (projectId: string, jobId: string, limit = 20) =>
+      proxy.get<{ items: CronRun[]; nextCursor: string | null }>(`${project(projectId)}/cron-jobs/${encodeURIComponent(jobId)}/executions?limit=${limit}`),
+
+    systemPrompt: (projectId: string) =>
+      proxy.get<{ systemPrompt: string }>(`${project(projectId)}/agent/system-prompt`),
+    setSystemPrompt: (projectId: string, systemPrompt: string) =>
+      proxy.put<{ systemPrompt: string }>(`${project(projectId)}/agent/system-prompt`, { systemPromptBase64: toBase64(systemPrompt) }),
+    mcpServers: (projectId: string) => proxy.get<{ servers: McpServer[] }>(`${project(projectId)}/agent/mcp-servers`),
+    verifyMcpServer: (projectId: string, mcp: McpServerDraft) =>
+      proxy.post<{ ok: true; tools: { name: string }[] }>(`${project(projectId)}/agent/mcp-servers/verify`, { mcp }),
+    addMcpServer: (projectId: string, mcp: McpServerDraft) =>
+      proxy.post<McpServer>(`${project(projectId)}/agent/mcp-servers`, { mcp }),
+    setMcpServerEnabled: (projectId: string, mcpId: string, enabled: boolean) =>
+      proxy.patch<McpServer>(`${project(projectId)}/agent/mcp-servers/${encodeURIComponent(mcpId)}`, { enabled }),
+    removeMcpServer: (projectId: string, mcpId: string) =>
+      proxy.delete(`${project(projectId)}/agent/mcp-servers/${encodeURIComponent(mcpId)}`),
+
+    apiKeys: (projectId: string) => proxy.get<{ keys: ProjectApiKey[] }>(`${project(projectId)}/api-keys`),
+    createApiKey: (projectId: string, body: { name: string; scopes: string[]; env: ProjectApiKey["env"] }) =>
+      proxy.post<{ key: ProjectApiKey & { plaintext: string } }>(`${project(projectId)}/api-keys`, body),
+    rotateApiKey: (projectId: string, keyId: string) =>
+      proxy.post<{ key: ProjectApiKey & { plaintext: string } }>(`${project(projectId)}/api-keys/${encodeURIComponent(keyId)}/rotate`, {}),
+    revokeApiKey: (projectId: string, keyId: string) =>
+      proxy.delete(`${project(projectId)}/api-keys/${encodeURIComponent(keyId)}`),
+    /** A10.15: a new development preview address; the old one stops at once. */
+    rotatePreviewUrl: (projectId: string) =>
+      proxy.post<{ temporalLinkUrl: string; rotatedAt: string }>(`${project(projectId)}/preview/rotate-url`, {}),
+
+    /** "day" = today so far, "month" = this calendar month so far (UTC); the API needs the range. */
+    usage: (projectId: string | null, query: { env: "all" | "dev" | "live"; groupBy: "day" | "month" }) => {
+      const now = new Date();
+      const from = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), query.groupBy === "day" ? now.getUTCDate() : 1));
+      const qs = new URLSearchParams({ ...query, from: from.toISOString(), to: now.toISOString() }).toString();
+      return proxy.get<V2Usage>(projectId ? `${project(projectId)}/usage?${qs}` : `${API}/usage?${qs}`);
+    },
+    limits: (projectId: string) => proxy.get<ProjectLimits>(`${project(projectId)}/limits`),
+    setLimits: (projectId: string, features: Partial<Record<FeatureKey, Partial<Pick<FeatureLimit, "enabled" | "monthlyCreditCap" | "monthlyUnitCap">>>>) =>
+      proxy.put<ProjectLimits>(`${project(projectId)}/limits`, { features }),
+    /** abud: the project's monthly development / infrastructure caps and this month's spend on each. */
+    creditLimits: (projectId: string) => proxy.get<ProjectCreditLimits>(`${project(projectId)}/credit-limits`),
+    /** The account's projects at a monthly limit this month (one account-level read, never one per project). */
+    atLimit: () => proxy.get<AtLimitAnswer>(`${API}/projects/credit-limits/at-limit`),
+    /** `PATCH …/credit-limits` (owner only): a positive number, or `null` for no limit. */
+    setCreditLimits: (projectId: string, creditLimits: Partial<ProjectCreditLimits["creditLimits"]>) =>
+      proxy.patch<Pick<ProjectCreditLimits, "creditLimits">>(`${project(projectId)}/credit-limits`, creditLimits),
+
+    /** One Stripe mode's connected account (plan 11 §9.4); no mode = test. */
+    paymentsStatus: (projectId: string, mode: PaymentsMode = "live") =>
+      proxy.get<PaymentsStatus>(`${project(projectId)}/payments/status?mode=${mode}`),
+    /** Stripe-hosted onboarding of that mode's account; the live one is created with the merchant's `country`. */
+    paymentsOnboardingLink: (projectId: string, body: { returnUrl: string; refreshUrl: string; country?: string }, mode: PaymentsMode = "live") =>
+      proxy.post<{ url: string; expiresAt: string }>(`${project(projectId)}/payments/onboarding-link?mode=${mode}`, body),
+    /** The published site's Stripe mode (owner only); `live` is refused until the live account can take charges. */
+    setPaymentsMode: (projectId: string, mode: PaymentsMode) =>
+      proxy.put<{ mode: PaymentsMode }>(`${project(projectId)}/payments/mode`, { mode }),
+    webhook: (projectId: string) => proxy.get<ProjectWebhook>(`${project(projectId)}/webhook`),
+    setWebhook: (projectId: string, url: string | null) => proxy.put<ProjectWebhook>(`${project(projectId)}/webhook`, { url }),
+    rotateWebhookSecret: (projectId: string) => proxy.post<{ secret: string }>(`${project(projectId)}/webhook/rotate-secret`, {}),
+
+    mobileBuilds: (projectId: string) => proxy.get<{ builds: MobileBuild[] }>(`${project(projectId)}/mobile/builds`),
+    startMobileBuild: (projectId: string, platform: "android" | "ios" = "android") =>
+      proxy.post<{ buildId: string }>(
+        `${project(projectId)}/mobile/builds`,
+        platform === "ios" ? { platform, artifact: "simulator-app" } : { platform, artifact: "debug-apk" },
+      ),
+    mobileStores: (projectId: string) => proxy.get<MobileStores>(`${project(projectId)}/mobile/stores`),
+    storeUploads: (projectId: string) => proxy.get<{ uploads: StoreUpload[] }>(`${project(projectId)}/mobile/store-uploads`),
+    startStoreUpload: (projectId: string, buildId: string) =>
+      proxy.post<StoreUpload>(`${project(projectId)}/mobile/builds/${encodeURIComponent(buildId)}/store-upload`, {}),
+    /** A7.10b: a build still waiting in the Codemagic queue; its reserved credits are given back. */
+    cancelMobileBuild: (projectId: string, buildId: string) =>
+      proxy.post<MobileBuild>(`${project(projectId)}/mobile/builds/${encodeURIComponent(buildId)}/cancel`, {}),
+    mobileBuildDownload: (projectId: string, buildId: string) =>
+      proxy.get<{ url: string }>(`${project(projectId)}/mobile/builds/${encodeURIComponent(buildId)}/download`),
+    mobileBuildLog: (projectId: string, buildId: string) =>
+      proxy.get<{ url: string }>(`${project(projectId)}/mobile/builds/${encodeURIComponent(buildId)}/log`),
+    /** Owner-only: connect a store. Google Play takes the Play Console service-account JSON; the App Store reuses the iOS key. */
+    connectGooglePlay: (projectId: string, body: { serviceAccountJson: string; packageName: string }) =>
+      proxy.put<MobileStores>(`${project(projectId)}/mobile/stores/google-play`, body),
+    setIosSigning: (projectId: string, body: { apiKeyP8: string; keyId: string; issuerId: string; bundleId: string }) =>
+      proxy.put<{ configured: boolean }>(`${project(projectId)}/mobile/signing/ios`, body),
+    connectAppStore: (projectId: string, body: { appAppleId?: string }) =>
+      proxy.put<MobileStores>(`${project(projectId)}/mobile/stores/app-store`, body),
+    disconnectStore: (projectId: string, store: "google-play" | "app-store") =>
+      proxy.delete(`${project(projectId)}/mobile/stores/${store}`),
+    /** Owner-only: builds on the owner's own Codemagic account (no shared queue, no build credits). */
+    ownBuildKey: (projectId: string) => proxy.get<OwnBuildKey>(`${project(projectId)}/mobile/signing/codemagic`),
+    setOwnBuildKey: (projectId: string, apiToken: string) =>
+      proxy.put<OwnBuildKey>(`${project(projectId)}/mobile/signing/codemagic`, { apiToken }),
+    removeOwnBuildKey: (projectId: string) => proxy.delete(`${project(projectId)}/mobile/signing/codemagic`),
+    mobileSettings: (projectId: string) => proxy.get<MobileSettings>(`${project(projectId)}/mobile/settings`),
+    setMobileSettings: (projectId: string, body: MobileSettings) =>
+      proxy.put<MobileSettings>(`${project(projectId)}/mobile/settings`, body),
+
+    domains: () => proxy.get<{ domains: AccountDomain[] }>(`${API}/domains`),
+    searchDomains: (q: string) => proxy.get<{ results: DomainSearchResult[] }>(`${API}/domains/search?q=${encodeURIComponent(q)}`),
+    domainContacts: () => proxy.get<{ contacts?: { id: string }[] } | { id: string }[]>(`${API}/domains/contacts`),
+    createDomainContact: (contact: Record<string, string>) =>
+      proxy.post<{ id: string }>(`${API}/domains/contacts`, { contact }),
+    purchaseDomain: (body: { domain: string; contactId: string; expectedPrice: number; projectId?: string }) =>
+      proxy.post<{ domain: AccountDomain }>(`${API}/domains/purchase`, body),
+    setDomainAutoRenew: (domainId: string, autoRenew: boolean) =>
+      proxy.patch<AccountDomain>(`${API}/domains/${encodeURIComponent(domainId)}`, { autoRenew }),
+    attachDomain: (domainId: string, projectId: string, canonicalHost?: "www" | "apex") =>
+      proxy.post<AccountDomain>(`${API}/domains/${encodeURIComponent(domainId)}/attach`, canonicalHost ? { projectId, canonicalHost } : { projectId }),
+    /** POST …/domains/{id}/detach — the project stops answering on it; the domain stays registered. */
+    detachDomain: (domainId: string) =>
+      proxy.post<AccountDomain>(`${API}/domains/${encodeURIComponent(domainId)}/detach`, {}),
+    dnsRecords: (domainId: string) =>
+      proxy.get<{ records: DomainDnsRecord[] }>(`${API}/domains/${encodeURIComponent(domainId)}/dns/records`),
+    createDnsRecord: (domainId: string, record: DomainDnsRecordInput) =>
+      proxy.post<DomainDnsRecord>(`${API}/domains/${encodeURIComponent(domainId)}/dns/records`, { record }),
+    updateDnsRecord: (domainId: string, recordId: string, record: DomainDnsRecordInput) =>
+      proxy.patch<DomainDnsRecord>(
+        `${API}/domains/${encodeURIComponent(domainId)}/dns/records/${encodeURIComponent(recordId)}`,
+        { record },
+      ),
+    deleteDnsRecord: (domainId: string, recordId: string) =>
+      proxy.delete<unknown>(`${API}/domains/${encodeURIComponent(domainId)}/dns/records/${encodeURIComponent(recordId)}`),
+    domainForwarding: (domainId: string) =>
+      proxy.get<{ forwarding: DomainForward[] }>(`${API}/domains/${encodeURIComponent(domainId)}/forwarding`),
+    setDomainForwarding: (domainId: string, forwarding: DomainForward[]) =>
+      proxy.put<{ forwarding: DomainForward[] }>(`${API}/domains/${encodeURIComponent(domainId)}/forwarding`, { forwarding }),
+    /** Sends name.com's ICANN verification e-mail again, once per pending verification of the contact. */
+    resendDomainVerification: (contactId: string) =>
+      proxy.post<{ sent: number }>(`${API}/domains/contacts/${encodeURIComponent(contactId)}/resend-verification`, {}),
+    /** Charges the saved card now, then renews one year at the registrar. */
+    renewDomain: (domainId: string) =>
+      proxy.post<{ domain: AccountDomain }>(`${API}/domains/${encodeURIComponent(domainId)}/renew`, {}),
+    /** Unlocks the domain and answers its transfer (EPP) code ONCE; it is also e-mailed to the owner. */
+    exportDomain: (domainId: string) =>
+      proxy.post<{ authCode: string }>(`${API}/domains/${encodeURIComponent(domainId)}/export`, {}),
+    cancelDomainExport: (domainId: string) =>
+      proxy.post<AccountDomain>(`${API}/domains/${encodeURIComponent(domainId)}/export/cancel`, {}),
+  },
+
+  /** GET /vcaas/credit-costs — the fixed price, in credits, of every fixed-price action and monthly fee. Free. */
+  creditCosts: (engine: "v2" | "legacy" = "v2"): Promise<VcaasResponse<{ creditCosts: Record<string, number> }>> =>
+    proxy.get<{ creditCosts: Record<string, number> }>(`${API}/credit-costs?engine=${engine}`),
 
   // ─── Non-JSON endpoints (dedicated internal routes, not the catch-all) ───
 

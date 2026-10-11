@@ -19,7 +19,7 @@ import { cn } from "@/lib/utils";
  * Built on the shadcn Dialog (Radix) so focus trapping, focus restore, ESC,
  * scroll locking and `aria-modal` come for free. What we add:
  *   · centred dialog on >= sm, BOTTOM SHEET on mobile (thumb-reachable, with a
- *     grab handle) — the design calls for the mobile bottom-sheet behaviour
+ *     grab handle) — CONTEXT §7.11 requires the mobile bottom-sheet behaviour
  *   · a scrollable body with sticky header/footer so long content never pushes
  *     the primary action off screen
  *   · one place to make every modal in phases 10–19 look identical
@@ -69,6 +69,17 @@ export interface ModalProps {
   children?: React.ReactNode;
 }
 
+/**
+ * Inside `<InlineModals>` a `Modal` renders in place — the same title, description, body and footer, laid out as a page
+ * section instead of a dialog — so a modal's component can also be a page section with its own UI and logic unchanged
+ * (the v2 workspace "More" view). Only the outermost one: a dialog it opens (a confirm, a dirty guard) stays a dialog.
+ */
+const InlineModalContext = React.createContext(false);
+
+export function InlineModals({ children }: { children: React.ReactNode }) {
+  return <InlineModalContext.Provider value>{children}</InlineModalContext.Provider>;
+}
+
 export function Modal({
   open,
   onOpenChange,
@@ -88,6 +99,36 @@ export function Modal({
   const t = useT();
   const descriptionId = React.useId();
   const hasHeader = Boolean(title || description || headerAside);
+  const inline = React.useContext(InlineModalContext);
+
+  if (inline) {
+    if (!open) return null;
+    return (
+      <InlineModalContext.Provider value={false}>
+        <section data-slot="modal-inline" aria-labelledby={title ? descriptionId + "t" : undefined} className={cn("mx-auto flex w-full max-w-4xl flex-col", !footer && "pb-8", className)}>
+          {hasHeader ? (
+            <div className="flex items-start gap-3 pb-5">
+              <div className="min-w-0 flex-1 space-y-1.5">
+                {title ? (
+                  <h2 id={descriptionId + "t"} className="font-display text-lg font-semibold">
+                    {title}
+                  </h2>
+                ) : null}
+                {description ? <p className="text-muted-foreground text-sm">{description}</p> : null}
+              </div>
+              {headerAside ? <div className="shrink-0">{headerAside}</div> : null}
+            </div>
+          ) : null}
+          <div className={cn("min-w-0", bodyClassName)}>{children}</div>
+          {footer ? (
+            <div className="bg-background/95 sticky bottom-0 mt-6 flex flex-col-reverse gap-2 border-t py-4 backdrop-blur-sm sm:flex-row sm:justify-end [&>*]:w-full sm:[&>*]:w-auto">
+              {footer}
+            </div>
+          ) : null}
+        </section>
+      </InlineModalContext.Provider>
+    );
+  }
 
   const blockClose = (event: Event) => {
     if (!dismissible) event.preventDefault();

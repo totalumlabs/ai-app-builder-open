@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { publicUrlRejectionReason } from "@/lib/safe-url";
+import { TOTALUM_API_ORIGIN } from "@/lib/vcaas-server";
 
 // Git-diff text proxy. The `gitDiffUrl` returned by the VCaaS conversation API
 // points at an external (signed) storage host, so the browser can't fetch it
@@ -26,6 +27,8 @@ const ALLOWED_HOSTS = [
 function isAllowedDiffUrl(url: URL): boolean {
   if (url.protocol !== "https:") return false;
   const host = url.hostname.toLowerCase();
+  // The configured Totalum API host serves diffs too (another environment's host, when `TOTALUM_API_URL` is set).
+  if (url.origin === TOTALUM_API_ORIGIN) return true;
   return ALLOWED_HOSTS.some(
     (allowed) => host === allowed || host.endsWith(`.${allowed}`)
   );

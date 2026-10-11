@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { vcaasApi } from "@/lib/vcaas";
 import { Button } from "@/components/ui/button";
 import {
-  Rocket, Loader2, Eye, Database, Key, Globe, Terminal,
+  Rocket, Loader2, Eye, LayoutGrid, Key, Globe, Terminal,
   RefreshCw, Server, PanelLeftClose, PanelLeft, Monitor, Smartphone,
   ExternalLink, Sparkles, ChevronDown, FolderOpen, Plus,
   Clock, Github, Code2, ArrowLeft, Figma, Copy,
@@ -14,7 +14,8 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { ChatPanel } from "@/components/workspace/ChatPanel";
 import { PreviewPanel } from "@/components/workspace/PreviewPanel";
-import { DatabasePanel } from "@/components/workspace/DatabasePanel";
+import { WorkspaceMore } from "@/components/workspace/v2/WorkspaceMore";
+import { V2Banner } from "@/components/workspace/v2/V2Banner";
 import { CodePanel } from "@/components/workspace/CodePanel";
 import { LogsPanel } from "@/components/workspace/LogsPanel";
 import { VersionsModal } from "@/components/workspace/VersionsModal";
@@ -38,7 +39,8 @@ import { OperationBanner } from "@/components/workspace/OperationBanner";
 import { PublishedModal } from "@/components/workspace/PublishedModal";
 import { useProjectOperation } from "@/components/workspace/use-project-operation";
 import { OPERATION_COPY, OPERATION_PROFILES, shouldAdoptServerRebuild } from "@/lib/project-operation";
-import { getPublishedHost, getPreviewUrlField } from "@/lib/project-status";
+import { getPublishedHost, getPreviewUrlField, isV2Project } from "@/lib/project-status";
+import { optionsForEngine } from "@/lib/run-options";
 import { useVisualEditor } from "@/components/workspace/visual-editor/use-visual-editor";
 import { VisualEditorPanel } from "@/components/workspace/visual-editor/VisualEditorPanel";
 import { VisualChangesBar } from "@/components/workspace/visual-editor/VisualChangesBar";
@@ -313,7 +315,7 @@ export default function WorkspacePage() {
 
   const TABS = [
     { id: "preview", label: "Preview", icon: Eye },
-    { id: "database", label: "Database", icon: Database },
+    { id: "more", label: translate("more.tab"), icon: LayoutGrid },
     { id: "code", label: "Code", icon: Code2 },
   ];
 
@@ -573,7 +575,14 @@ export default function WorkspacePage() {
         fetchConversation();
         return;
       }
-      if (res.data.status === "error") { setDeploying(false); operation.end("publish"); toast.error("Deployment failed"); return; }
+      if (res.data.status === "error") {
+        setDeploying(false);
+        operation.end("publish");
+        // New engine: why it failed is on the status (and on the project's `lastDeployError`, which the banner shows).
+        toast.error(res.data.errorDetails?.title || "Deployment failed");
+        void fetchProject();
+        return;
+      }
     }
     setTimeout(pollDeployOnce, 10000);
   }
@@ -655,7 +664,7 @@ export default function WorkspacePage() {
      * ⚠️ ONLY WHAT THE USER CHOSE IS SENT. `options` is `{}` unless the run-options menu
      * was touched, so Totalum's own model/effort routing stays in charge by default.
      */
-    const res = await vcaasApi.agent.start(projectId, { prompt: text, inputFiles: files || [], ...(options || {}) });
+    const res = await vcaasApi.agent.start(projectId, { prompt: text, inputFiles: files || [], ...optionsForEngine(options || {}, isV2Project(project)) });
     if (res.ok) {
       setProject((prev) => prev ? { ...prev, agentProcessStatus: "init" } : prev);
       pendingRunRef.current = true; runWaitPollsRef.current = 0;
@@ -1150,11 +1159,12 @@ export default function WorkspacePage() {
       if (el) { el.focus(); const len = el.value.length; el.setSelectionRange(len, len); }
     }, 60);
   }, []);
-  const handleDeploy = async () => {
+  /** `confirmDestructive`: the user confirmed the pending migration that deletes data (new engine; from the banner). */
+  const handleDeploy = async (confirmDestructive = false) => {
     if (deploying) return;
     if (refuseWhileBusy()) return;
     setDeploying(true);
-    const res = await vcaasApi.deployments.deploy(projectId);
+    const res = await vcaasApi.deployments.deploy(projectId, confirmDestructive);
 
     /**
      * ⭐ THE SERVER WAS ASLEEP, SO THE API STARTED IT AND REFUSED THE PUBLISH. Not a
@@ -1382,6 +1392,12 @@ export default function WorkspacePage() {
 
   // The chat's composer props that both layouts share — the tool tray's wiring.
   const composerProps = {
+    v2: isV2Project(project),
+    onClearContext: async () => {
+      const res = await vcaasApi.agent.clearContext(projectId);
+      if (res.ok) toast.success(translate("workspace.chat.runOptions.clearContextDone"));
+      else toast.error(res.error || translate("workspace.chat.runOptions.clearContextFailed"));
+    },
     attachedFiles,
     setAttachedFiles,
     onOpenFigma: () => setOpenModal("figma"),
@@ -1475,7 +1491,7 @@ export default function WorkspacePage() {
               isDeploying={deploying}
               isRunning={isBuilding}
               blockedReason={deploying ? null : operationBusyReason}
-              onDeploy={handleDeploy}
+              onDeploy={() => void handleDeploy()}
               onOpenDomain={() => setOpenModal("domain")}
             />
           </div>
@@ -1505,6 +1521,8 @@ export default function WorkspacePage() {
               showing, so the explanation belongs above that panel and not in a toast that
               is gone before the work is.
             */}
+            {/* New-engine projects: paused / emergency stop / database move / last publish failed (renders nothing otherwise). */}
+            <V2Banner project={project} onChanged={() => void fetchProject()} onAskFix={setPrompt} onPublishConfirmed={() => void handleDeploy(true)} />
             {operation.kind && (
               <div className="px-2 pt-2 sm:px-3">
                 <OperationBanner kind={operation.kind} elapsedMs={operation.elapsedMs} />
@@ -1523,7 +1541,7 @@ export default function WorkspacePage() {
             <div className={`flex-1 overflow-hidden ${activeTab === "preview" ? "rounded-none" : "m-2 sm:m-3 rounded-xl shadow-sm"}`} style={{ background: cardBg }}>
               {activeTab === "preview" && <PreviewPanel key={previewKey} previewUrl={shownPreviewUrl} cached={previewCached} onRefresh={() => { fetchProject(); setPreviewKey((k) => k + 1); }} loading={isBuilding} mobilePreview={mobilePreview} iframePath={iframePath} frameRef={previewFrameRef} /* ⭐ Same-origin ONLY while the editor is open — and for the length of an apply, which outlives the panel: dropping the proxy mid-apply would reload the frame and throw away the preview-only edits the user is watching. */ proxiedSrc={visualEditorOpen || visualLocked ? `/api/preview/${encodeURIComponent(projectId)}` : null} />}
               {activeTab === "code" && <CodePanel projectId={projectId} darkMode={darkMode} onAskAiEdit={handleAskAiEdit} wake={serverWake} onRebuildStarted={() => operation.begin("rebuild")} onRebuildFinished={() => operation.end("rebuild")} />}
-              {activeTab === "database" && <DatabasePanel projectId={projectId} />}
+              {activeTab === "more" && <WorkspaceMore project={project} onProjectChanged={() => void fetchProject()} onPublish={() => void handleDeploy()} />}
             </div>
             {/* The unsaved-changes bar owns the whole batch: count, undo, discard and apply. */}
             <VisualChangesBar
@@ -1606,6 +1624,8 @@ export default function WorkspacePage() {
           </div>
         )}
 
+        <V2Banner project={project} onChanged={() => void fetchProject()} onAskFix={(text) => { setPrompt(text); setMobileTab("chat"); }} onPublishConfirmed={() => void handleDeploy(true)} />
+
         {/* Mobile content area */}
         <div className="flex-1 overflow-hidden" style={{ background: cardBg }}>
           {mobileTab === "chat" ? (
@@ -1617,7 +1637,7 @@ export default function WorkspacePage() {
             <div className="h-full overflow-hidden">
               {activeTab === "preview" && <PreviewPanel key={previewKey} previewUrl={shownPreviewUrl} cached={previewCached} onRefresh={() => { fetchProject(); setPreviewKey((k) => k + 1); }} loading={isBuilding} mobilePreview={false} iframePath={iframePath} />}
               {activeTab === "code" && <CodePanel projectId={projectId} darkMode={darkMode} onAskAiEdit={handleAskAiEdit} wake={serverWake} onRebuildStarted={() => operation.begin("rebuild")} onRebuildFinished={() => operation.end("rebuild")} />}
-              {activeTab === "database" && <DatabasePanel projectId={projectId} />}
+              {activeTab === "more" && <WorkspaceMore project={project} onProjectChanged={() => void fetchProject()} onPublish={() => void handleDeploy()} />}
             </div>
           )}
         </div>

@@ -207,7 +207,11 @@ export function SecretsModal({
                                             ••••••••
                                         </span>
                                         <StatusPill tone={ENV_TONE[secret.environment] ?? "neutral"}>
-                                            {secret.environment}
+                                            {/* SP20: the label, never the raw value */}
+                                            {(() => {
+                                                const known = ENVIRONMENTS.find(e => e.value === secret.environment);
+                                                return known ? t(known.labelKey) : secret.environment;
+                                            })()}
                                         </StatusPill>
                                         <Button
                                             variant="ghost"

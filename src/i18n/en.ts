@@ -9,7 +9,9 @@
  *  · Keep the nesting shallow and grouped by surface (nav, auth, projects, …).
  */
 
-export const en = {
+import { enMore } from "./en-more";
+
+const base = {
   brand: {
     name: "Totalum",
     product: "Totalum Platform",
@@ -3641,6 +3643,20 @@ export const en = {
   },
 
   // ── The project workspace ──────────────────────────────────────
+  /* This app's "More" tab (the platform's More view plus its custom domain and logs). */
+  more: {
+    tab: "More",
+    legacyTitle: "Available on new-engine projects",
+    legacyBody:
+      "This project runs on Totalum's legacy engine. The database explorer, scheduled jobs, mobile apps, payments, API keys, usage and the rest of More need a project created on the current engine. Versions, secrets, the custom domain and logs stay in the header.",
+    settingsDescription: "The agent's instructions and tools, the live address, and pausing the project.",
+    boughtTitle: "Domains bought on Totalum",
+    hostWww: "Site at www.{domain}; {domain} redirects to it",
+    hostApex: "Site at {domain}; www.{domain} redirects to it",
+    hostLabel: "Main address",
+    attachHere: "Attach to this project",
+    paymentsNeedHttps: "Stripe sends you back to this app after the setup, so it must be served over HTTPS: set NEXT_PUBLIC_APP_URL to its HTTPS address.",
+  },
   workspace: {
     tabsLabel: "Workspace panels",
 
@@ -3927,7 +3943,7 @@ export const en = {
       whatHappensAgain: "What happens when you publish again",
       factPublic: "Your app becomes public — anyone with the address can open it.",
       factReplace: "The live version is replaced. Visitors see the new one as soon as it finishes.",
-      costNotice: "Publishing costs 1 credit.",
+      costNotice: "Publishing costs {price}.",
       domainSection: "Address",
       domainActive: "Active",
       domainPendingDns: "Pending DNS",
@@ -5181,5 +5197,21 @@ export const en = {
     draft: "Draft",
   },
 } as const;
+
+type Merged<A, B> = {
+  [K in keyof A | keyof B]: K extends keyof B ? (K extends keyof A ? (A[K] extends string ? A[K] : Merged<A[K], B[K]>) : B[K]) : K extends keyof A ? A[K] : never;
+};
+
+function merge(a: Record<string, unknown>, b: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...a };
+  for (const [k, v] of Object.entries(b)) {
+    const cur = out[k];
+    out[k] = cur && typeof cur === "object" && v && typeof v === "object" ? merge(cur as Record<string, unknown>, v as Record<string, unknown>) : cur ?? v;
+  }
+  return out;
+}
+
+/** This app's dictionary plus the platform keys of the v2 "More" view (`en-more.ts`); a local value always wins. */
+export const en = merge(base, enMore) as unknown as Merged<typeof base, typeof enMore>;
 
 export default en;

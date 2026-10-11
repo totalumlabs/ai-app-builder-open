@@ -215,6 +215,8 @@ export function getPreviewUrlField(detail: VcaasProject | null | undefined): Pre
 }
 
 export function getPreviewUrl(detail: VcaasProject | null | undefined): string | null {
+    // v2: one preview address — the temporal link, iframed directly, never composed.
+    if (isV2Project(detail)) return detail?.preview?.temporalLinkUrl || detail?.preview?.url || detail?.temporalDevelopmentProjectUrl || null;
     if (!detail) return null;
 
     const field = getPreviewUrlField(detail);
@@ -341,4 +343,41 @@ export function getPublishedHost(
             : detail?.productionProjectUrl || `${projectId}.totalum-project.com`;
 
     return host.replace(/^https?:\/\//i, "").replace(/\/+$/, "");
+}
+
+// ─────────────── engine gating (plan 15 §1.2) ───────────────
+// The ONLY place `engineVersion` is read. Not loaded yet (`undefined`) ⇒ legacy, so a slow
+// load can never flash a v2 surface on a legacy project.
+
+export type EngineVersion = "legacy" | "v2";
+
+export function engineOf(project: { engineVersion?: string | null } | null | undefined): EngineVersion {
+    return project?.engineVersion === "v2" ? "v2" : "legacy";
+}
+
+export function isV2Project(project: { engineVersion?: string | null } | null | undefined): boolean {
+    return engineOf(project) === "v2";
+}
+
+/**
+ * A new v2 project whose databases, preview Worker and sandbox are still being created (≈ 10–20 s after the create).
+ * Its preview host answers "This Totalum project doesn't exist" until then, so the workspace shows "Setting up your
+ * project" instead of the iframe, and re-reads the project until it is `ready`.
+ */
+export function isV2SettingUp(project: Pick<VcaasProject, "engineVersion" | "engineState"> | null | undefined): boolean {
+    return isV2Project(project) && (project?.engineState === "queued" || project?.engineState === "provisioning");
+}
+
+/** A v2 project the user paused (A4.13). Contracts carry it flat (`state`) and under `lifecycle`. */
+export function isPausedByUser(project: VcaasProject | null | undefined): boolean {
+    if (!isV2Project(project)) return false;
+    return project?.state === "paused-by-user" || project?.lifecycle?.state === "paused-by-user";
+}
+
+/**
+ * B2-SW9: the engine's note that ends a run the user stopped (`🛑 …`, the legacy wording the API keeps). The chat
+ * shows the run's "You stopped this run" card for it, never the note under a green "Completed".
+ */
+export function isStoppedRunMessage(message: string | null | undefined): boolean {
+    return typeof message === "string" && message.trimStart().startsWith("🛑");
 }

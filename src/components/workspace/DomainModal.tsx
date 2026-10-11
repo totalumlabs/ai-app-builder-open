@@ -1,19 +1,23 @@
 "use client";
 
 import * as React from "react";
-import { CheckCircle2Icon, ExternalLinkIcon, GlobeIcon, LoaderIcon, RocketIcon, TriangleAlertIcon } from "lucide-react";
+import { ArrowLeftIcon, CheckCircle2Icon, ExternalLinkIcon, GlobeIcon, LoaderIcon, RocketIcon, TriangleAlertIcon } from "lucide-react";
 import { ConfirmDialog, CopyButton, Modal, StatusPill } from "@/components/primitives";
 import { PaidFeature, CapabilityUsage } from "@/components/plan/PaidFeature";
 import { useCapabilities } from "@/components/plan/CapabilityProvider";
+import { usePrice } from "@/components/credits/CreditsProvider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useT } from "@/i18n";
 import { toast } from "@/lib/toast";
+import { HOSTNAME_REGEX, domainHelpKey, isManagedHostname, normaliseHostname } from "@/lib/domain-connect";
 import { getDomainProgress, isDomainSettling } from "@/lib/domain-status";
 import { vcaasApi } from "@/lib/vcaas";
 import type { VcaasDomain, VcaasProject } from "@/lib/vcaas-types";
 import { cn } from "@/lib/utils";
+import { DomainBuyPanel } from "./DomainBuyPanel";
+import { ApexPreview, ApexRedirectNote, DomainChoice, DomainTroubleshooting, SslLine } from "./DomainConnectGuide";
 import { DomainProgressPanel } from "./DomainProgress";
 import { useDirtyGuard } from "./use-dirty-guard";
 
@@ -52,9 +56,6 @@ import { useDirtyGuard } from "./use-dirty-guard";
 
 const POLL_INTERVAL_MS = 20_000;
 
-/** Accepts `example.com` and `app.example.com`; rejects schemes, paths and ports. */
-const HOSTNAME_REGEX = /^(?!-)[a-z0-9-]{1,63}(?<!-)(\.(?!-)[a-z0-9-]{1,63}(?<!-))+$/;
-
 export interface DomainModalProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
@@ -66,6 +67,15 @@ export interface DomainModalProps {
 export function DomainModal({ open, onOpenChange, projectId, project, onChanged }: DomainModalProps) {
     const t = useT();
     const { refresh: refreshCapabilities } = useCapabilities();
+    const price = usePrice();
+    /**
+     * domodal (Francesc 2026-10-01): a v2 project first chooses "buy a new domain" or "connect one I own"; the buy
+     * path is Settings → Domains' purchase with this project attached in the same call. Legacy keeps the form.
+     */
+    const isV2 = project?.engineVersion === "v2";
+    const [path, setPath] = React.useState<"choose" | "buy" | "connect">("choose");
+    const attachFee = price("ADD_CUSTOM_DOMAIN", isV2 ? "v2" : undefined);
+    const monthlyFee = price("MONTHLY_CUSTOM_DOMAIN_FEE", "v2");
 
     const [hostname, setHostname] = React.useState("");
     const [saving, setSaving] = React.useState(false);
@@ -94,7 +104,10 @@ export function DomainModal({ open, onOpenChange, projectId, project, onChanged 
     }, [project?.customDomain]);
 
     React.useEffect(() => {
-        if (!open) setHostname("");
+        if (!open) {
+            setHostname("");
+            setPath("choose");
+        }
     }, [open]);
 
     const settling = isDomainSettling(domain);
@@ -158,7 +171,7 @@ export function DomainModal({ open, onOpenChange, projectId, project, onChanged 
         return () => clearInterval(timer);
     }, [open, settling]);
 
-    const normalised = hostname.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+    const normalised = normaliseHostname(hostname);
     const hostnameValid = HOSTNAME_REGEX.test(normalised);
 
     async function handleSave(event: React.FormEvent) {
@@ -197,8 +210,27 @@ export function DomainModal({ open, onOpenChange, projectId, project, onChanged 
         void refreshCapabilities();
     }
 
+    /**
+     * A domain bought through Totalum and attached here has its records written by Totalum at the registrar, so the
+     * "add these records at your provider" ask would be wrong. The project view does not say where a domain came
+     * from; the account's domain list does (`attachedProjectId`).
+     */
+    const [managed, setManaged] = React.useState(false);
+    const attachedHost = isV2 && open ? domain?.hostname ?? null : null;
+    React.useEffect(() => {
+        if (!attachedHost) return setManaged(false);
+        let live = true;
+        void vcaasApi.v2.domains().then(r => {
+            if (!live || !r.ok) return;
+            setManaged(isManagedHostname(attachedHost, projectId, r.data?.domains ?? []));
+        });
+        return () => {
+            live = false;
+        };
+    }, [attachedHost, projectId]);
+
     const progress = getDomainProgress(domain);
-    const hasRecords = (domain?.dnsRecordsToAdd?.length ?? 0) > 0;
+    const hasRecords = !managed && (domain?.dnsRecordsToAdd?.length ?? 0) > 0;
     /** The records are still the user's move — the one state this screen shouts about. */
     const needsRecords = progress?.steps[0].state === "active" && hasRecords;
 
@@ -242,7 +274,31 @@ export function DomainModal({ open, onOpenChange, projectId, project, onChanged 
                             </div>
                         )}
 
-                        {domain?.hostname ? (
+                        {isV2 && path !== "choose" && !domain?.hostname && (
+                            <button
+                                type="button"
+                                onClick={() => setPath("choose")}
+                                className="text-muted-foreground hover:text-foreground -mt-1 flex items-center gap-1 text-xs"
+                            >
+                                <ArrowLeftIcon className="size-3.5" aria-hidden />
+                                {t("workspace.domain.choice.back")}
+                            </button>
+                        )}
+
+                        {isV2 && path === "buy" ? (
+                            // ── Buy a new domain (v2): search → confirm → bought + attached ──
+                            <DomainBuyPanel
+                                projectId={projectId}
+                                attachFee={attachFee}
+                                monthlyFee={monthlyFee}
+                                onBought={() => {
+                                    onChanged();
+                                    void refreshCapabilities();
+                                    void checkNow();
+                                }}
+                                onDone={() => setPath("connect")}
+                            />
+                        ) : domain?.hostname ? (
                             // ── An attached domain ────────────────────────────
                             <div className="space-y-3">
                                 <div className="border-border rounded-lg border p-3">
@@ -277,8 +333,13 @@ export function DomainModal({ open, onOpenChange, projectId, project, onChanged 
                                     {/* What to DO about this status — not just what it is. */}
                                     {progress && (
                                         <p className="text-muted-foreground mt-2 text-xs">
-                                            {t(progress.helpKey)}
+                                            {t(domainHelpKey(progress.helpKey, managed))}
                                         </p>
+                                    )}
+                                    {isV2 && (
+                                        <div className="mt-2">
+                                            <SslLine sslStatus={domain.sslStatus} />
+                                        </div>
                                     )}
                                 </div>
 
@@ -313,7 +374,17 @@ export function DomainModal({ open, onOpenChange, projectId, project, onChanged 
                                   people were closing this dialog without knowing
                                   that was still their job.
                                 */}
-                                {domain.dnsRecordsToAdd && domain.dnsRecordsToAdd.length > 0 && (
+                                {managed && (
+                                    <p
+                                        className="border-success/40 bg-success-subtle text-success-subtle-foreground flex items-start gap-1.5 rounded-lg border p-2.5 text-xs"
+                                        data-testid="domain-managed"
+                                    >
+                                        <CheckCircle2Icon className="mt-px size-3.5 shrink-0" aria-hidden />
+                                        {t("workspace.domain.connect.managed")}
+                                    </p>
+                                )}
+
+                                {hasRecords && domain.dnsRecordsToAdd && (
                                     <div className="space-y-2">
                                         <div className="flex flex-wrap items-center gap-2">
                                             <h3 className="text-sm font-medium">
@@ -335,52 +406,47 @@ export function DomainModal({ open, onOpenChange, projectId, project, onChanged 
                                                 : t("workspace.domain.dnsDescription")}
                                         </p>
 
-                                        <div className="border-border overflow-x-auto rounded-lg border">
-                                            <table className="w-full border-collapse text-xs">
-                                                <thead className="bg-muted/60">
-                                                    <tr>
-                                                        <th scope="col" className="px-2.5 py-1.5 text-left font-medium">
-                                                            {t("workspace.domain.dnsType")}
-                                                        </th>
-                                                        <th scope="col" className="px-2.5 py-1.5 text-left font-medium">
-                                                            {t("workspace.domain.dnsName")}
-                                                        </th>
-                                                        <th scope="col" className="px-2.5 py-1.5 text-left font-medium">
-                                                            {t("workspace.domain.dnsValue")}
-                                                        </th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {domain.dnsRecordsToAdd.map((record, index) => (
-                                                        <tr key={index} className="border-border/60 border-t">
-                                                            <td className="px-2.5 py-1.5 font-mono">{record.type}</td>
-                                                            <td className="px-2.5 py-1.5">
-                                                                <span className="flex items-center gap-1">
-                                                                    <code className="min-w-0 truncate font-mono">
-                                                                        {record.name}
-                                                                    </code>
-                                                                    <CopyButton value={record.name} />
-                                                                </span>
-                                                            </td>
-                                                            <td className="px-2.5 py-1.5">
-                                                                <span className="flex items-center gap-1">
-                                                                    <code className="min-w-0 truncate font-mono">
-                                                                        {record.value}
-                                                                    </code>
-                                                                    <CopyButton value={record.value} />
-                                                                </span>
-                                                            </td>
-                                                        </tr>
-                                                    ))}
-                                                </tbody>
-                                            </table>
-                                        </div>
+                                        {/* domodal: one card per record, every field wraps — a table cut the
+                                           values off at the dialog edge, the one thing that must be copied whole. */}
+                                        <ul className="border-border divide-border divide-y rounded-lg border" data-testid="domain-dns-records">
+                                            {domain.dnsRecordsToAdd.map((record, index) => (
+                                                <li key={index} className="grid gap-1.5 p-3 text-xs sm:grid-cols-[4.5rem_1fr]">
+                                                    <span className="bg-muted h-fit w-fit rounded px-1.5 py-0.5 font-mono font-medium">
+                                                        {record.type}
+                                                    </span>
+                                                    <dl className="min-w-0 space-y-1.5">
+                                                        {([
+                                                            ["dnsName", record.name],
+                                                            ["dnsValue", record.value],
+                                                        ] as const).map(([label, value]) => (
+                                                            <div key={label} className="flex items-start gap-2">
+                                                                <dt className="text-muted-foreground w-12 shrink-0 pt-0.5">
+                                                                    {t(`workspace.domain.${label}`)}
+                                                                </dt>
+                                                                <dd className="flex min-w-0 flex-1 items-start gap-1">
+                                                                    <code className="min-w-0 flex-1 font-mono break-all">{value}</code>
+                                                                    <CopyButton value={value} />
+                                                                </dd>
+                                                            </div>
+                                                        ))}
+                                                    </dl>
+                                                </li>
+                                            ))}
+                                        </ul>
 
                                         <p className="text-muted-foreground flex items-start gap-1.5 text-xs">
                                             <TriangleAlertIcon className="mt-px size-3 shrink-0" aria-hidden />
                                             {t("workspace.deploy.dnsNotice")}
                                         </p>
+                                        {isV2 && <ApexRedirectNote hostname={domain.hostname} />}
                                     </div>
+                                )}
+
+                                {isV2 && !managed && domain.status !== "active" && <DomainTroubleshooting />}
+                                {isV2 && (
+                                    <p className="text-muted-foreground text-xs">
+                                        {t("workspace.domain.connect.monthlyFee", { monthly: monthlyFee })}
+                                    </p>
                                 )}
 
                                 {/*
@@ -404,6 +470,8 @@ export function DomainModal({ open, onOpenChange, projectId, project, onChanged 
                                 <p className="text-sm font-medium">{t("workspace.domain.deployFirstTitle")}</p>
                                 <p className="mt-1 text-xs">{t("workspace.domain.deployFirstDescription")}</p>
                             </div>
+                        ) : isV2 && path === "choose" ? (
+                            <DomainChoice onChoose={setPath} />
                         ) : (
                             // ── Attach a domain ───────────────────────────────
                             <form onSubmit={handleSave} className="space-y-3">
@@ -430,10 +498,17 @@ export function DomainModal({ open, onOpenChange, projectId, project, onChanged 
                                         </p>
                                     ) : (
                                         <p className="text-muted-foreground text-xs">
-                                            {t("workspace.domain.hostnameHint")}
+                                            {isV2 ? t("workspace.domain.connect.hint") : t("workspace.domain.hostnameHint")}
                                         </p>
                                     )}
                                 </div>
+
+                                {isV2 && hostnameValid && <ApexPreview hostname={normalised} />}
+                                {isV2 && (
+                                    <p className="text-muted-foreground text-xs">
+                                        {t("workspace.domain.connect.fee", { price: attachFee, monthly: monthlyFee })}
+                                    </p>
+                                )}
 
                                 <Button type="submit" size="sm" disabled={!hostnameValid || saving}>
                                     {saving ? (

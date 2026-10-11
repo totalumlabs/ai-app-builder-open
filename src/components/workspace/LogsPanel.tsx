@@ -40,7 +40,7 @@ import type { VcaasErrorCode } from "@/lib/vcaas-errors";
 import { cn } from "@/lib/utils";
 
 /**
- * THE SERVER LOGS — DEVELOPMENT **AND** PRODUCTION.
+ * THE SERVER LOGS — DEVELOPMENT **AND** PRODUCTION (Feature F9).
  *
  * ⚠️⚠️ PHASE 09 SHIPPED ONE TAB ON A FALSE PREMISE, and this is the correction.
  * It assumed the dev server "on PORT 80 serves both the preview and the published
@@ -138,9 +138,19 @@ export interface LogsPanelProps {
      * site that they have never deployed is worse than saying nothing.
      */
     hasBeenDeployed?: boolean;
+    /**
+     * A new-engine (v2) project. Its production logs come from Cloudflare Workers
+     * Logs, measured on dev 2026-09-30 at ~20 s from request to query (not Logpush's
+     * hours), and they have no per-plan request limit, so production refreshes at the
+     * dev rate and the copy states the real delay.
+     */
+    engineV2?: boolean;
 }
 
-export function LogsPanel({ projectId, hasBeenDeployed }: LogsPanelProps) {
+export function LogsPanel({ projectId, hasBeenDeployed, engineV2 = false }: LogsPanelProps) {
+    /** The v2 variant of a production string, when there is one. */
+    const prodKey = (key: "prodHint" | "autoRefreshHintProd" | "emptyProdDescription") =>
+        `workspace.logs.${key}${engineV2 ? "V2" : ""}` as const;
     const t = useT();
     const { locale } = useLocale();
 
@@ -164,6 +174,8 @@ export function LogsPanel({ projectId, hasBeenDeployed }: LogsPanelProps) {
     const mounted = React.useRef(true);
     const atBottomRef = React.useRef(true);
     const sourceRef = React.useRef<Source>(source);
+    /** `hours|query` of the latest production request (see `fetchLogs`). */
+    const lastProdKey = React.useRef<string | null>(null);
     sourceRef.current = source;
 
     const current = state[source];
@@ -182,6 +194,10 @@ export function LogsPanel({ projectId, hasBeenDeployed }: LogsPanelProps) {
     const fetchLogs = React.useCallback(
         async (target: Source, query: string, hours: ProdRangeHours) => {
             setLoading(true);
+            // The newest production request wins: a range or search chosen while one is in flight is fetched too,
+            // and the older answer is dropped instead of landing under the new range.
+            const prodKey = target === "prod" ? `${hours}|${query}` : null;
+            if (prodKey) lastProdKey.current = prodKey;
 
             const response =
                 target === "dev"
@@ -207,7 +223,7 @@ export function LogsPanel({ projectId, hasBeenDeployed }: LogsPanelProps) {
                           ...(query.trim() ? { regexSearch: query.trim() } : {}),
                       });
 
-            if (!mounted.current) return;
+            if (!mounted.current || (prodKey && prodKey !== lastProdKey.current)) return;
 
             setState(previous => {
                 const before = previous[target];
@@ -269,8 +285,8 @@ export function LogsPanel({ projectId, hasBeenDeployed }: LogsPanelProps) {
             firstSearch.current = false;
             return;
         }
-        // Dev filters what we already hold — no request, no debounce.
-        if (source !== "prod" || !state.prod.fetched) return;
+        // Dev filters what we already hold — no request, no debounce. A tab switch already fetched these params.
+        if (source !== "prod" || lastProdKey.current === `${rangeHours}|${search}`) return;
 
         const handle = setTimeout(() => void fetchLogs("prod", search, rangeHours), SEARCH_DEBOUNCE_MS);
         return () => clearTimeout(handle);
@@ -285,7 +301,7 @@ export function LogsPanel({ projectId, hasBeenDeployed }: LogsPanelProps) {
         }
 
         let cancelled = false;
-        const interval = source === "prod" ? PROD_REFRESH_MS : DEV_REFRESH_MS;
+        const interval = source === "prod" && !engineV2 ? PROD_REFRESH_MS : DEV_REFRESH_MS;
 
         const tick = async () => {
             if (cancelled) return;
@@ -303,7 +319,7 @@ export function LogsPanel({ projectId, hasBeenDeployed }: LogsPanelProps) {
             cancelled = true;
             if (timer.current) clearTimeout(timer.current);
         };
-    }, [autoRefresh, refresh, source]);
+    }, [autoRefresh, refresh, source, engineV2]);
 
     // ── Switching tabs ────────────────────────────────────────────────────
     function selectSource(next: Source) {
@@ -422,7 +438,7 @@ export function LogsPanel({ projectId, hasBeenDeployed }: LogsPanelProps) {
                 <p className="text-muted-foreground min-w-0 flex-1 truncate text-[11px]">
                     {source === "dev"
                         ? t("workspace.logs.devHint")
-                        : t("workspace.logs.prodHint", { range: rangeLabel })}
+                        : t(prodKey("prodHint"), { range: rangeLabel })}
                 </p>
 
                 {updatedLabel && (
@@ -517,7 +533,7 @@ export function LogsPanel({ projectId, hasBeenDeployed }: LogsPanelProps) {
                     <span id="logs-auto-refresh-hint" className="sr-only">
                         {t(
                             source === "prod"
-                                ? "workspace.logs.autoRefreshHintProd"
+                                ? prodKey("autoRefreshHintProd")
                                 : "workspace.logs.autoRefreshHint"
                         )}
                     </span>
@@ -640,7 +656,7 @@ export function LogsPanel({ projectId, hasBeenDeployed }: LogsPanelProps) {
                                             ? "workspace.logs.notDeployedDescription"
                                             : search
                                               ? "workspace.logs.emptyProdSearchDescription"
-                                              : "workspace.logs.emptyProdDescription"
+                                              : prodKey("emptyProdDescription")
                                         : "workspace.logs.emptyDescription",
                                     // Only the production strings interpolate it; the
                                     // dev ones simply ignore the extra value.

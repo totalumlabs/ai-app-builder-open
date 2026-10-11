@@ -62,10 +62,11 @@ All of this works with **one API key**. No other cloud accounts, no glue code:
 - 👀 **Live preview.** Watch the running app update while the agent works.
 - 🖱️ **Visual editor.** Click any element in the preview and change its text, size, colours or image. The change is written back to the exact file and line, and the app rebuilds.
 - 🧑‍💻 **Code editor.** A Monaco (VS Code) editor to read and edit every generated file. Save, rebuild, done.
-- 🗄️ **Database.** Every app gets a real database. Browse, query and edit its records from the UI.
+- 🗄️ **Database.** Every app gets its own SQL database, with a dev and a live copy. Browse and edit rows, run SQL or ask in plain words, read the schema and migrations, take backups and restore them, all from **More → Database**.
+- 🧰 **Everything else in "More".** The workspace's **More** tab holds every project control: database, site analytics, usage and spending limits, project API keys and `.env`, scheduled jobs (cron), secrets, mobile apps (Android/iOS builds and store uploads), payments (the app's own Stripe), custom domains (buy, connect, DNS records, auto-renew), logs and project settings (agent instructions, MCP servers, live address, pause).
 - 🔐 **Secrets and environment variables.** Managed per project and per environment.
 - 🚀 **Hosting and one-click deploy.** Every project has a live URL. Publish to production in one click.
-- 🌐 **Custom domains.** Attach your own domain with guided DNS setup and watch it go live.
+- 🌐 **Custom domains.** Buy a domain from the app or connect one you own with guided DNS setup, then manage its DNS records and renewal.
 - 🔗 **GitHub sync.** Connect a repo and push or pull changes in both directions.
 - 🎨 **Figma.** Paste a Figma frame link in the chat and the agent builds from the design.
 - 📦 **Export, import and duplicate projects.** Package a whole project into an import code, restore it, or clone it in one action.
@@ -128,7 +129,8 @@ That single key covers hosting, databases, AI, custom domains, GitHub sync and s
 | Variable | Required | What it is |
 | --- | :---: | --- |
 | `TOTALUM_VCAAS_API_KEY` | ✅ **Yes** | Your Totalum API key. The only variable the app needs. It is read on the server only and never reaches the browser. |
-| `NEXT_PUBLIC_APP_URL` | ⬜ Optional | The public URL of your deployment, e.g. `https://your-domain.com`. Used to allow-list your origin for CSP and CORS in production. Defaults to the same host. |
+| `TOTALUM_API_URL` | ⬜ Optional | The Totalum API host. Defaults to `https://builder-api.totalum.app`. Only change it to point the app at another Totalum environment. |
+| `NEXT_PUBLIC_APP_URL` | ⬜ Optional | The public URL of your deployment, e.g. `https://your-domain.com`. Used to allow-list your origin for CSP and CORS in production, and as the HTTPS address Stripe returns to after the payments setup when the app itself is served over plain HTTP. Defaults to the same host. |
 
 To start from the example file:
 
@@ -248,6 +250,7 @@ Three things worth knowing:
 
 - **The browser never sees your API key.** Client code calls same-origin proxy routes under `/api/vcaas/*`. The server adds the key and forwards the request to Totalum.
 - **Every Totalum call goes through one file.** The client side is `src/lib/vcaas.ts`, with its types in `src/lib/vcaas-types.ts`. The part that holds the key is `src/lib/vcaas-server.ts`. If you want to see how an endpoint is really called, polled and error-handled, read there.
+- **New projects use Totalum's current engine.** Each app gets its own SQL database (dev and live), scheduled jobs, mobile builds, payments and the rest of the **More** tab. Projects created on the legacy engine keep working (chat, preview, code, versions, secrets, domain, logs, publish), but More shows a notice for them: the new database explorer and those features need a current-engine project. See [Legacy projects: what differs](https://www.totalum.app/docs/api/migration-v2).
 - **Credits belong to the operator.** Every action runs on the one API key in your environment. When that account runs out of credits the app says so once and links to the billing page. ⚠️ That message is for **you**, not your users. Remove it before you sell this to customers.
 
 ---
@@ -270,14 +273,16 @@ Working on this repo with an AI agent? Start from [`AGENTS.md`](AGENTS.md). It i
 src/
 ├─ app/
 │  ├─ page.tsx                 # Dashboard: prompt box, your projects, import/duplicate
-│  ├─ project/[projectId]/     # The workspace (chat, preview, code, database, …)
+│  ├─ project/[projectId]/     # The workspace (chat, preview, code, more, …)
 │  └─ api/
 │     ├─ vcaas/[...path]/      # Server proxy to the Totalum API
 │     ├─ preview/[projectId]/  # Same-origin proxy of a project, needed by the visual editor
 │     ├─ visual-edit/…/apply   # Turns visual changes into real source edits
 │     └─ config/               # Reports whether the API key is configured
 ├─ components/
-│  └─ workspace/               # Chat, Preview, Code, Database, GitHub, Figma, Logs…
+│  └─ workspace/               # Chat, Preview, Code, GitHub, Figma, Logs…
+│     ├─ v2/                   # The More tab: analytics, usage, keys, cron, mobile, payments, domain, settings
+│     ├─ database-v2/          # The database explorer (rows, SQL, schema, migrations, backups)
 │     └─ visual-editor/        # Inspector panel, changes bar, the editor's own hook
 ├─ i18n/                       # One English dictionary + `useT()`
 ├─ lib/

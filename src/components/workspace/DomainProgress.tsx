@@ -232,7 +232,7 @@ export function DomainProgressPanel({
      * there — VCaaS omits `dnsRecordsToAdd` in some states, so this is a real case,
      * not a defensive one.
      */
-    const needsRecords = current?.id === "dns" && current.state === "active" && recordsBelow;
+    const needsRecords = current?.id === "dns" && current.state === "active" && recordsBelow && domain.source !== "purchase"; // SP19
 
     return (
         <section
@@ -373,7 +373,8 @@ export function DomainProgressCompact({
     */
     const line =
         current?.id === "dns" && current.state === "active"
-            ? t("workspace.domain.actionAddRecordsElsewhere")
+            ? // SP19: Totalum writes the records of a domain it registered — nothing for the user to add
+              t(domain.source === "purchase" ? "workspace.domain.purchasedSettingUp" : "workspace.domain.actionAddRecordsElsewhere")
             : current
               ? t(current.detailKey)
               : t(progress.helpKey);

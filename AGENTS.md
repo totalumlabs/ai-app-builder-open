@@ -42,7 +42,8 @@ browser ── vcaasApi (src/lib/vcaas.ts, one function per endpoint, no secrets
 /api/vcaas/[...path]  (src/app/api/vcaas/*) ── adds `api-key` header ── vcaas-server.ts
    │                                                                     (server-only)
    ▼
-https://api-accounts.totalum.app/api/v1/vcaas   ← documented at totalum.app/totalum-api.md
+https://builder-api.totalum.app/api/v1/vcaas    ← documented at totalum.app/totalum-api.md
+                                                  (TOTALUM_API_URL overrides the host)
 ```
 
 - `src/lib/vcaas.ts` — the client catalog. Every UI call goes through here; never hardcode an `/api/vcaas/...` path in a component.
@@ -69,7 +70,11 @@ https://api-accounts.totalum.app/api/v1/vcaas   ← documented at totalum.app/to
 | Waking a sleeping server | `app/project/[projectId]/page.tsx` (`markWorkspaceTouched`, `autoStartedFor`) | An `Archived` sandbox is started when the user **touches** the project, not when the page loads — opening a project is too cheap to spend credits and minutes on. Clicks inside `[data-workspace-header]` do not count: the header is scaffolding, and clicking it is usually how someone leaves. Guarded on operation-in-flight, agent-running, `serverWake.waking`, `agentServerStatus === "Archived"` exactly, and at least one user message. Once per project per mount. A refused action claims the wake instead of erroring: publish, pull, restore **and the composer** (`SERVER_NOT_READY` → strip + the prompt and its attachments go back in the box, so "send again" is possible). The strip renders in the panel column on desktop and above the tab switch on mobile, where the panel is a separate view. |
 | Live preview / wake / blocked dialogs | `PreviewPanel`, `use-server-wake.ts`, `ServerWakeNotice`, `ServerBlockedDialog` | `SERVER_NOT_READY` → wait strip, never a silent failure. |
 | Code editor + rebuild | `CodePanel.tsx` | Monaco; save = `files.write`, then rebuild. |
-| Database CMS | `DatabasePanel.tsx` + `components/workspace/db/*` + `lib/{totalum-schema,totalum-query,db-cell,db-files,join-filter}.ts` | The platform's browser/editor, copied verbatim. Table picker, grid with per-type cells, record detail, typed edit form, create and delete, file fields with upload and gallery, linked-record pickers, and a join-filter builder. **Querying is server-side, always** — paging, sorting, search and filters go into `queryOptions` (`_limit`/`_offset`/`_sort`/`_count`/`_filter`), never applied to a fetched page. Writing a file field sends `{name}` only; persisting the signed URL it was read with would bake in an expiring link. |
+| More tab | `components/workspace/v2/WorkspaceMore.tsx` → `MoreView.tsx` | The platform's "More" view: an aside of sections, the chosen one in place. Each section is the platform's own dialog rendered inline (`<InlineModals>` in `primitives/Modal`). Sections: Database, Analytics, Usage & limits, API keys (+ `.env`), Scheduled jobs, Secrets, Mobile, Payments, Custom domain, Logs, Settings. **New-engine projects only** (`isV2Project`); a legacy project gets a notice. |
+| Database explorer | `components/workspace/database-v2/*`, `lib/{db-v2-form,sql-statement,db-backups,db-move}.ts` | The platform's v2 explorer: Dev/Live switch, tables, paged rows with search/sort, create/edit/delete rows, raw SQL and plain-language questions, schema, migrations, backups/restore, database settings. Calls `database/schema`, `database/rows`, `database/records`, `database/sql`, `database/ask`, `database/backups`… The legacy `tables-structure`/`query` explorer was removed. |
+| Custom domain | `v2/ProjectDomainPanel.tsx` (More) and `DomainModal.tsx` (+ `DomainBuyPanel`, `DomainConnectGuide`, `settings/DomainManager`, `settings/DomainContactForm`) | Buy (`/domains/search`, `/domains/purchase` with `projectId`) or connect (`PUT …/domain`); bought domains: auto-renew, DNS records, forwarding, renew, transfer code, detach, attach a free one with `canonicalHost` `www`/`apex`. |
+| New-engine banner | `v2/V2Banner.tsx` (+ `RunawayNotice`, `DeployErrorCard`) | Paused project (Resume), emergency stop, database move, last publish failed ("Ask the AI to fix", "Publish anyway" = `confirmDestructive`). |
+| Run options | `RunOptionsMenu.tsx`, `lib/run-options.ts` | Legacy: model/effort/fast mode. New engine: the agent tier (Auto/Cheap/Normal/Expensive) only, via `optionsForEngine`. Also "Clear agent context". |
 | Visual editor | `components/workspace/visual-editor/*` | Desktop only; refused until the live dev server is ready. |
 | Versions, Secrets, Domain, GitHub, Figma, Logs | `*Modal.tsx`, `LogsPanel.tsx` (in a `Modal`) | Errands, not tabs. One `openModal` string in the page → never two at once. |
 | Publish | `DeployControl.tsx` → `PublishedModal.tsx` | Dialog explains public URL, ~3 min, 1 credit; links to the domain modal. |
@@ -79,6 +84,7 @@ https://api-accounts.totalum.app/api/v1/vcaas   ← documented at totalum.app/to
 
 ## Rules that are not obvious from the code
 
+0. **Shims for copied platform code.** `components/credits/CreditsProvider.tsx` (`usePrice` from `GET /credit-costs`), `lib/usage.ts` (chart colours), and `i18n/en-more.ts` (the platform keys the More view needs, merged into `en` by `en.ts`; a local value always wins). Platform-internal routes are never called: the `.env` download has its own proxy route (`api/vcaas/env/[projectId]`, the upstream answers plain text).
 1. **Copied-from-platform files stay verbatim.** Most of `components/workspace/*`, `components/prompt/*`, `components/primitives/*`, `lib/{format,logs,domain-status,env-parse,diff-parse,github-repo}.ts` and `i18n/en.ts` are straight copies of totalum-platform. Fix bugs there first, then re-copy. The only local adapters are `components/plan/*` (no-op plan gates) and `useLocale()` in `i18n/index.ts`.
 2. **Long operations belong to the page, not the modal or popover** that started them — those unmount. Start with `operation.begin(kind)`; the page's bounded watcher ends it.
 3. **Preview URL rule (from the API docs):** after every finished prompt, refetch the project and pick the URL named by `developmentUrlFieldToUse`; default to `temporalDevelopmentProjectUrl`. Never cache it.
@@ -113,7 +119,7 @@ This repo is the reference implementation. Two ways to use it:
 **A. Run it as-is beside your product.** Deploy it on a subdomain (`builder.yourapp.com`), put your login in front of it (see below), and link to `/project/<id>`. Rebrand `layout.tsx`, the dashboard header and `icon.svg`. Nothing else needs to change.
 
 **B. Port the flow into your own stack.** The UI is optional; the contract is not. Mirror three things in your backend language:
-1. **A key-holding proxy** = `src/lib/vcaas-server.ts` + `src/app/api/vcaas/[...path]/route.ts`: forward `method`, path, query and body to `https://api-accounts.totalum.app/api/v1/vcaas/<path>`, add `api-key: <your key>`, return the `{ errors, data }` envelope unchanged. Your browser code must never hold the key.
+1. **A key-holding proxy** = `src/lib/vcaas-server.ts` + `src/app/api/vcaas/[...path]/route.ts`: forward `method`, path, query and body to `https://builder-api.totalum.app/api/v1/vcaas/<path>`, add `api-key: <your key>`, return the `{ errors, data }` envelope unchanged. Your browser code must never hold the key.
 2. **The minimum flow** (section "Complete integration flow" in the API reference): `POST /projects/launch` → poll `GET /projects/:id/agent/status` every 10–15 s until `done` → `GET /projects/:id` and show the URL named by `developmentUrlFieldToUse` in an iframe → follow-ups with `POST /projects/:id/agent/start` → `POST /projects/:id/deployments/deploy` → poll `deployments/status`. Everything else (versions, secrets, domain, GitHub, logs) is additive; copy the matching `*Modal.tsx` for the exact calls and error handling.
 3. **Tenancy** = one Totalum project per customer (or per user). Store `projectId ↔ tenant` in your DB, check it on every proxied path that starts with `/projects/<id>/`, and filter `GET /projects` by your own table — the API lists every project the key owns.
 
@@ -145,7 +151,7 @@ Keep your own price separate from Totalum's credit cost; `GET /api/v1/vcaas/cred
 
 - ✅ Edit anything under `src/`, `README.md`, `AGENTS.md`, `.env.example`.
 - ⚠️ Ask before: changing `src/app/api/vcaas/_shared.ts` semantics, renaming `TOTALUM_VCAAS_API_KEY`, editing copied platform files in place, adding dependencies.
-- 🚫 Never: commit `.env*` files or any `tlm_sk_` key; expose the key via `NEXT_PUBLIC_*`; call `api-accounts.totalum.app` from client code; vendor the API docs into the repo; run publish/restore/delete against real projects to "test".
+- 🚫 Never: commit `.env*` files or any `tlm_sk_` key; expose the key via `NEXT_PUBLIC_*`; call the Totalum API (`builder-api.totalum.app`) from client code; vendor the API docs into the repo; run publish/restore/delete against real projects to "test".
 
 ## Git
 

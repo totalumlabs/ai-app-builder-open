@@ -12,8 +12,13 @@
 /**
  * Base URL for every Totalum API endpoint. Single source of truth.
  * 📖 API reference: https://www.totalum.app/totalum-api.md
+ *
+ * `builder-api.totalum.app` is the Totalum API host (`api-accounts.totalum.app`, the older host, answers the same
+ * paths). `TOTALUM_API_URL` points the app at another Totalum environment — an origin only, the `/api/v1/vcaas`
+ * prefix is added here.
  */
-const VCAAS_BASE_URL = "https://api-accounts.totalum.app/api/v1/vcaas";
+export const TOTALUM_API_ORIGIN = new URL(process.env.TOTALUM_API_URL || "https://builder-api.totalum.app").origin;
+const VCAAS_BASE_URL = `${TOTALUM_API_ORIGIN}/api/v1/vcaas`;
 
 /**
  * ═══⭐⭐⭐ EVERY UPSTREAM URL MUST STAY INSIDE `/api/v1/vcaas/` ═══════════════
@@ -68,7 +73,7 @@ export function resolveVcaasUrl(path: string): string {
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  SERVER LAYER — runs only inside Route Handlers (`src/app/api/vcaas/*`)
-//  Reads the API key and is the only code that hits api-accounts.totalum.app.
+//  Reads the API key and is the only code that calls the Totalum API.
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**

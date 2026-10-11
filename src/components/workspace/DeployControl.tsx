@@ -16,7 +16,8 @@ import { CopyButton, Modal, StatusPill } from "@/components/primitives";
 import { Button } from "@/components/ui/button";
 import { useT } from "@/i18n";
 import { getDomainProgress } from "@/lib/domain-status";
-import { getPublishedHost } from "@/lib/project-status";
+import { engineOf, getPublishedHost } from "@/lib/project-status";
+import { usePrice } from "@/components/credits/CreditsProvider";
 import { cn } from "@/lib/utils";
 import type { VcaasProject } from "@/lib/vcaas-types";
 import { DomainPendingBadge, DomainProgressCompact } from "./DomainProgress";
@@ -105,6 +106,7 @@ export function DeployControl({
     onOpenDomain,
 }: DeployControlProps) {
     const t = useT();
+    const price = usePrice();
     const [open, setOpen] = React.useState(false);
 
     const isPublished = project?.deployment?.status === "success";
@@ -270,7 +272,7 @@ export function DeployControl({
                                 {t("workspace.deploy.durationNotice")}
                             </Fact>
                             <Fact icon={<CoinsIcon aria-hidden className="size-4" />}>
-                                {t("workspace.deploy.costNotice")}
+                                {t("workspace.deploy.costNotice", { price: price("CREATE_DEPLOYMENT", engineOf(project)) })}
                             </Fact>
                         </ul>
                     </section>

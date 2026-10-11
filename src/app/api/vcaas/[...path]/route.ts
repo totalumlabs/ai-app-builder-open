@@ -1,5 +1,5 @@
 /**
- * Catch-all proxy: `/api/vcaas/<path>` → `https://api-accounts.totalum.app/api/v1/vcaas/<path>`
+ * Catch-all proxy: `/api/vcaas/<path>` → `https://builder-api.totalum.app/api/v1/vcaas/<path>` (or `TOTALUM_API_URL`)
  * with the operator's `api-key` header added server-side.
  *
  * 📖 What each forwarded path accepts and returns: https://www.totalum.app/totalum-api.md

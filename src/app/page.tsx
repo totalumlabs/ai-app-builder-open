@@ -394,7 +394,10 @@ export default function DashboardPage() {
        * expected instead of in an empty project with no explanation.
        */
       if (!launched.data.agent?.started) {
-        launched.data.warnings?.forEach(w => w?.step !== "figma" && w?.message && toast.warning(w.message));
+        launched.data.warnings?.forEach(w => {
+          const message = w?.errorMessage || w?.message;
+          if (w?.step !== "figma" && message) toast.warning(message);
+        });
         try {
           sessionStorage.setItem(`vibebuild:pendingPrompt:${created}`, firstPrompt.trim());
         } catch { /* ignore */ }

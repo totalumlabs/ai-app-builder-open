@@ -90,6 +90,26 @@ export function formatDateTime(value: string | Date | null | undefined, locale: 
 }
 
 /**
+ * `formatDateTime` plus the zone it is in: `2 Oct 2026, 10:30 CEST` (or `GMT-4` where the zone has no short name).
+ * `timeZone` defaults to the browser's; pass it in tests.
+ */
+export function formatDateTimeZoned(value: string | Date | null | undefined, locale: Locale, timeZone?: string): string {
+    const date = toDate(value);
+    if (!date) return "";
+
+    return new Intl.DateTimeFormat(INTL_LOCALE[locale] ?? INTL_LOCALE.en, {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+        timeZone,
+        timeZoneName: "short",
+    }).format(date);
+}
+
+/**
  * Is this string an ISO-8601 timestamp?
  *
  * ⚠️ IT EXISTS BECAUSE THE SCHEMA DOES NOT COVER EVERY DATE. `createdAt`,

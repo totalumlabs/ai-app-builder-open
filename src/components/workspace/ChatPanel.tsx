@@ -44,6 +44,10 @@ interface ChatPanelProps {
   runStartedAt?: number | null;
   /** The engine's estimate for the in-flight run (`agent/status.expectedMinutes`); the bar fills against it. */
   expectedMinutes?: number | null;
+  /** A new-engine project: the run options are the agent tier (Auto / Cheap / Normal / Expensive). */
+  v2?: boolean;
+  /** "Clear agent context": the next prompt starts a fresh agent session. */
+  onClearContext?: () => void | Promise<void>;
 
   /**
    * ⭐ THE ATTACHMENTS ARE THE PAGE'S, NOT THIS PANEL'S. Both composers (mobile and
@@ -551,7 +555,7 @@ function BuildGroup({ group, projectId, onTellAi, projectSecrets }: { group: Mes
 
 export function ChatPanel({
   messages, isBuilding, prompt, setPrompt, onSend, onStop, sending, projectId, projectSecrets,
-  runStartedAt = null, expectedMinutes = null,
+  runStartedAt = null, expectedMinutes = null, v2 = false, onClearContext,
   attachedFiles, setAttachedFiles,
   onOpenFigma, figmaConnected = false, onDisconnectFigma,
   onOpenGithub, onGithubStatusChange, onGithubPull, githubPulling = false,
@@ -738,7 +742,7 @@ export function ChatPanel({
         ⭐ THE CHOICE IS VISIBLE AT THE MOMENT OF SENDING. A Sonnet or fast-mode prompt is
         never sent by surprise, and each chip's × clears just that option.
       */}
-      <RunOptionsChips value={runOptions} onChange={setRunOptions} disabled={isBuilding} className="px-4 pb-1" />
+      <RunOptionsChips value={runOptions} onChange={setRunOptions} disabled={isBuilding} className="px-4 pb-1" v2={v2} />
 
       {/* ⭐ The attachments, with a real preview for images and a kind plate otherwise. */}
       <AttachmentPreviews
@@ -792,7 +796,7 @@ export function ChatPanel({
                 />
               )}
               {/* ⭐ MODEL · EFFORT · FAST MODE for the NEXT prompt — the platform's menu. */}
-              <RunOptionsMenu value={runOptions} onChange={setRunOptions} disabled={isBuilding} />
+              <RunOptionsMenu value={runOptions} onChange={setRunOptions} disabled={isBuilding} v2={v2} onClearContext={onClearContext} clearContextDisabled={isBuilding} />
               {visualEditAvailable && onToggleVisualEdit && (
                 <Tooltip>
                   <TooltipTrigger asChild>

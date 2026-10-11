@@ -703,6 +703,8 @@ function useTransferRun() {
             const created = await vcaasApi.projects.create({
                 projectId: targetName,
                 description: t("transfer.createdDescription"),
+                // The copy is created on the engine of the code it is about to receive (a code imports only into its own engine).
+                sourceImportCode: importCode,
             });
             if (!created.ok) {
                 setPhase("failed");

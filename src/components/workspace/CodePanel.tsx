@@ -544,8 +544,11 @@ export function CodePanel({ projectId, darkMode, onAskAiEdit, wake, onRebuildSta
      * not the same message — a write lands in the sandbox's filesystem, and the running
      * dev server keeps serving the build it already has until it is rebuilt.
      */
-    setRebuildNeeded(true);
-    toast.success(`Saved ${selected.split("/").pop()}`);
+    // A legacy project says `rebuildRequired: true`; a new-engine save is a new version the preview picks up itself.
+    setRebuildNeeded(res.data?.rebuildRequired === true);
+    // New engine: a save still committing after ~45 s answers `saved: false`; it lands shortly after.
+    if (res.data?.saved === false) toast.info(`Saving ${selected.split("/").pop()}… it is still being committed; reopen the file in a moment to check it.`);
+    else toast.success(`Saved ${selected.split("/").pop()}`);
   }, [selected, saving, drafts, projectId, wake]);
 
   /**

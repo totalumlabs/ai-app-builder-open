@@ -27,8 +27,24 @@ export interface ConfirmDialogProps {
   confirmPhrase?: string;
   /** Extra content between the description and the input (cost notices…). */
   children?: React.ReactNode;
+  /** Keeps the confirm button disabled — e.g. until a required checkbox in `children` is ticked. */
+  confirmDisabled?: boolean;
   /** May be async; the dialog shows a pending state and closes on success. */
   onConfirm: () => void | Promise<void>;
+}
+
+/**
+ * Runs `onConfirm` and closes on success. A rejection keeps the dialog open and is swallowed here: the caller has
+ * already said why (a toast), and rethrowing from a click handler was an unhandled promise rejection (B2-SW10).
+ */
+export async function confirmAndClose(onConfirm: () => void | Promise<void>, close: () => void): Promise<boolean> {
+  try {
+    await onConfirm();
+  } catch {
+    return false;
+  }
+  close();
+  return true;
 }
 
 /**
@@ -47,6 +63,7 @@ export function ConfirmDialog({
   tone = "default",
   confirmPhrase,
   children,
+  confirmDisabled = false,
   onConfirm,
 }: ConfirmDialogProps) {
   const t = useT();
@@ -62,14 +79,13 @@ export function ConfirmDialog({
     }
   }, [open]);
 
-  const phraseSatisfied = !confirmPhrase || typed.trim() === confirmPhrase;
+  const phraseSatisfied = (!confirmPhrase || typed.trim() === confirmPhrase) && !confirmDisabled;
 
   const handleConfirm = async () => {
     if (!phraseSatisfied || pending) return;
     setPending(true);
     try {
-      await onConfirm();
-      onOpenChange(false);
+      await confirmAndClose(onConfirm, () => onOpenChange(false));
     } finally {
       setPending(false);
     }

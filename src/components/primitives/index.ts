@@ -13,7 +13,7 @@ export { PageHeader, type PageHeaderProps } from "./PageHeader";
 export { Section, type SectionProps } from "./Section";
 export { EmptyState, type EmptyStateProps } from "./EmptyState";
 export { ErrorState, type ErrorStateProps } from "./ErrorState";
-export { Modal, ModalPrimitive, type ModalProps } from "./Modal";
+export { InlineModals, Modal, ModalPrimitive, type ModalProps } from "./Modal";
 export { ConfirmDialog, type ConfirmDialogProps } from "./ConfirmDialog";
 export { CopyButton, type CopyButtonProps } from "./CopyButton";
 export { Spinner, SpinnerBlock, type SpinnerProps } from "./Spinner";
