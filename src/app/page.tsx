@@ -370,6 +370,8 @@ export default function DashboardPage() {
        */
       const launched = await vcaasApi.projects.launch({
         projectId: id,
+        // Every project this app creates is on the new Totalum engine, whatever the account.
+        engineVersion: "v2",
         prompt: firstPrompt.trim(),
         description: firstPrompt.trim().slice(0, 200),
         ...(figmaToken ? { figma: { token: figmaToken } } : {}),
@@ -409,7 +411,11 @@ export default function DashboardPage() {
       return;
     }
 
-    const res = await vcaasApi.projects.create({ projectId: id, description: firstPrompt.trim().slice(0, 200) });
+    const res = await vcaasApi.projects.create({
+      projectId: id,
+      description: firstPrompt.trim().slice(0, 200),
+      engineVersion: "v2",
+    });
     if (!res.ok) {
       setBuildError(res.error || `Could not create "${id}".`);
       setBuildCreating(false);

@@ -188,6 +188,12 @@ export function errorKeyFor(code: string | null | undefined): TranslationKey | n
  * empty, whitespace-bearing, absurdly short or long, or a pasted URL. A code we
  * wave through is judged by the server; a valid code we reject is a dead end.
  */
+/**
+ * A `.zip` export code comes from a project on Totalum's previous engine, and a code imports only into its own
+ * engine: that copy is the one project this app creates off the new engine (the dialog says so).
+ */
+export const isLegacyImportCode = (value: string): boolean => /\.zip$/i.test(value.trim());
+
 export function looksLikeImportCode(value: string): boolean {
     const code = value.trim();
     if (code.length < 12 || code.length > 400) return false;

@@ -5182,6 +5182,9 @@ const base = {
       description: "Bring in a project from an import code as a brand-new project of your own.",
       codeLabel: "Import code",
       codeInvalid: "That doesn't look like an import code. Paste the whole thing, including the .zip.",
+      /** Local value (not in the platform's dictionary): this app asks for the new engine on every other create. */
+      legacyCode:
+        "This code comes from a project on the previous engine, so the copy is created on that engine. Every other new project is created on the new engine.",
       costDetail: "One for the new project, six for the import.",
       action: "Import",
     },

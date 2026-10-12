@@ -30,6 +30,7 @@ import {
     hasCreatedProject,
     isBusyPhase,
     isStepComplete,
+    isLegacyImportCode,
     looksLikeImportCode,
     suggestCopyName,
     type TransferPhase,
@@ -425,6 +426,9 @@ export function ImportProjectDialog({
                             {code && !codeLooksRight && (
                                 <p className="text-destructive text-xs">{t("transfer.import.codeInvalid")}</p>
                             )}
+                            {codeLooksRight && isLegacyImportCode(code) && (
+                                <p className="text-muted-foreground text-xs">{t("transfer.import.legacyCode")}</p>
+                            )}
                         </div>
 
                         <NameField
@@ -703,7 +707,9 @@ function useTransferRun() {
             const created = await vcaasApi.projects.create({
                 projectId: targetName,
                 description: t("transfer.createdDescription"),
-                // The copy is created on the engine of the code it is about to receive (a code imports only into its own engine).
+                // The copy is created on the engine of the code it is about to receive (a code imports only into its own
+                // engine), so no engineVersion here: a new-engine code makes a new-engine project, and a legacy `.zip`
+                // code — said so in the dialog — is the one way this app makes a legacy one.
                 sourceImportCode: importCode,
             });
             if (!created.ok) {
