@@ -4,7 +4,7 @@
  *
  * 📖 What each forwarded path accepts and returns: https://www.totalum.app/totalum-api.md
  */
-import { vcaasRequest, VcaasPathError } from "@/lib/vcaas-server";
+import { getVcaasApiKey, vcaasRequest, VcaasPathError } from "@/lib/vcaas-server";
 import { normalizeVcaasError, toErrorEnvelope } from "@/lib/vcaas-errors";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -54,7 +54,36 @@ async function handleRequest(
       body,
     });
 
-    const json = (await response.json()) as VcaasApiResponse;
+    const raw = await response.text();
+    let json: Partial<VcaasApiResponse> & { error?: unknown; message?: unknown } = {};
+    try {
+      json = JSON.parse(raw) as typeof json;
+    } catch {
+      // not JSON: a refusal (an HTML error page from a gateway) is handled below by its status
+      if (response.ok) throw new Error(`upstream answered ${response.status} with a non-JSON body`);
+    }
+
+    /**
+     * ⚠️ A REFUSAL THAT IS NOT IN THE `{ errors }` SHAPE MUST NOT BECOME `{ ok:true }`. The key check
+     * answers `401 {"error":"Unauthorized api key"}` (or `"invalid token"` with no key) before any VCaaS
+     * handler runs; read as success, the create dialog could only say "Could not create…". Forward the
+     * status and say what to fix.
+     */
+    if (!response.ok && !json.errors) {
+      const keyRefused = response.status === 401 || response.status === 403;
+      const upstreamMessage =
+        typeof json.error === "string" ? json.error : typeof json.message === "string" ? json.message : "";
+      const message = keyRefused
+        ? getVcaasApiKey()
+          ? "Your Totalum API key is invalid or revoked — check TOTALUM_VCAAS_API_KEY in your .env and restart the app."
+          : "No Totalum API key is set — add TOTALUM_VCAAS_API_KEY to your .env and restart the app."
+        : upstreamMessage || `The Totalum API answered ${response.status}.`;
+      const normalized = normalizeVcaasError(
+        { errorCode: keyRefused ? "INVALID_API_KEY" : undefined, errorMessage: message },
+        response.status
+      );
+      return NextResponse.json(toErrorEnvelope(normalized), { status: normalized.status });
+    }
 
     /**
      * ═══⭐⭐ THE ERROR ENVELOPE THE WORKSPACE SWITCHES ON ══════════════════
