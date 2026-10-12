@@ -369,6 +369,7 @@ export default function DashboardPage() {
        * not fail the launch — it comes back as a `figma` warning, surfaced below.
        */
       const launched = await vcaasApi.projects.launch({
+        engineVersion: "v2", // always the new Totalum engine
         projectId: id,
         prompt: firstPrompt.trim(),
         description: firstPrompt.trim().slice(0, 200),
@@ -409,7 +410,7 @@ export default function DashboardPage() {
       return;
     }
 
-    const res = await vcaasApi.projects.create({ projectId: id, description: firstPrompt.trim().slice(0, 200) });
+    const res = await vcaasApi.projects.create({ projectId: id, description: firstPrompt.trim().slice(0, 200), engineVersion: "v2" });
     if (!res.ok) {
       setBuildError(res.error || `Could not create "${id}".`);
       setBuildCreating(false);
