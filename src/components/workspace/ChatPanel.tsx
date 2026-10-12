@@ -20,6 +20,8 @@ import { ConfirmDialog } from "@/components/primitives";
 import { useT } from "@/i18n";
 import { cn } from "@/lib/utils";
 import { RunProgress } from "@/components/workspace/RunProgress";
+import { RunActivity } from "@/components/workspace/RunActivity";
+import type { RunProgressView } from "@/lib/run-progress";
 import { useRunClock } from "@/components/workspace/use-run-clock";
 import { uploadFilesToProjectDetailed, splitBySize, MAX_UPLOAD_MB, TOO_LARGE_ADVICE } from "@/lib/upload";
 import { toast } from "sonner";
@@ -46,6 +48,8 @@ interface ChatPanelProps {
   expectedMinutes?: number | null;
   /** A new-engine project: the run options are the agent tier (Auto / Cheap / Normal / Expensive). */
   v2?: boolean;
+  /** New engine: the live run timeline, polled by the page (`useRunProgress`). */
+  runProgress?: RunProgressView | null;
   /** "Clear agent context": the next prompt starts a fresh agent session. */
   onClearContext?: () => void | Promise<void>;
 
@@ -555,7 +559,7 @@ function BuildGroup({ group, projectId, onTellAi, projectSecrets }: { group: Mes
 
 export function ChatPanel({
   messages, isBuilding, prompt, setPrompt, onSend, onStop, sending, projectId, projectSecrets,
-  runStartedAt = null, expectedMinutes = null, v2 = false, onClearContext,
+  runStartedAt = null, expectedMinutes = null, v2 = false, runProgress = null, onClearContext,
   attachedFiles, setAttachedFiles,
   onOpenFigma, figmaConnected = false, onDisconnectFigma,
   onOpenGithub, onGithubStatusChange, onGithubPull, githubPulling = false,
@@ -724,16 +728,18 @@ export function ChatPanel({
 
         {isBuilding && (
           <div className="py-2">
-            <div className="flex items-center gap-2">
+            {/* New engine: `RunActivity` below carries the live status, so no second "Building…" line. */}
+            {!v2 && <div className="flex items-center gap-2">
               <div className="flex gap-1">
                 <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
                 <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
                 <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
               </div>
               <span className="text-sm text-gray-400">{"Building..."}</span>
-            </div>
+            </div>}
             {/* The platform's run progress bar, copied verbatim — see `RunProgress`. */}
             <RunProgress elapsedMs={elapsedMs} expectedMinutes={expectedMinutes} />
+            {v2 && <RunActivity progress={runProgress} />}
           </div>
         )}
       </div>

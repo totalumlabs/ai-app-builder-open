@@ -14,6 +14,8 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { ChatPanel } from "@/components/workspace/ChatPanel";
 import { PreviewPanel } from "@/components/workspace/PreviewPanel";
+import { useRunProgress } from "@/components/workspace/RunActivity";
+import { isRunOver, stageText } from "@/lib/run-progress";
 import { WorkspaceMore } from "@/components/workspace/v2/WorkspaceMore";
 import { V2Banner } from "@/components/workspace/v2/V2Banner";
 import { CodePanel } from "@/components/workspace/CodePanel";
@@ -1320,6 +1322,9 @@ export default function WorkspacePage() {
    */
   const isFirstBuild = isBuilding && !messages.some((m) => m.messageType === "finished");
   const shownPreviewUrl = isFirstBuild ? null : previewUrl;
+  /** New engine: the live run timeline (`agent/progress`) for the chat and the preview loader. */
+  const runProgress = useRunProgress(projectId, isBuilding, isV2Project(project));
+  const buildStage = runProgress && !isRunOver(runProgress.stage) ? stageText(runProgress.stage) : null;
   const leftHeaderWidth = chatCollapsed ? "auto" : chatWidth + 5;
   const pageBg = darkMode ? "#1a1a1a" : "#fcfbf8";
   const cardBg = darkMode ? "#222" : "#fff";
@@ -1393,6 +1398,7 @@ export default function WorkspacePage() {
   // The chat's composer props that both layouts share — the tool tray's wiring.
   const composerProps = {
     v2: isV2Project(project),
+    runProgress,
     onClearContext: async () => {
       const res = await vcaasApi.agent.clearContext(projectId);
       if (res.ok) toast.success(translate("workspace.chat.runOptions.clearContextDone"));
@@ -1539,7 +1545,7 @@ export default function WorkspacePage() {
               </div>
             )}
             <div className={`flex-1 overflow-hidden ${activeTab === "preview" ? "rounded-none" : "m-2 sm:m-3 rounded-xl shadow-sm"}`} style={{ background: cardBg }}>
-              {activeTab === "preview" && <PreviewPanel key={previewKey} previewUrl={shownPreviewUrl} cached={previewCached} onRefresh={() => { fetchProject(); setPreviewKey((k) => k + 1); }} loading={isBuilding} mobilePreview={mobilePreview} iframePath={iframePath} frameRef={previewFrameRef} /* ⭐ Same-origin ONLY while the editor is open — and for the length of an apply, which outlives the panel: dropping the proxy mid-apply would reload the frame and throw away the preview-only edits the user is watching. */ proxiedSrc={visualEditorOpen || visualLocked ? `/api/preview/${encodeURIComponent(projectId)}` : null} />}
+              {activeTab === "preview" && <PreviewPanel key={previewKey} previewUrl={shownPreviewUrl} cached={previewCached} onRefresh={() => { fetchProject(); setPreviewKey((k) => k + 1); }} loading={isBuilding} buildStage={buildStage} mobilePreview={mobilePreview} iframePath={iframePath} frameRef={previewFrameRef} /* ⭐ Same-origin ONLY while the editor is open — and for the length of an apply, which outlives the panel: dropping the proxy mid-apply would reload the frame and throw away the preview-only edits the user is watching. */ proxiedSrc={visualEditorOpen || visualLocked ? `/api/preview/${encodeURIComponent(projectId)}` : null} />}
               {activeTab === "code" && <CodePanel projectId={projectId} darkMode={darkMode} onAskAiEdit={handleAskAiEdit} wake={serverWake} onRebuildStarted={() => operation.begin("rebuild")} onRebuildFinished={() => operation.end("rebuild")} />}
               {activeTab === "more" && <WorkspaceMore project={project} onProjectChanged={() => void fetchProject()} onPublish={() => void handleDeploy()} />}
             </div>
@@ -1635,7 +1641,7 @@ export default function WorkspacePage() {
             </div>
           ) : (
             <div className="h-full overflow-hidden">
-              {activeTab === "preview" && <PreviewPanel key={previewKey} previewUrl={shownPreviewUrl} cached={previewCached} onRefresh={() => { fetchProject(); setPreviewKey((k) => k + 1); }} loading={isBuilding} mobilePreview={false} iframePath={iframePath} />}
+              {activeTab === "preview" && <PreviewPanel key={previewKey} previewUrl={shownPreviewUrl} cached={previewCached} onRefresh={() => { fetchProject(); setPreviewKey((k) => k + 1); }} loading={isBuilding} buildStage={buildStage} mobilePreview={false} iframePath={iframePath} />}
               {activeTab === "code" && <CodePanel projectId={projectId} darkMode={darkMode} onAskAiEdit={handleAskAiEdit} wake={serverWake} onRebuildStarted={() => operation.begin("rebuild")} onRebuildFinished={() => operation.end("rebuild")} />}
               {activeTab === "more" && <WorkspaceMore project={project} onProjectChanged={() => void fetchProject()} onPublish={() => void handleDeploy()} />}
             </div>
