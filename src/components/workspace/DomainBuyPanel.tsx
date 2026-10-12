@@ -19,8 +19,10 @@ import { EMPTY_CONTACT, contactComplete, latestSavedContact, renewsAtAnotherPric
 import { useLocale, useT } from "@/i18n";
 import type { TranslationKey } from "@/i18n/types";
 import { attachWarningKey, purchaseErrorKey } from "@/lib/domain-connect";
+import { DEFAULT_PREFIX, isValidPrefix } from "@/lib/domain-prefix";
 import { vcaasApi } from "@/lib/vcaas";
 import type { DomainSearchResult } from "@/lib/vcaas-types";
+import { DomainPrefixField } from "./DomainConnectGuide";
 
 function money(value: number, currency: string, locale: string) {
     return new Intl.NumberFormat(locale, { style: "currency", currency }).format(value);
@@ -66,6 +68,8 @@ export function DomainBuyPanel({
     const [saved, setSaved] = React.useState<SavedContact | null | undefined>(undefined);
     const [contact, setContact] = React.useState<Contact>(EMPTY_CONTACT);
     const [step, setStep] = React.useState<Step>({ kind: "search" });
+    /** The site answers on `<prefix>.<domain>` (or the bare domain for `apex`); sent as `canonicalHost`. */
+    const [prefix, setPrefix] = React.useState<string>(DEFAULT_PREFIX);
 
     React.useEffect(() => {
         void vcaasApi.v2.domainContacts().then(r => {
@@ -98,7 +102,7 @@ export function DomainBuyPanel({
         if ("error" in registrant)
             return setStep({ kind: "failed", result, messageKey: null, message: registrant.error || t("engineV2.common.failed") });
         setSaved(registrant.saved);
-        const response = await vcaasApi.v2.purchaseDomain({ domain: result.domain, contactId: registrant.saved.id, expectedPrice: result.price, projectId });
+        const response = await vcaasApi.v2.purchaseDomain({ domain: result.domain, contactId: registrant.saved.id, expectedPrice: result.price, projectId, canonicalHost: prefix });
         if (!response.ok) {
             return setStep({
                 kind: "failed",
@@ -171,6 +175,8 @@ export function DomainBuyPanel({
                     </p>
                 </div>
 
+                {!busy && <DomainPrefixField domain={result.domain} value={prefix} onChange={setPrefix} />}
+
                 {saved !== undefined && !busy && <DomainContactForm value={contact} onChange={setContact} saved={saved !== null} />}
 
                 {busy && (
@@ -202,7 +208,7 @@ export function DomainBuyPanel({
                     <Button variant="ghost" size="sm" disabled={busy} onClick={() => setStep({ kind: "search" })}>
                         {t("workspace.domain.buy.otherDomain")}
                     </Button>
-                    <Button size="sm" disabled={busy || saved === undefined || !contactComplete(contact)} onClick={() => void buy(result)}>
+                    <Button size="sm" disabled={busy || saved === undefined || !contactComplete(contact) || !isValidPrefix(prefix)} onClick={() => void buy(result)}>
                         {busy ? <LoaderIcon className="size-4 animate-spin" aria-hidden /> : <CreditCardIcon className="size-4" aria-hidden />}
                         {t("workspace.domain.buy.payButton", { price: money(result.price, result.currency, locale) })}
                     </Button>

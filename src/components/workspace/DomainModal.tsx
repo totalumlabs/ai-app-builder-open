@@ -17,7 +17,7 @@ import { vcaasApi } from "@/lib/vcaas";
 import type { VcaasDomain, VcaasProject } from "@/lib/vcaas-types";
 import { cn } from "@/lib/utils";
 import { DomainBuyPanel } from "./DomainBuyPanel";
-import { ApexPreview, ApexRedirectNote, DomainChoice, DomainTroubleshooting, SslLine } from "./DomainConnectGuide";
+import { ApexPreview, ApexRedirectNote, DomainChoice, DomainHostnames, DomainTroubleshooting, SslLine } from "./DomainConnectGuide";
 import { DomainProgressPanel } from "./DomainProgress";
 import { useDirtyGuard } from "./use-dirty-guard";
 
@@ -113,7 +113,7 @@ export function DomainModal({ open, onOpenChange, projectId, project, onChanged 
     const settling = isDomainSettling(domain);
 
     /**
-     * One read of the project (there is no dedicated domain-status endpoint),
+     * One read of the project (its `customDomain` is the same refreshed view as `GET …/domain`),
      * shared by the interval and the "Check now" button so both reschedule the
      * countdown the same way.
      */
@@ -340,6 +340,9 @@ export function DomainModal({ open, onOpenChange, projectId, project, onChanged 
                                         <div className="mt-2">
                                             <SslLine sslStatus={domain.sslStatus} />
                                         </div>
+                                    )}
+                                    {isV2 && domain.hostnames && domain.hostnames.length > 1 && (
+                                        <DomainHostnames site={domain.hostname} hostnames={domain.hostnames} />
                                     )}
                                 </div>
 

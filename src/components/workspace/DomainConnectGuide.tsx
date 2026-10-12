@@ -3,8 +3,11 @@
 import * as React from "react";
 import { ChevronRightIcon, InfoIcon, LifeBuoyIcon, Link2Icon, ShoppingCartIcon } from "lucide-react";
 import { useT } from "@/i18n";
+import { Input } from "@/components/ui/input";
 import { apexOf, isApexHostname, servedHostname } from "@/lib/domain-connect";
-import type { VcaasDomainSslStatus } from "@/lib/vcaas-types";
+import { PREFIX_PRESETS, isValidPrefix, normalisePrefix, siteHostname } from "@/lib/domain-prefix";
+import { cn } from "@/lib/utils";
+import type { VcaasDomainHostname, VcaasDomainSslStatus } from "@/lib/vcaas-types";
 
 /**
  * The presentational pieces of the v2 custom-domain modal (domodal): the "buy or connect" choice, the apex/`www`
@@ -109,5 +112,106 @@ export function DomainTroubleshooting() {
                 ))}
             </ul>
         </details>
+    );
+}
+
+/**
+ * Where a bought domain's site answers: `www` (default), `app`, or any label typed in "Other", or the bare domain
+ * (`apex`). Below it, the address that results, so the choice is never abstract. The bare domain's redirect to the
+ * site is announced as "coming soon": it does not answer over HTTPS yet.
+ */
+export function DomainPrefixField({ domain, value, onChange }: { domain: string; value: string; onChange: (prefix: string) => void }) {
+    const t = useT();
+    const [other, setOther] = React.useState(!PREFIX_PRESETS.includes(value));
+    const valid = isValidPrefix(value); // "apex" is a valid label too
+    const chip = (active: boolean) =>
+        cn(
+            "rounded-md border px-2.5 py-1 font-mono text-xs transition-colors focus-visible:ring-ring focus-visible:ring-2 focus-visible:outline-none",
+            active ? "border-primary bg-primary/10 text-primary font-medium" : "border-border hover:bg-accent",
+        );
+    return (
+        <fieldset className="space-y-2" data-testid="domain-prefix">
+            <legend className="text-xs font-medium">{t("workspace.domain.prefix.label")}</legend>
+            <div className="flex flex-wrap items-center gap-1.5">
+                {PREFIX_PRESETS.map(p => (
+                    <button
+                        key={p}
+                        type="button"
+                        aria-pressed={!other && value === p}
+                        className={chip(!other && value === p)}
+                        onClick={() => {
+                            setOther(false);
+                            onChange(p);
+                        }}
+                    >
+                        {p === "apex" ? domain : `${p}.`}
+                    </button>
+                ))}
+                <button
+                    type="button"
+                    aria-pressed={other}
+                    className={chip(other)}
+                    onClick={() => {
+                        setOther(true);
+                        if (PREFIX_PRESETS.includes(value)) onChange("");
+                    }}
+                >
+                    {t("workspace.domain.prefix.other")}
+                </button>
+                {other && (
+                    <Input
+                        value={value}
+                        onChange={event => onChange(normalisePrefix(event.target.value))}
+                        placeholder="shop"
+                        aria-label={t("workspace.domain.prefix.otherLabel")}
+                        aria-invalid={value !== "" && !valid}
+                        autoFocus
+                        autoComplete="off"
+                        spellCheck={false}
+                        className={cn("h-7 w-32 font-mono text-xs", value !== "" && !valid && "border-destructive")}
+                    />
+                )}
+            </div>
+            {value !== "" && !valid ? (
+                <p className="text-destructive text-xs">{t("workspace.domain.prefix.invalid")}</p>
+            ) : valid ? (
+                <p className="text-muted-foreground text-xs" data-testid="domain-prefix-preview">
+                    {value === "apex"
+                        ? t("workspace.domain.prefix.previewApex", { site: domain })
+                        : t("workspace.domain.prefix.preview", { site: siteHostname(domain, value), apex: domain })}
+                </p>
+            ) : null}
+        </fieldset>
+    );
+}
+
+/**
+ * Each address of the custom domain on its own line: the site, and the bare domain that redirects to it. The bare
+ * domain's redirect does not answer over HTTPS yet, so it reads "coming soon" whatever its status — never "setting up"
+ * forever. Change this line once the redirect works.
+ */
+export function DomainHostnames({ site, hostnames }: { site: string; hostnames: VcaasDomainHostname[] }) {
+    const t = useT();
+    return (
+        <ul className="border-border mt-3 space-y-1.5 border-t pt-3 text-xs" data-testid="domain-hostnames">
+            {hostnames.map(h => {
+                const redirect = h.role === "alias";
+                const live = !redirect && h.status === "active" && h.sslStatus === "active";
+                return (
+                    <li key={h.hostname} className="flex flex-wrap items-center gap-2">
+                        <span
+                            aria-hidden
+                            className={cn("size-1.5 shrink-0 rounded-full", live ? "bg-emerald-500" : redirect ? "bg-muted-foreground" : "bg-warning animate-pulse")}
+                        />
+                        <code className="font-mono">{h.hostname}</code>
+                        <span className="text-muted-foreground">
+                            {redirect ? t("workspace.domain.hostRedirect", { site }) : t("workspace.domain.hostSite")}
+                            {" · "}
+                            {redirect ? t("workspace.domain.hostRedirectSoon") : live ? t("workspace.domain.hostLive") : t("workspace.domain.hostPending")}
+                        </span>
+                    </li>
+                );
+            })}
+        </ul>
     );
 }

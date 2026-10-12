@@ -10,6 +10,8 @@ import { formatDate } from "@/lib/format";
 import { toast } from "@/lib/toast";
 import { vcaasApi } from "@/lib/vcaas";
 import type { AccountDomain, VcaasProject } from "@/lib/vcaas-types";
+import { isValidPrefix, siteHostname } from "@/lib/domain-prefix";
+import { DomainPrefixField } from "../DomainConnectGuide";
 import { DomainModal } from "../DomainModal";
 
 const noop = () => {};
@@ -17,12 +19,11 @@ const noop = () => {};
 /**
  * More → Custom domain. The top half is the platform's domain dialog laid out in place: buy a new domain or connect
  * one the user already owns, then the DNS / HTTPS progress. The bottom half manages the domains bought on Totalum
- * (`/domains/*`): the one serving this project (auto-renew, which host is the main address, DNS records, forwarding,
- * renew, transfer code, disconnect) and the account's free ones, which can be attached here.
+ * (`/domains/*`): the one serving this project (auto-renew, where the site answers, DNS records, forwarding, renew,
+ * transfer code, disconnect) and the account's free ones, which can be attached here.
  *
- * TODO(api): two controls of the platform's domain view have no documented VCaaS endpoint yet, so they are not here:
- *   - changing the main host of an ATTACHED domain (today `canonicalHost` is only accepted on attach / purchase);
- *   - an `app.` prefix as the main host (the documented choice is `www` or the bare domain, `apex`).
+ * Where the site answers is the `canonicalHost` prefix (`www`, `app`, any label, or `apex`). Changing it = attaching the
+ * same domain to the same project again with another prefix: the API moves the site, no second fee.
  */
 export function ProjectDomainPanel({ project, onChanged }: { project: VcaasProject; onChanged: () => void }) {
     const t = useT();
@@ -31,7 +32,9 @@ export function ProjectDomainPanel({ project, onChanged }: { project: VcaasProje
     const [domains, setDomains] = React.useState<AccountDomain[] | null>(null);
     const [open, setOpen] = React.useState<string | null>(null);
     const [detaching, setDetaching] = React.useState<AccountDomain | null>(null);
-    const [host, setHost] = React.useState<"www" | "apex">("www");
+    /** The prefix picked per domain, before it is applied. */
+    const [prefixes, setPrefixes] = React.useState<Record<string, string>>({});
+    const [busy, setBusy] = React.useState<string | null>(null);
 
     const load = React.useCallback(async () => {
         const response = await vcaasApi.v2.domains();
@@ -47,13 +50,25 @@ export function ProjectDomainPanel({ project, onChanged }: { project: VcaasProje
     const attached = (domains ?? []).filter((d) => d.attachedProjectId === projectId);
     const free = (domains ?? []).filter((d) => !d.attachedProjectId && d.status === "active");
 
+    /** Where the site answers now: the project's view first (it is the engine's), then the domains list. */
+    const currentPrefix = (domain: AccountDomain) => project.customDomain?.canonicalHost ?? domain.canonicalHost ?? "www";
+    const prefixOf = (domain: AccountDomain) => prefixes[domain.id] ?? (domain.attachedProjectId ? currentPrefix(domain) : "www");
+
+    /** Attach a free domain, or attach again with another prefix to move the site (no second fee). */
     const attach = async (domain: AccountDomain) => {
-        const response = await vcaasApi.v2.attachDomain(domain.id, projectId, host);
+        const prefix = prefixOf(domain);
+        const moving = domain.attachedProjectId === projectId;
+        setBusy(domain.id);
+        const response = await vcaasApi.v2.attachDomain(domain.id, projectId, prefix);
+        setBusy(null);
         if (!response.ok) return void toast.error(response.error || t("engineV2.common.failed"));
-        toast.success(t("engineV2.domains.attached"));
-        patch(domain.id, { attachedProjectId: projectId, canonicalHost: host });
+        toast.success(moving ? t("workspace.domain.prefix.moved", { site: siteHostname(domain.domain, prefix) }) : t("engineV2.domains.attached"));
+        patch(domain.id, { attachedProjectId: projectId, canonicalHost: prefix });
         onChanged();
     };
+    const prefixField = (domain: AccountDomain) => (
+        <DomainPrefixField domain={domain.domain} value={prefixOf(domain)} onChange={(prefix) => setPrefixes((all) => ({ ...all, [domain.id]: prefix }))} />
+    );
 
     return (
         <div className="space-y-8">
@@ -73,9 +88,6 @@ export function ProjectDomainPanel({ project, onChanged }: { project: VcaasProje
                                     <span className="font-medium">{domain.domain}</span>{" "}
                                     <span className="text-muted-foreground text-xs">
                                         {t("engineV2.domains.expires", { date: formatDate(domain.expiresAt, locale) })}
-                                    </span>
-                                    <span className="text-muted-foreground block text-xs">
-                                        {t(domain.canonicalHost === "apex" ? "more.hostApex" : "more.hostWww", { domain: domain.domain })}
                                     </span>
                                 </span>
                                 <StatusPill tone={domain.status === "active" ? "success" : "warning"}>{domain.status}</StatusPill>
@@ -101,6 +113,17 @@ export function ProjectDomainPanel({ project, onChanged }: { project: VcaasProje
                                 >
                                     {t("engineV2.domains.manageDomain")}
                                 </Button>
+                                <div className="w-full space-y-2">
+                                    {prefixField(domain)}
+                                    {prefixOf(domain) !== currentPrefix(domain) && isValidPrefix(prefixOf(domain)) ? (
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            <Button size="sm" disabled={busy !== null} onClick={() => void attach(domain)}>
+                                                {t("workspace.domain.prefix.move")}
+                                            </Button>
+                                            <p className="text-muted-foreground text-xs">{t("workspace.domain.prefix.moveNote")}</p>
+                                        </div>
+                                    ) : null}
+                                </div>
                                 {open === domain.id ? (
                                     <DomainManager domain={domain} onChanged={(updated) => (updated ? patch(domain.id, updated) : void load())} />
                                 ) : null}
@@ -110,18 +133,10 @@ export function ProjectDomainPanel({ project, onChanged }: { project: VcaasProje
                             ? free.map((domain) => (
                                   <li key={domain.id} className="border-border flex flex-wrap items-center gap-3 rounded-lg border px-3 py-2 text-sm">
                                       <span className="min-w-0 flex-1 font-medium">{domain.domain}</span>
-                                      <select
-                                          className="border-input bg-background h-8 rounded-md border px-2 text-xs"
-                                          aria-label={t("more.hostLabel")}
-                                          value={host}
-                                          onChange={(e) => setHost(e.target.value as "www" | "apex")}
-                                      >
-                                          <option value="www">www.{domain.domain}</option>
-                                          <option value="apex">{domain.domain}</option>
-                                      </select>
-                                      <Button size="sm" onClick={() => void attach(domain)}>
+                                      <Button size="sm" disabled={busy !== null || !isValidPrefix(prefixOf(domain))} onClick={() => void attach(domain)}>
                                           {t("more.attachHere")}
                                       </Button>
+                                      <div className="w-full">{prefixField(domain)}</div>
                                   </li>
                               ))
                             : null}

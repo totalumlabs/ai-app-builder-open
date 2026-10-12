@@ -1061,11 +1061,12 @@ export const vcaasApi = {
     domainContacts: () => proxy.get<{ contacts?: { id: string }[] } | { id: string }[]>(`${API}/domains/contacts`),
     createDomainContact: (contact: Record<string, string>) =>
       proxy.post<{ id: string }>(`${API}/domains/contacts`, { contact }),
-    purchaseDomain: (body: { domain: string; contactId: string; expectedPrice: number; projectId?: string }) =>
+    purchaseDomain: (body: { domain: string; contactId: string; expectedPrice: number; projectId?: string; canonicalHost?: string }) =>
       proxy.post<{ domain: AccountDomain }>(`${API}/domains/purchase`, body),
     setDomainAutoRenew: (domainId: string, autoRenew: boolean) =>
       proxy.patch<AccountDomain>(`${API}/domains/${encodeURIComponent(domainId)}`, { autoRenew }),
-    attachDomain: (domainId: string, projectId: string, canonicalHost?: "www" | "apex") =>
+    /** Attaching again to the same project with another `canonicalHost` moves the site to that prefix (no second fee). */
+    attachDomain: (domainId: string, projectId: string, canonicalHost?: string) =>
       proxy.post<AccountDomain>(`${API}/domains/${encodeURIComponent(domainId)}/attach`, canonicalHost ? { projectId, canonicalHost } : { projectId }),
     /** POST …/domains/{id}/detach — the project stops answering on it; the domain stays registered. */
     detachDomain: (domainId: string) =>

@@ -280,6 +280,21 @@ export interface VcaasDomain {
   updatedAt?: string;
   /** New engine: `purchase` = registered through Totalum, which sets its records itself (SP19). */
   source?: "manual" | "purchase";
+  /** New engine: where the site answers — `www`, `app`, any label, or `apex`; null for a subdomain. */
+  canonicalHost?: string | null;
+  /** New engine: each address with its own status — the site and the bare domain that redirects to it. */
+  hostnames?: VcaasDomainHostname[];
+  /** New engine: the bought domain (`GET /domains`) this is, when it was bought on Totalum. */
+  accountDomainId?: string;
+}
+
+export interface VcaasDomainHostname {
+  hostname: string;
+  /** `canonical` = where the site answers; `alias` = redirects (301) to it; `sub` = a connected subdomain. */
+  role: "canonical" | "alias" | "sub";
+  status: VcaasDomainStatus;
+  sslStatus: VcaasDomainSslStatus;
+  dnsRecordsToAdd?: DnsRecord[];
 }
 
 export interface DnsRecord {
@@ -925,8 +940,8 @@ export interface AccountDomain {
   expiresAt: string;
   autoRenew: boolean;
   attachedProjectId?: string;
-  /** Which host serves the site: `www` (the bare domain redirects to it, the default) or `apex`. */
-  canonicalHost?: "www" | "apex";
+  /** Where the attached site answers: `www` (default), `app`, any DNS label, or `apex` (the bare domain). */
+  canonicalHost?: string;
   pricing?: { renewalPriceEstimate: number; currency: string };
   /** ICANN's 60-day transfer lock ends here (plan 22 §3.6). */
   exportAvailableAt?: string;

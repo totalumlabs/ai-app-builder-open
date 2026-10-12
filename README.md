@@ -66,7 +66,7 @@ All of this works with **one API key**. No other cloud accounts, no glue code:
 - 🧰 **Everything else in "More".** The workspace's **More** tab holds every project control: database, site analytics, usage and spending limits, project API keys and `.env`, scheduled jobs (cron), secrets, mobile apps (Android/iOS builds and store uploads), payments (the app's own Stripe), custom domains (buy, connect, DNS records, auto-renew), logs and project settings (agent instructions, MCP servers, live address, pause).
 - 🔐 **Secrets and environment variables.** Managed per project and per environment.
 - 🚀 **Hosting and one-click deploy.** Every project has a live URL. Publish to production in one click.
-- 🌐 **Custom domains.** Buy a domain from the app or connect one you own with guided DNS setup, then manage its DNS records and renewal.
+- 🌐 **Custom domains.** Buy a domain from the app or connect one you own with guided DNS setup, then manage its DNS records and renewal. Choose where a bought domain's site answers (`www.`, `app.`, any prefix you type, or the bare domain) and change it later at no extra fee; each address shows its own status. The bare domain redirecting to the prefixed address is coming soon.
 - 🔗 **GitHub sync.** Connect a repo and push or pull changes in both directions.
 - 🎨 **Figma.** Paste a Figma frame link in the chat and the agent builds from the design.
 - 📦 **Export, import and duplicate projects.** Package a whole project into an import code, restore it, or clone it in one action.
