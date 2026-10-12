@@ -441,7 +441,7 @@ export function DomainModal({ open, onOpenChange, projectId, project, onChanged 
                                             <TriangleAlertIcon className="mt-px size-3 shrink-0" aria-hidden />
                                             {t("workspace.deploy.dnsNotice")}
                                         </p>
-                                        {isV2 && <ApexRedirectNote hostname={domain.hostname} />}
+                                        {isV2 && <ApexRedirectNote hostname={domain.hostname} hostnames={domain.hostnames} />}
                                     </div>
                                 )}
 

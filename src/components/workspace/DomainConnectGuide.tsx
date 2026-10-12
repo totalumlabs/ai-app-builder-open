@@ -60,15 +60,20 @@ export function ApexPreview({ hostname }: { hostname: string }) {
     );
 }
 
-/** After connecting a whole domain: the bare apex needs a redirect to `www` at the user's provider. */
-export function ApexRedirectNote({ hostname }: { hostname: string }) {
+/**
+ * After connecting a whole domain: how the bare domain reaches the site. When the engine lists `A`/`AAAA` records for
+ * it (Totalum's redirect service, which 301s to `https://<site>`), they are in the records list and work at any
+ * provider; otherwise the bare apex of a `www.` site needs a URL redirect at the user's provider.
+ */
+export function ApexRedirectNote({ hostname, hostnames }: { hostname: string; hostnames?: VcaasDomainHostname[] }) {
     const t = useT();
-    const apex = apexOf(hostname);
+    const redirect = hostnames?.find(h => h.role === "alias" && h.dnsRecordsToAdd?.some(r => r.type === "A" || r.type === "AAAA"));
+    const apex = redirect?.hostname ?? apexOf(hostname);
     if (!apex) return null;
     return (
         <p className="bg-muted/40 flex items-start gap-1.5 rounded-lg p-2.5 text-xs" data-testid="domain-apex-note">
             <InfoIcon className="text-primary mt-px size-3.5 shrink-0" aria-hidden />
-            <span>{t("workspace.domain.connect.apexRedirect", { apex, www: hostname })}</span>
+            <span>{t(redirect ? "workspace.domain.connect.apexRedirectRecords" : "workspace.domain.connect.apexRedirect", { apex, www: hostname })}</span>
         </p>
     );
 }
@@ -117,8 +122,7 @@ export function DomainTroubleshooting() {
 
 /**
  * Where a bought domain's site answers: `www` (default), `app`, or any label typed in "Other", or the bare domain
- * (`apex`). Below it, the address that results, so the choice is never abstract. The bare domain's redirect to the
- * site is announced as "coming soon": it does not answer over HTTPS yet.
+ * (`apex`). Below it, the address that results, so the choice is never abstract (the bare domain 301s to the site).
  */
 export function DomainPrefixField({ domain, value, onChange }: { domain: string; value: string; onChange: (prefix: string) => void }) {
     const t = useT();
@@ -186,28 +190,23 @@ export function DomainPrefixField({ domain, value, onChange }: { domain: string;
 }
 
 /**
- * Each address of the custom domain on its own line: the site, and the bare domain that redirects to it. The bare
- * domain's redirect does not answer over HTTPS yet, so it reads "coming soon" whatever its status — never "setting up"
- * forever. Change this line once the redirect works.
+ * Each address of the custom domain on its own line: the site, and the bare domain that 301s to it (Totalum's redirect
+ * service). Each is "working" once the engine reports it active with HTTPS — for the redirect, once it answers the 301.
  */
 export function DomainHostnames({ site, hostnames }: { site: string; hostnames: VcaasDomainHostname[] }) {
     const t = useT();
     return (
         <ul className="border-border mt-3 space-y-1.5 border-t pt-3 text-xs" data-testid="domain-hostnames">
             {hostnames.map(h => {
-                const redirect = h.role === "alias";
-                const live = !redirect && h.status === "active" && h.sslStatus === "active";
+                const live = h.status === "active" && h.sslStatus === "active";
                 return (
                     <li key={h.hostname} className="flex flex-wrap items-center gap-2">
-                        <span
-                            aria-hidden
-                            className={cn("size-1.5 shrink-0 rounded-full", live ? "bg-emerald-500" : redirect ? "bg-muted-foreground" : "bg-warning animate-pulse")}
-                        />
+                        <span aria-hidden className={cn("size-1.5 shrink-0 rounded-full", live ? "bg-emerald-500" : "bg-warning animate-pulse")} />
                         <code className="font-mono">{h.hostname}</code>
                         <span className="text-muted-foreground">
-                            {redirect ? t("workspace.domain.hostRedirect", { site }) : t("workspace.domain.hostSite")}
+                            {h.role === "alias" ? t("workspace.domain.hostRedirect", { site }) : t("workspace.domain.hostSite")}
                             {" · "}
-                            {redirect ? t("workspace.domain.hostRedirectSoon") : live ? t("workspace.domain.hostLive") : t("workspace.domain.hostPending")}
+                            {live ? t("workspace.domain.hostLive") : t("workspace.domain.hostPending")}
                         </span>
                     </li>
                 );
