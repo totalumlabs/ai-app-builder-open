@@ -13,9 +13,9 @@ import { enMore } from "./en-more";
 
 const base = {
   brand: {
-    name: "Totalum",
-    product: "Totalum Platform",
-    tagline: "Describe your app. Watch it get built.",
+    name: "RyanFenn.ai",
+    product: "RyanFenn.ai",
+    tagline: "Your ideas. Your software. Powered by AI.",
   },
 
   common: {
@@ -2909,7 +2909,7 @@ const base = {
   pages: {
     projects: {
       title: "Projects",
-      description: "Describe what you want to build and Totalum builds it for you.",
+      description: "Describe what you want to build and RyanFenn.ai builds it for you.",
       placeholderTitle: "No projects yet",
       placeholderDescription: "Your project dashboard is being built. You'll create apps from here.",
 
@@ -2919,9 +2919,9 @@ const base = {
       // second sentence because languages put the verb in different places
       // ("What do you want to build?" / "¿Qué quieres construir?"). Rendered with
       // `interpolateNodes` in `ProjectsHero`.
-      heroTitle: "What do you want to {accent}?",
-      heroTitleAccent: "build",
-      heroSubtitle: "Describe your app in a sentence. We'll write the code, host it and give you a live URL.",
+      heroTitle: "IMAGINE IT. {accent}",
+      heroTitleAccent: "BUILD IT.",
+      heroSubtitle: "Your ideas. Your software. Powered by AI.",
       heroPlaceholder: "A booking app for my barbershop, with a calendar, SMS reminders and Stripe payments…",
       heroSubmit: "Start building",
       heroSubmitShort: "Build",

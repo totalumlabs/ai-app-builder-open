@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import {
   Rocket, Loader2, Eye, LayoutGrid, Key, Globe, Terminal,
   RefreshCw, Server, PanelLeftClose, PanelLeft, Monitor, Smartphone,
-  ExternalLink, Sparkles, ChevronDown, FolderOpen, Plus,
+  ExternalLink, ChevronDown, FolderOpen, Plus,
   Clock, Github, Code2, ArrowLeft, Figma, Copy,
 } from "lucide-react";
 import Link from "next/link";
@@ -47,6 +47,7 @@ import { useVisualEditor } from "@/components/workspace/visual-editor/use-visual
 import { VisualEditorPanel } from "@/components/workspace/visual-editor/VisualEditorPanel";
 import { VisualChangesBar } from "@/components/workspace/visual-editor/VisualChangesBar";
 import { t as translate } from "@/i18n";
+import { BrandMark } from "@/components/BrandMark";
 
 // Pick the correct development preview URL following the Totalum API docs:
 // use `developmentUrlFieldToUse` to decide between the live server URL and the
@@ -368,7 +369,7 @@ export default function WorkspacePage() {
   const [mobileTab, setMobileTab] = useState<"chat" | "panel">("panel");
   const [mobilePreview, setMobilePreview] = useState(false);
   const [iframePath, setIframePath] = useState("/");
-  const [darkMode, setDarkMode] = useState(false);
+  const [darkMode] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
   const [diffSource, setDiffSource] = useState<DiffSource | null>(null);
   /**
@@ -415,11 +416,12 @@ export default function WorkspacePage() {
 
   useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; }; }, []);
 
-  // Global dark mode
+  // Always-on Electric Intelligence chrome. The app is dark-only; do not strip
+  // `html.dark` on unmount or the dashboard flashes a light theme.
   useEffect(() => {
-    if (darkMode) { document.documentElement.classList.add("dark"); document.body.style.background = "#1a1a1a"; document.body.style.color = "#e5e5e5"; }
-    else { document.documentElement.classList.remove("dark"); document.body.style.background = ""; document.body.style.color = ""; }
-    return () => { document.documentElement.classList.remove("dark"); document.body.style.background = ""; document.body.style.color = ""; };
+    document.documentElement.classList.add("dark");
+    document.body.style.background = "#05080D";
+    document.body.style.color = "#FFFFFF";
   }, [darkMode]);
 
   // Close menu on outside click or iframe blur
@@ -1321,17 +1323,17 @@ export default function WorkspacePage() {
   const runProgress = useRunProgress(projectId, isBuilding, isV2Project(project));
   const buildStage = runProgress && !isRunOver(runProgress.stage) ? stageText(runProgress.stage) : null;
   const leftHeaderWidth = chatCollapsed ? "auto" : chatWidth + 5;
-  const pageBg = darkMode ? "#1a1a1a" : "#fcfbf8";
-  const cardBg = darkMode ? "#222" : "#fff";
-  const btnBorder = darkMode ? "border-gray-700/60" : "border-gray-200/60";
+  const pageBg = "#05080D";
+  const cardBg = "#0E1925";
+  const btnBorder = "border-cyan-400/20";
 
   if (loading) return <div className="h-screen flex flex-col items-center justify-center gap-3 dark:text-gray-200" style={{ background: pageBg }}><Loader2 className="w-7 h-7 animate-spin" /><p className="text-sm text-gray-400">{"Loading..."}</p></div>;
   if (!project) return <div className="h-screen flex flex-col items-center justify-center gap-4 dark:text-gray-200" style={{ background: pageBg }}><p className="text-gray-500">Project not found</p><Link href="/"><Button variant="outline">{"Back"}</Button></Link></div>;
 
   // Popup menu content (shared between desktop and mobile)
   const popupMenu = menuOpen && (
-    <div data-popup-menu className="absolute top-full left-0 mt-1.5 w-56 rounded-xl shadow-xl z-[60] overflow-hidden" style={{ background: darkMode ? "#2a2a2a" : "#fff", border: `1px solid ${darkMode ? "#444" : "#e5e5e5"}` }}>
-      <div className="px-3 py-2 border-b" style={{ borderColor: darkMode ? "#444" : "#eee" }}>
+    <div data-popup-menu className="absolute top-full left-0 mt-1.5 w-56 rounded-sm shadow-[0_0_24px_rgba(0,223,255,0.12)] z-[60] overflow-hidden" style={{ background: "#0E1925", border: "1px solid rgba(0, 223, 255, 0.22)" }}>
+      <div className="px-3 py-2 border-b" style={{ borderColor: "rgba(0, 223, 255, 0.16)" }}>
         <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wider">{projectId}</p>
       </div>
       <div className="py-1">
@@ -1345,7 +1347,7 @@ export default function WorkspacePage() {
         </button>
       </div>
       {/* Tabs - visible on mobile only */}
-      <div className="sm:hidden border-t py-1" style={{ borderColor: darkMode ? "#444" : "#eee" }}>
+      <div className="sm:hidden border-t py-1" style={{ borderColor: "rgba(0, 223, 255, 0.16)" }}>
         {TABS.map((tab) => (
           <button key={tab.id} onClick={() => { setActiveTab(tab.id); setMobileTab("panel"); setMenuOpen(false); }}
             className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-black/5 dark:hover:bg-white/10 transition-colors ${activeTab === tab.id ? "text-gray-900 dark:text-white font-medium" : "text-gray-700 dark:text-gray-200"}`}>
@@ -1354,7 +1356,7 @@ export default function WorkspacePage() {
         ))}
       </div>
       {/* The errands — each opens a dialog over the workspace */}
-      <div className="border-t py-1" style={{ borderColor: darkMode ? "#444" : "#eee" }}>
+      <div className="border-t py-1" style={{ borderColor: "rgba(0, 223, 255, 0.16)" }}>
         {MODAL_ENTRIES.map((entry) => {
           const connected = (entry.id === "github" && githubConnected) || (entry.id === "figma" && figmaConnected);
           return (
@@ -1374,14 +1376,14 @@ export default function WorkspacePage() {
           <Copy className="w-4 h-4 text-gray-400" /> {"Duplicate project"}
         </button>
       </div>
-      <div className="border-t py-1" style={{ borderColor: darkMode ? "#444" : "#eee" }}>
+      <div className="border-t py-1" style={{ borderColor: "rgba(0, 223, 255, 0.16)" }}>
         {/* Publish on mobile */}
         <button onClick={() => { handleDeploy(); setMenuOpen(false); }} disabled={deploying || isBuilding}
           className="w-full sm:hidden flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-black/5 dark:hover:bg-white/10 transition-colors text-gray-700 dark:text-gray-200">
           <Rocket className="w-4 h-4 text-gray-400" /> {deploying ? "Deploying" : "Publish"}
         </button>
       </div>
-      <div className="border-t py-1" style={{ borderColor: darkMode ? "#444" : "#eee" }}>
+      <div className="border-t py-1" style={{ borderColor: "rgba(0, 223, 255, 0.16)" }}>
         <button onClick={() => { handleRestartServer(); setMenuOpen(false); }}
           className="w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-black/5 dark:hover:bg-white/10 transition-colors text-gray-700 dark:text-gray-200">
           <Server className="w-4 h-4 text-gray-400" /> {"Restart Agent Server"}
@@ -1417,16 +1419,16 @@ export default function WorkspacePage() {
       {/* ═══ DESKTOP LAYOUT ═══ */}
       <div className="hidden sm:flex flex-col h-full">
         {/* Desktop header 48px */}
-        <header data-workspace-header className="flex items-stretch shrink-0 z-10" style={{ height: 48 }}>
+        <header data-workspace-header className="flex items-stretch shrink-0 z-10 border-b border-cyan-400/15" style={{ height: 48, background: pageBg }}>
           {/* LEFT: aside width */}
           <div className="flex items-center gap-1.5 px-3 shrink-0" style={{ width: typeof leftHeaderWidth === "number" ? leftHeaderWidth : undefined }}>
             <Link href="/" title={"Back"} className="h-7 w-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-black/5 dark:hover:bg-white/10 transition-colors shrink-0">
               <ArrowLeft className="w-4 h-4" />
             </Link>
             <div className="relative flex-1 min-w-0" ref={menuRef}>
-              <button onClick={() => setMenuOpen(!menuOpen)} className="flex items-center gap-1.5 max-w-full rounded-lg px-1.5 py-1 hover:bg-black/5 dark:hover:bg-white/10 transition-colors">
-                <div className="w-5 h-5 rounded bg-gray-900 dark:bg-white flex items-center justify-center shrink-0"><Sparkles className="w-2.5 h-2.5 text-white dark:text-gray-900" /></div>
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-200 truncate">{project.label || projectId}</span>
+              <button onClick={() => setMenuOpen(!menuOpen)} className="flex items-center gap-1.5 max-w-full rounded-sm px-1.5 py-1 hover:bg-white/5 transition-colors">
+                <BrandMark size="sm" className="h-5 w-5 shrink-0" />
+                <span className="text-sm font-medium text-white truncate">{project.label || projectId}</span>
                 <ChevronDown className="w-3 h-3 text-gray-400 shrink-0" />
               </button>
               {popupMenu}
@@ -1443,13 +1445,13 @@ export default function WorkspacePage() {
             <div className="flex items-center gap-1 shrink-0">
               {TABS.map((tab) => (
                 <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center gap-1 h-7 px-2.5 rounded-lg text-sm font-medium transition-all border ${btnBorder} ${activeTab === tab.id ? "bg-gray-900 dark:bg-white text-white dark:text-gray-900" : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 bg-transparent"}`}>
+                  className={`flex items-center gap-1 h-7 px-2.5 rounded-sm text-sm font-medium transition-all border ${btnBorder} ${activeTab === tab.id ? "bg-[#00DFFF] text-[#05080D] border-[#00DFFF]" : "text-[#94A3B8] hover:text-[#00DFFF] hover:border-[#00DFFF]/50 bg-transparent"}`}>
                   <tab.icon className="w-3.5 h-3.5" /><span className="hidden lg:inline">{tab.label}</span>
                 </button>
               ))}
             </div>
             <div className="flex-1 flex items-center justify-center min-w-0">
-              <div className={`flex items-center h-7 w-[320px] rounded-full border ${btnBorder} px-1.5 gap-1`}>
+              <div className={`flex items-center h-7 w-[320px] rounded-sm border ${btnBorder} bg-[#0E1925] px-1.5 gap-1`}>
                 {/* ⭐ Logs open as a dialog from the address bar — the platform's placement. */}
                 <button onClick={() => setLogsOpen(true)} className="p-1 rounded shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" title={translate("workspace.logs.title")}><Terminal className="w-3.5 h-3.5" /></button>
                 <div className="w-px h-3.5 bg-gray-200 dark:bg-gray-600 shrink-0" />
@@ -1596,14 +1598,14 @@ export default function WorkspacePage() {
       {/* ═══ MOBILE LAYOUT: header → content → fixed switch → fixed textarea ═══ */}
       <div className="flex sm:hidden flex-col h-full">
         {/* Mobile header */}
-        <header data-workspace-header className="flex items-center gap-1 px-2 shrink-0 z-10" style={{ height: 44 }}>
+        <header data-workspace-header className="flex items-center gap-1 px-2 shrink-0 z-10 border-b border-cyan-400/15" style={{ height: 44, background: pageBg }}>
           <Link href="/" title={"Back"} className="h-7 w-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-black/5 dark:hover:bg-white/10 transition-colors shrink-0">
             <ArrowLeft className="w-4 h-4" />
           </Link>
           <div className="relative" ref={menuRef}>
-            <button onClick={() => setMenuOpen(!menuOpen)} className="flex items-center gap-1.5 px-1.5 py-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition-colors">
-              <div className="w-5 h-5 rounded bg-gray-900 dark:bg-white flex items-center justify-center shrink-0"><Sparkles className="w-2.5 h-2.5 text-white dark:text-gray-900" /></div>
-              <span className="text-sm font-medium text-gray-700 dark:text-gray-200 truncate max-w-[160px]">{project.label || projectId}</span>
+            <button onClick={() => setMenuOpen(!menuOpen)} className="flex items-center gap-1.5 px-1.5 py-1 rounded-sm hover:bg-white/5 transition-colors">
+              <BrandMark size="sm" className="h-5 w-5 shrink-0" />
+              <span className="text-sm font-medium text-white truncate max-w-[160px]">{project.label || projectId}</span>
               <ChevronDown className="w-3 h-3 text-gray-400 shrink-0" />
             </button>
             {popupMenu}
@@ -1642,9 +1644,9 @@ export default function WorkspacePage() {
 
         {/* Fixed switch: Preview / Chat */}
         <div className="shrink-0 flex items-center justify-center py-2 px-4" style={{ background: pageBg }}>
-          <div className="flex bg-gray-100 dark:bg-gray-800 rounded-full p-1 w-full max-w-xs">
-            <button onClick={() => setMobileTab("panel")} className={`w-1/2 py-2 rounded-full text-sm font-medium text-center transition-colors ${mobileTab === "panel" ? "bg-white dark:bg-gray-700 shadow text-gray-900 dark:text-white" : "text-gray-500"}`}>{"Preview"}</button>
-            <button onClick={() => setMobileTab("chat")} className={`w-1/2 py-2 rounded-full text-sm font-medium text-center transition-colors ${mobileTab === "chat" ? "bg-white dark:bg-gray-700 shadow text-gray-900 dark:text-white" : "text-gray-500"}`}>{"Chat"}</button>
+          <div className="flex bg-[#0E1925] border border-cyan-400/20 rounded-sm p-1 w-full max-w-xs">
+            <button onClick={() => setMobileTab("panel")} className={`w-1/2 py-2 rounded-sm text-sm font-medium text-center transition-colors ${mobileTab === "panel" ? "bg-[#00DFFF] text-[#05080D]" : "text-[#94A3B8]"}`}>{"Preview"}</button>
+            <button onClick={() => setMobileTab("chat")} className={`w-1/2 py-2 rounded-sm text-sm font-medium text-center transition-colors ${mobileTab === "chat" ? "bg-[#00DFFF] text-[#05080D]" : "text-[#94A3B8]"}`}>{"Chat"}</button>
           </div>
         </div>
       </div>

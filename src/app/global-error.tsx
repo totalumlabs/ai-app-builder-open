@@ -7,82 +7,81 @@ export default function GlobalError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
-  // Must include html and body tags as per Next.js docs
-  // Show user-friendly error message for critical errors
   return (
     <html lang="en">
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>Error - Application</title>
+        <title>Error — RyanFenn.ai</title>
       </head>
       <body style={{
         margin: 0,
         padding: 0,
-        fontFamily: 'system-ui, -apple-system, sans-serif',
-        background: 'linear-gradient(to bottom right, #f9fafb, #f3f4f6)',
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center'
+        fontFamily: "IBM Plex Sans, system-ui, sans-serif",
+        background: "#05080D",
+        color: "#FFFFFF",
+        minHeight: "100vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center"
       }}>
         <div style={{
-          maxWidth: '500px',
-          width: '90%',
-          background: 'white',
-          borderRadius: '12px',
-          boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-          padding: '32px',
-          textAlign: 'center'
+          maxWidth: "500px",
+          width: "90%",
+          background: "#0E1925",
+          border: "1px solid rgba(0, 223, 255, 0.22)",
+          boxShadow: "0 0 40px rgba(0, 223, 255, 0.12)",
+          padding: "32px",
+          textAlign: "center"
         }}>
           <div style={{
-            width: '64px',
-            height: '64px',
-            background: '#fee2e2',
-            borderRadius: '50%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            margin: '0 auto 24px',
-            fontSize: '32px'
+            width: "56px",
+            height: "56px",
+            background: "#05080D",
+            border: "1px solid rgba(255, 77, 109, 0.5)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            margin: "0 auto 24px",
+            fontSize: "22px"
           }}>
-            ⚠️
+            !
           </div>
 
           <h1 style={{
-            fontSize: '24px',
-            fontWeight: '600',
-            color: '#111827',
-            marginBottom: '12px'
+            fontSize: "24px",
+            fontWeight: "700",
+            color: "#FFFFFF",
+            marginBottom: "12px",
+            letterSpacing: "0.04em"
           }}>
             Something went wrong
           </h1>
 
           <p style={{
-            fontSize: '16px',
-            color: '#6b7280',
-            marginBottom: '24px',
-            lineHeight: '1.5'
+            fontSize: "16px",
+            color: "#94A3B8",
+            marginBottom: "24px",
+            lineHeight: "1.5"
           }}>
-            An error occurred. The error has been logged to the console. Please refresh the page to continue.
+            An error occurred. Refresh the page to continue.
           </p>
 
           <button
             onClick={() => window.location.reload()}
             style={{
-              background: '#3b82f6',
-              color: 'white',
-              padding: '12px 24px',
-              borderRadius: '8px',
-              border: 'none',
-              fontSize: '16px',
-              fontWeight: '500',
-              cursor: 'pointer',
-              transition: 'background 0.2s',
-              width: '100%'
+              background: "#00DFFF",
+              color: "#05080D",
+              padding: "12px 24px",
+              borderRadius: "2px",
+              border: "none",
+              fontSize: "14px",
+              fontWeight: "600",
+              letterSpacing: "0.12em",
+              textTransform: "uppercase",
+              cursor: "pointer",
+              width: "100%"
             }}
-            onMouseOver={(e) => (e.currentTarget.style.background = '#2563eb')}
-            onMouseOut={(e) => (e.currentTarget.style.background = '#3b82f6')}
           >
             Refresh Page
           </button>

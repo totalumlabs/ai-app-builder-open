@@ -28,9 +28,9 @@ export default function Error({
 
   return (
     <div className="flex min-h-[400px] w-full items-center justify-center p-4">
-      <div className="w-full max-w-md rounded-lg border border-red-200 bg-red-50 p-6 shadow-sm dark:border-red-900 dark:bg-red-950/30">
+      <div className="w-full max-w-md rounded-sm border border-[#ff4d6d]/40 bg-[#0E1925] p-6 shadow-[0_0_40px_rgba(255,77,109,0.08)]">
         <div className="mb-4 flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/50">
+          <div className="flex h-10 w-10 items-center justify-center rounded-sm bg-[#2a1018] border border-[#ff4d6d]/40">
             <svg
               className="h-5 w-5 text-red-600 dark:text-red-400"
               fill="none"
@@ -62,25 +62,25 @@ export default function Error({
         </div>
 
         {/* AI Help Section */}
-        <div className="mb-4 rounded-lg border-2 border-blue-300 bg-gradient-to-br from-blue-50 to-indigo-50 p-4 dark:border-blue-700 dark:from-blue-950/50 dark:to-indigo-950/50">
+        <div className="mb-4 rounded-sm border border-cyan-400/30 bg-[#0E1925] p-4">
           <div className="mb-2 flex items-center gap-2">
-            <svg className="h-5 w-5 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="h-5 w-5 text-[#00DFFF]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
             </svg>
-            <span className="text-base font-bold text-blue-800 dark:text-blue-200">
+            <span className="text-base font-bold text-white">
               Let AI fix this
             </span>
           </div>
-          <p className="mb-3 text-sm text-blue-700 dark:text-blue-300">
+          <p className="mb-3 text-sm text-[#94A3B8]">
             Copy this and paste it in the AI chat:
           </p>
           <div className="relative">
-            <div className="rounded-md border border-blue-200 bg-white p-3 pr-12 font-mono text-sm text-gray-800 dark:border-blue-800 dark:bg-gray-900 dark:text-gray-200">
+            <div className="rounded-sm border border-cyan-400/20 bg-[#05080D] p-3 pr-12 font-mono text-sm text-white">
               {aiPrompt}
             </div>
             <button
               onClick={handleCopy}
-              className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md bg-blue-600 p-2 text-white transition-all hover:bg-blue-700 active:scale-95"
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded-sm bg-[#00DFFF] p-2 text-[#05080D] transition-all hover:bg-[#008CFF] hover:text-white active:scale-95"
               title="Copy to clipboard"
             >
               {copied ? (
@@ -104,19 +104,19 @@ export default function Error({
         <div className="flex flex-col gap-2">
           <button
             onClick={() => reset()}
-            className="w-full rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+            className="w-full rounded-sm bg-[#ff4d6d] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#ff335c]"
           >
             Try again
           </button>
           <button
             onClick={() => window.history.back()}
-            className="w-full rounded-md border border-red-300 bg-white px-4 py-2 text-sm font-medium text-red-700 transition-colors hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 dark:border-red-800 dark:bg-transparent dark:text-red-300 dark:hover:bg-red-900/30"
+            className="w-full rounded-sm border border-cyan-400/20 bg-transparent px-4 py-2 text-sm font-medium text-[#94A3B8] transition-colors hover:text-[#00DFFF] hover:border-[#00DFFF]/50"
           >
             Go back
           </button>
           <button
             onClick={() => setShowDetails(!showDetails)}
-            className="w-full rounded-md border border-red-300 bg-white px-4 py-2 text-sm font-medium text-red-700 transition-colors hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 dark:border-red-800 dark:bg-transparent dark:text-red-300 dark:hover:bg-red-900/30"
+            className="w-full rounded-sm border border-cyan-400/20 bg-transparent px-4 py-2 text-sm font-medium text-[#94A3B8] transition-colors hover:text-[#00DFFF] hover:border-[#00DFFF]/50"
           >
             {showDetails ? "Hide details" : "Show details"}
           </button>

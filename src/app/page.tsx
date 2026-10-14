@@ -31,6 +31,7 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { uploadFilesToProjectDetailed, splitBySize, MAX_UPLOAD_MB, TOO_LARGE_ADVICE } from "@/lib/upload";
 import { SetupBanners } from "@/components/SetupBanners";
+import { BrandWordmark } from "@/components/BrandMark";
 import type { VcaasProjectSummary } from "@/lib/vcaas-types";
 
 type ViewMode = "cards" | "table";
@@ -41,9 +42,9 @@ const VIEW_MODE_KEY = "vibebuild:dashboard-view";
 
 // --- Deterministic gradient + initials for the placeholder thumbnail ---
 const GRADIENTS: [string, string][] = [
-  ["#6366f1", "#a855f7"], ["#0ea5e9", "#22d3ee"], ["#f43f5e", "#f97316"],
-  ["#10b981", "#22d3ee"], ["#8b5cf6", "#ec4899"], ["#f59e0b", "#ef4444"],
-  ["#3b82f6", "#8b5cf6"], ["#14b8a6", "#10b981"],
+  ["#00DFFF", "#008CFF"], ["#008CFF", "#0E1925"], ["#041820", "#00DFFF"],
+  ["#0E1925", "#008CFF"], ["#00324d", "#00DFFF"], ["#05080D", "#00A8E8"],
+  ["#008CFF", "#00DFFF"], ["#0A1622", "#008CFF"],
 ];
 function gradientFor(id: string): [string, string] {
   let h = 0;
@@ -102,7 +103,7 @@ function ProjectThumbnail({
   const placeholder = (
     <div
       className="w-full h-full flex items-center justify-center relative overflow-hidden px-1.5"
-      style={{ background: `linear-gradient(135deg, ${c1}, ${c2})` }}
+      style={{ background: `linear-gradient(160deg, ${c1}, ${c2})` }}
     >
       <span
         className={`font-semibold text-white/95 tracking-tight text-center leading-tight break-words ${isRow ? "text-[9px] line-clamp-2" : "text-[11px] line-clamp-3"}`}
@@ -115,7 +116,7 @@ function ProjectThumbnail({
   );
 
   return (
-    <div className="w-full h-full relative overflow-hidden bg-gray-100 dark:bg-gray-800">
+    <div className="w-full h-full relative overflow-hidden bg-[#0E1925]">
       {previewImageUrl && state !== "failed" ? (
         <>
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -515,49 +516,48 @@ export default function DashboardPage() {
   const hasProjects = projects.length > 0;
 
   return (
-    <div className="min-h-screen relative overflow-hidden">
-      <div className="fixed inset-0 -z-10" style={{ background: "#fcfbf8" }} />
+    <div className="min-h-screen relative overflow-hidden text-white">
+      <div className="pointer-events-none fixed inset-0 -z-10">
+        <div className="absolute left-1/2 top-[18%] -translate-x-1/2 ei-hero-glow" />
+      </div>
 
-      {/* Header */}
-      <header className="sticky top-0 z-50">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 h-12 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-gray-900 flex items-center justify-center">
-              <Sparkles className="w-3.5 h-3.5 text-white" />
-            </div>
-            <span className="font-semibold tracking-tight text-gray-900 text-sm">VibeBuild</span>
+      <header className="sticky top-0 z-50 border-b border-cyan-400/10 bg-[#05080D]/90">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
+          <Link href="/" className="flex items-center">
+            <BrandWordmark />
           </Link>
-          <div className="flex items-center gap-2">
-            <Link href="/">
-              <button className="text-xs text-gray-500 hover:text-gray-700 px-2.5 py-1.5 rounded-lg hover:bg-black/5 transition-colors">Home</button>
-            </Link>
-          </div>
+          <nav className="flex items-center gap-1">
+            <button
+              onClick={focusComposer}
+              className="text-[11px] uppercase tracking-[0.18em] text-[#94A3B8] hover:text-[#00DFFF] px-3 py-2 transition-colors"
+            >
+              New
+            </button>
+          </nav>
         </div>
       </header>
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
         {/* Hero prompt */}
         {!loading && (
-          <div className={hasProjects || keyConfigured === false ? "mb-10" : "flex flex-col items-center justify-center min-h-[50vh]"}>
-            <div className="w-full max-w-2xl mx-auto">
-              <div className="text-center mb-6">
-                {!hasProjects && (
-                  <div className="w-12 h-12 rounded-2xl bg-gray-900 flex items-center justify-center mx-auto mb-4">
-                    <Sparkles className="w-6 h-6 text-white" />
-                  </div>
-                )}
-                <h1 className={`font-bold tracking-tight text-gray-900 ${hasProjects ? "text-xl" : "text-3xl sm:text-4xl"}`}>
-                  What do you want to build?
+          <div className={hasProjects || keyConfigured === false ? "mb-12" : "flex flex-col items-center justify-center min-h-[58vh]"}>
+            <div className="w-full max-w-3xl mx-auto relative">
+              <div className="text-center mb-8">
+                <p className="text-[11px] uppercase tracking-[0.42em] text-[#00DFFF] mb-4">Electric Intelligence</p>
+                <h1 className={`font-display font-extrabold tracking-tight text-white ${hasProjects ? "text-3xl sm:text-4xl" : "text-5xl sm:text-7xl leading-[0.92]"}`}>
+                  IMAGINE IT.<br className="hidden sm:block" /> BUILD IT.
                 </h1>
-                {!hasProjects && <p className="text-gray-500 max-w-md mx-auto mt-2 text-sm">Describe your app and AI will build it in minutes.</p>}
+                <p className={`text-[#94A3B8] max-w-lg mx-auto mt-4 ${hasProjects ? "text-sm" : "text-base sm:text-lg"}`}>
+                  Your ideas. Your software. Powered by AI.
+                </p>
               </div>
-              <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg shadow-gray-200/50 border border-gray-200/60 overflow-hidden">
+              <div className="ei-panel ei-glow overflow-hidden">
                 <textarea
                   ref={heroTextareaRef}
                   value={firstPrompt}
                   onChange={(e) => setFirstPrompt(e.target.value)}
-                  placeholder="Describe your app... e.g. 'A project management tool with kanban boards'"
-                  className="w-full min-h-[90px] sm:min-h-[110px] resize-none text-[15px] p-5 pb-2 outline-none placeholder:text-gray-400 bg-transparent"
+                  placeholder="Describe the software you want to build…"
+                  className="w-full min-h-[110px] sm:min-h-[140px] resize-none text-[16px] p-5 pb-2 outline-none placeholder:text-[#94A3B8]/70 bg-transparent text-white focus:shadow-[inset_0_0_0_1px_rgba(0,223,255,0.45)]"
                   onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); openBuildModal(); } }}
                   onPaste={handleHeroPaste}
                 />
@@ -571,9 +571,9 @@ export default function DashboardPage() {
                   items={attachedFiles.map((f) => ({ name: f.name, file: f.file, type: f.file.type, size: f.file.size }))}
                   onRemove={(index) => setAttachedFiles((prev) => prev.filter((_, j) => j !== index))}
                 />
-                <div className="flex items-center justify-between px-4 py-2.5 border-t border-gray-100/80">
+                <div className="flex items-center justify-between px-4 py-2.5 border-t border-cyan-400/15">
                   <div className="flex items-center gap-1">
-                    <label className="cursor-pointer flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 transition-colors px-1.5 py-1 rounded-lg hover:bg-gray-50">
+                    <label className="cursor-pointer flex items-center gap-1.5 text-xs text-[#94A3B8] hover:text-[#00DFFF] transition-colors px-1.5 py-1 rounded-sm hover:bg-white/5">
                       <input type="file" multiple className="hidden" onChange={handleFileSelect} accept="image/*,.pdf,.svg" />
                       {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Paperclip className="w-4 h-4" />}
                       <span className="hidden sm:inline">Attach</span>
@@ -592,7 +592,7 @@ export default function DashboardPage() {
                     />
                   </div>
                   <button onClick={openBuildModal} disabled={!firstPrompt.trim() && attachedFiles.length === 0}
-                    className="flex items-center gap-1.5 bg-gray-900 hover:bg-gray-800 disabled:bg-gray-300 text-white text-xs font-medium px-4 h-8 rounded-xl transition-colors">
+                    className="flex items-center gap-1.5 bg-[#00DFFF] hover:bg-[#008CFF] hover:text-white disabled:bg-[#1a2a38] disabled:text-[#94A3B8] text-[#05080D] text-xs font-semibold tracking-[0.14em] uppercase px-5 h-9 rounded-sm transition-all hover:shadow-[0_0_24px_rgba(0,140,255,0.45)]">
                     <Send className="w-3.5 h-3.5" /><span>Build</span>
                   </button>
                 </div>
@@ -610,22 +610,22 @@ export default function DashboardPage() {
             {/* Toolbar: search, sort, view toggle */}
             <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-5">
               <div className="flex items-center gap-2">
-                <h2 className="text-base font-semibold text-gray-700">Projects</h2>
-                <span className="text-xs text-gray-400 bg-gray-100 rounded-full px-2 py-0.5">{filtered.length}</span>
+                <h2 className="text-sm font-display font-semibold tracking-[0.16em] uppercase text-white">Projects</h2>
+                <span className="text-[11px] text-[#00DFFF] border border-cyan-400/30 px-2 py-0.5">{filtered.length}</span>
               </div>
 
               <div className="flex-1 flex flex-wrap items-center gap-2 sm:justify-end">
                 {/* Search */}
                 <div className="relative flex-1 sm:flex-none sm:w-56 min-w-[160px]">
-                  <Search className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <Search className="w-3.5 h-3.5 text-[#94A3B8] absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                   <input
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     placeholder="Search by id or description..."
-                    className="w-full h-8 pl-8 pr-7 text-xs rounded-lg border border-gray-200 bg-white/70 text-gray-700 outline-none focus:ring-2 focus:ring-gray-200"
+                    className="w-full h-8 pl-8 pr-7 text-xs rounded-sm border border-cyan-400/20 bg-[#0E1925] text-white outline-none focus:border-[#00DFFF] focus:shadow-[0_0_12px_rgba(0,223,255,0.25)]"
                   />
                   {search && (
-                    <button onClick={() => setSearch("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                    <button onClick={() => setSearch("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-[#94A3B8] hover:text-white">
                       <X className="w-3 h-3" />
                     </button>
                   )}
@@ -633,11 +633,11 @@ export default function DashboardPage() {
 
                 {/* Sort */}
                 <div className="relative">
-                  <ArrowUpDown className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <ArrowUpDown className="w-3.5 h-3.5 text-[#94A3B8] absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                   <select
                     value={sortKey}
                     onChange={(e) => setSortKey(e.target.value as SortKey)}
-                    className="h-8 pl-8 pr-6 text-xs rounded-lg border border-gray-200 bg-white/70 text-gray-700 outline-none focus:ring-2 focus:ring-gray-200 appearance-none cursor-pointer"
+                    className="h-8 pl-8 pr-6 text-xs rounded-sm border border-cyan-400/20 bg-[#0E1925] text-white outline-none focus:border-[#00DFFF] appearance-none cursor-pointer"
                   >
                     <option value="date-desc">Newest first</option>
                     <option value="date-asc">Oldest first</option>
@@ -647,18 +647,18 @@ export default function DashboardPage() {
                 </div>
 
                 {/* View toggle */}
-                <div className="flex items-center rounded-lg border border-gray-200 bg-white/70 p-0.5">
+                <div className="flex items-center rounded-sm border border-cyan-400/20 bg-[#0E1925] p-0.5">
                   <button
                     onClick={() => chooseView("cards")}
                     title="Card view"
-                    className={`h-7 w-7 flex items-center justify-center rounded-md transition-colors ${resolvedView === "cards" ? "bg-gray-900 text-white" : "text-gray-400 hover:text-gray-600"}`}
+                    className={`h-7 w-7 flex items-center justify-center rounded-sm transition-colors ${resolvedView === "cards" ? "bg-[#00DFFF] text-[#05080D]" : "text-[#94A3B8] hover:text-[#00DFFF]"}`}
                   >
                     <LayoutGrid className="w-3.5 h-3.5" />
                   </button>
                   <button
                     onClick={() => chooseView("table")}
                     title="Table view"
-                    className={`h-7 w-7 flex items-center justify-center rounded-md transition-colors ${resolvedView === "table" ? "bg-gray-900 text-white" : "text-gray-400 hover:text-gray-600"}`}
+                    className={`h-7 w-7 flex items-center justify-center rounded-sm transition-colors ${resolvedView === "table" ? "bg-[#00DFFF] text-[#05080D]" : "text-[#94A3B8] hover:text-[#00DFFF]"}`}
                   >
                     <TableIcon className="w-3.5 h-3.5" />
                   </button>
@@ -671,7 +671,7 @@ export default function DashboardPage() {
                 */}
                 <button
                   onClick={() => setImportOpen(true)}
-                  className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 h-8 px-2.5 rounded-lg border border-gray-200 bg-white/70 hover:bg-white transition-colors"
+                  className="flex items-center gap-1 text-xs text-[#94A3B8] hover:text-[#00DFFF] h-8 px-2.5 rounded-sm border border-cyan-400/20 bg-[#0E1925] hover:border-[#00DFFF]/50 transition-colors"
                   title="Import a project from a code"
                 >
                   <Download className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Import</span>
@@ -680,7 +680,7 @@ export default function DashboardPage() {
                 {/* ⭐ New project = focus the composer. See `focusComposer`. */}
                 <button
                   onClick={focusComposer}
-                  className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 h-8 px-2.5 rounded-lg border border-gray-200 bg-white/70 hover:bg-white transition-colors"
+                  className="flex items-center gap-1 text-xs text-[#05080D] hover:text-white h-8 px-2.5 rounded-sm bg-[#00DFFF] hover:bg-[#008CFF] hover:shadow-[0_0_20px_rgba(0,140,255,0.4)] transition-all"
                   title="New project"
                 >
                   <Plus className="w-3.5 h-3.5" /> <span className="hidden sm:inline">New</span>
@@ -689,8 +689,8 @@ export default function DashboardPage() {
             </div>
 
             {filtered.length === 0 ? (
-              <div className="text-center py-16 text-gray-400">
-                <Search className="w-8 h-8 mx-auto mb-2 text-gray-300" />
+              <div className="text-center py-16 text-[#94A3B8]">
+                <Search className="w-8 h-8 mx-auto mb-2 text-[#00DFFF]/40" />
                 <p className="text-sm">No projects match &ldquo;{search}&rdquo;</p>
               </div>
             ) : resolvedView === "cards" ? (
@@ -698,20 +698,20 @@ export default function DashboardPage() {
               <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {pageItems.map((p) => (
                   <Link key={p.projectId} href={`/project/${p.projectId}`}>
-                    <div className="bg-white/70 backdrop-blur-sm border border-gray-200/50 rounded-xl overflow-hidden hover:shadow-lg hover:bg-white/90 transition-all cursor-pointer group h-full">
-                      <div className="h-32 relative overflow-hidden">
+                    <div className="ei-panel overflow-hidden hover:shadow-[0_0_24px_rgba(0,223,255,0.16)] hover:border-[#00DFFF]/40 transition-all cursor-pointer group h-full">
+                      <div className="h-32 relative overflow-hidden border-b border-cyan-400/10">
                         <ProjectThumbnail project={p} />
-                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors pointer-events-none" />
+                        <div className="absolute inset-0 bg-cyan-400/0 group-hover:bg-cyan-400/5 transition-colors pointer-events-none" />
                       </div>
                       <div className="p-4">
                         <div className="flex items-start justify-between mb-1">
-                          <h3 className="font-medium text-sm text-gray-800 group-hover:text-gray-900 truncate flex-1">{p.projectId}</h3>
+                          <h3 className="font-medium text-sm text-white group-hover:text-[#00DFFF] truncate flex-1">{p.projectId}</h3>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <button
                                 onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
                                 title="Options"
-                                className="w-6 h-6 rounded-md flex items-center justify-center text-gray-300 hover:text-gray-600 hover:bg-gray-100 transition-all shrink-0 ml-2"
+                                className="w-6 h-6 rounded-sm flex items-center justify-center text-[#94A3B8] hover:text-[#00DFFF] hover:bg-white/5 transition-all shrink-0 ml-2"
                               >
                                 <MoreVertical className="w-3.5 h-3.5" />
                               </button>
@@ -739,10 +739,10 @@ export default function DashboardPage() {
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </div>
-                        <p className="text-[11px] text-gray-500 line-clamp-1">{p.description || "No description"}</p>
+                        <p className="text-[11px] text-[#94A3B8] line-clamp-1">{p.description || "No description"}</p>
                         <div className="flex items-center justify-between mt-2">
-                          <span className="text-[10px] text-gray-400">{new Date(p.createdAt).toLocaleDateString()}</span>
-                          <ArrowRight className="w-3 h-3 text-gray-300 group-hover:text-gray-500 transition-colors" />
+                          <span className="text-[10px] text-[#94A3B8]/80">{new Date(p.createdAt).toLocaleDateString()}</span>
+                          <ArrowRight className="w-3 h-3 text-[#00DFFF]/40 group-hover:text-[#00DFFF] transition-colors" />
                         </div>
                       </div>
                     </div>
@@ -751,11 +751,11 @@ export default function DashboardPage() {
               </div>
             ) : (
               /* ── TABLE VIEW ── */
-              <div className="bg-white/70 backdrop-blur-sm border border-gray-200/60 rounded-xl overflow-hidden">
+              <div className="ei-panel overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full text-left">
                     <thead>
-                      <tr className="border-b border-gray-200/70 text-[11px] uppercase tracking-wider text-gray-400">
+                      <tr className="border-b border-cyan-400/15 text-[11px] uppercase tracking-wider text-[#94A3B8]">
                         <th className="font-medium px-4 py-2.5 w-16">Preview</th>
                         <th className="font-medium px-2 py-2.5">Project</th>
                         <th className="font-medium px-2 py-2.5 hidden md:table-cell">Description</th>
@@ -768,21 +768,21 @@ export default function DashboardPage() {
                         <tr
                           key={p.projectId}
                           onClick={() => router.push(`/project/${p.projectId}`)}
-                          className="border-b border-gray-100/70 last:border-0 hover:bg-gray-50/60 cursor-pointer transition-colors group"
+                          className="border-b border-cyan-400/10 last:border-0 hover:bg-cyan-400/5 cursor-pointer transition-colors group"
                         >
                           <td className="px-4 py-2">
-                            <div className="w-11 h-8 rounded-md overflow-hidden border border-gray-200/60">
+                            <div className="w-11 h-8 rounded-sm overflow-hidden border border-cyan-400/20">
                               <ProjectThumbnail project={p} variant="row" />
                             </div>
                           </td>
                           <td className="px-2 py-2">
-                            <span className="text-sm font-medium text-gray-800 group-hover:text-gray-900">{p.projectId}</span>
+                            <span className="text-sm font-medium text-white group-hover:text-[#00DFFF]">{p.projectId}</span>
                           </td>
                           <td className="px-2 py-2 hidden md:table-cell">
-                            <span className="text-xs text-gray-500 line-clamp-1 max-w-[280px]">{p.description || "No description"}</span>
+                            <span className="text-xs text-[#94A3B8] line-clamp-1 max-w-[280px]">{p.description || "No description"}</span>
                           </td>
                           <td className="px-2 py-2 whitespace-nowrap">
-                            <span className="text-xs text-gray-400">{new Date(p.createdAt).toLocaleDateString()}</span>
+                            <span className="text-xs text-[#94A3B8]">{new Date(p.createdAt).toLocaleDateString()}</span>
                           </td>
                           <td className="px-4 py-2 text-right">
                             <DropdownMenu>
@@ -790,7 +790,7 @@ export default function DashboardPage() {
                                 <button
                                   onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
                                   title="Options"
-                                  className="w-6 h-6 rounded-md inline-flex items-center justify-center text-gray-300 hover:text-gray-600 hover:bg-gray-100 transition-all"
+                                  className="w-6 h-6 rounded-sm inline-flex items-center justify-center text-[#94A3B8] hover:text-[#00DFFF] hover:bg-white/5 transition-all"
                                 >
                                   <MoreVertical className="w-3.5 h-3.5" />
                                 </button>
@@ -831,15 +831,15 @@ export default function DashboardPage() {
                 <button
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                   disabled={safePage <= 1}
-                  className="h-8 w-8 flex items-center justify-center rounded-lg border border-gray-200 bg-white/70 text-gray-500 hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  className="h-8 w-8 flex items-center justify-center rounded-sm border border-cyan-400/20 bg-[#0E1925] text-[#94A3B8] hover:text-[#00DFFF] hover:border-[#00DFFF]/50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 >
                   <ChevronLeft className="w-4 h-4" />
                 </button>
-                <span className="text-xs text-gray-500 px-2">Page {safePage} of {totalPages}</span>
+                <span className="text-xs text-[#94A3B8] px-2">Page {safePage} of {totalPages}</span>
                 <button
                   onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                   disabled={safePage >= totalPages}
-                  className="h-8 w-8 flex items-center justify-center rounded-lg border border-gray-200 bg-white/70 text-gray-500 hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  className="h-8 w-8 flex items-center justify-center rounded-sm border border-cyan-400/20 bg-[#0E1925] text-[#94A3B8] hover:text-[#00DFFF] hover:border-[#00DFFF]/50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 >
                   <ChevronRight className="w-4 h-4" />
                 </button>
@@ -850,7 +850,7 @@ export default function DashboardPage() {
 
         {loading && (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-6">
-            {[1, 2, 3].map((i) => <Skeleton key={i} className="h-48 rounded-xl bg-white/40" />)}
+            {[1, 2, 3].map((i) => <Skeleton key={i} className="h-48 rounded-sm bg-[#0E1925] border border-cyan-400/10" />)}
           </div>
         )}
       </div>
@@ -860,7 +860,7 @@ export default function DashboardPage() {
         <DialogContent>
           <DialogHeader><DialogTitle>Name your project</DialogTitle></DialogHeader>
           <div className="space-y-4 mt-4">
-            <p className="text-sm text-gray-500">Choose a unique name for your project. It will be used in the URL.</p>
+            <p className="text-sm text-[#94A3B8]">Choose a unique name for your project. It will be used in the URL.</p>
             <div>
               <Label>Project name</Label>
               <Input
@@ -871,15 +871,15 @@ export default function DashboardPage() {
                 onKeyDown={(e) => { if (e.key === "Enter" && !buildCreating) confirmBuild(); }}
                 className="mt-1.5"
               />
-              <p className="text-xs text-gray-400 mt-1">3-35 chars, lowercase, hyphens allowed. Final id: <span className="font-mono text-gray-500">{normalizeId(buildName) || "…"}</span></p>
+              <p className="text-xs text-[#94A3B8] mt-1">3-35 chars, lowercase, hyphens allowed. Final id: <span className="font-mono text-[#00DFFF]">{normalizeId(buildName) || "…"}</span></p>
             </div>
             {buildError && (
-              <div className="flex items-start gap-2 text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg p-2.5">
+              <div className="flex items-start gap-2 text-xs text-[#ff4d6d] bg-[#2a1018] border border-[#ff4d6d]/40 rounded-sm p-2.5">
                 <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
                 <span>{buildError}</span>
               </div>
             )}
-            <Button className="w-full bg-gray-900 hover:bg-gray-800" onClick={confirmBuild} disabled={buildCreating || normalizeId(buildName).length < 3}>
+            <Button className="w-full" onClick={confirmBuild} disabled={buildCreating || normalizeId(buildName).length < 3}>
               {buildCreating ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Creating...</> : <><ArrowRight className="w-4 h-4 mr-2" /> Create & Build</>}
             </Button>
           </div>
@@ -890,21 +890,21 @@ export default function DashboardPage() {
       <Dialog open={!!deleteTarget} onOpenChange={(o) => { if (!o && !deleting) setDeleteTarget(null); }}>
         <DialogContent className="sm:max-w-md overflow-hidden p-0 gap-0">
           {/* Red accent header */}
-          <div className="relative bg-gradient-to-br from-red-50 to-rose-100/60 px-6 pt-7 pb-6 text-center">
-            <div className="mx-auto w-14 h-14 rounded-2xl bg-white shadow-sm ring-1 ring-red-100 flex items-center justify-center">
-              <AlertTriangle className="w-7 h-7 text-red-500" />
+          <div className="relative bg-[#1a0c12] border-b border-[#ff4d6d]/30 px-6 pt-7 pb-6 text-center">
+            <div className="mx-auto w-14 h-14 rounded-sm bg-[#05080D] border border-[#ff4d6d]/40 flex items-center justify-center">
+              <AlertTriangle className="w-7 h-7 text-[#ff4d6d]" />
             </div>
             <DialogHeader className="mt-4">
-              <DialogTitle className="text-center text-lg font-semibold text-gray-900">Delete this project?</DialogTitle>
+              <DialogTitle className="text-center text-lg font-semibold text-white">Delete this project?</DialogTitle>
             </DialogHeader>
           </div>
 
           <div className="px-6 py-5 space-y-4">
-            <p className="text-sm text-gray-600 text-center leading-relaxed">
+            <p className="text-sm text-[#94A3B8] text-center leading-relaxed">
               You&rsquo;re about to permanently delete{" "}
-              <span className="font-semibold text-gray-900 font-mono break-all">{deleteTarget}</span>.
+              <span className="font-semibold text-white font-mono break-all">{deleteTarget}</span>.
             </p>
-            <div className="flex items-start gap-2.5 text-xs text-red-700 bg-red-50 border border-red-200 rounded-xl p-3">
+            <div className="flex items-start gap-2.5 text-xs text-[#ff4d6d] bg-[#2a1018] border border-[#ff4d6d]/40 rounded-sm p-3">
               <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
               <span>This action is <strong>irreversible</strong>. Once deleted, the project and all its data cannot be recovered.</span>
             </div>
