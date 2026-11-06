@@ -5152,7 +5152,7 @@ const base = {
       createRateLimited: "You've created a lot of projects very quickly. Wait a minute and try again.",
       /* ⚠️ Retrying never clears this one — say what actually does. */
       projectLimitReached:
-        "Your plan's projects are all in use, so there's no room for a new one. Delete a project you no longer need, or move up a plan.",
+        "The Totalum plan's project limit is reached. Upgrade the Totalum plan to have more projects, or delete a project you no longer need.",
     },
 
     export: {

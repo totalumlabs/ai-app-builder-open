@@ -29,7 +29,7 @@ npx tsc --noEmit --noUnusedLocals --noUnusedParameters   # import hygiene (ESLin
 npm run build && npm start       # production build — run this before any PR
 ```
 
-There is no test suite. Verification = typecheck + build + open the changed screen in a
+`npm test` runs the unit tests in `scripts/*.test.mjs` (no extra dependency). Beyond that, verification = typecheck + build + open the changed screen in a
 browser with a real key. The key hits real projects and spends real credits: click through
 UI, but do not fire publish / restore / pull / delete unless the task requires it.
 
@@ -108,7 +108,7 @@ https://builder-api.totalum.app/api/v1/vcaas    ← documented at totalum.app/to
 ## Common next steps
 
 - **Put real users behind it:** see "Boilerplate mode" below — the guards live in `src/app/api/vcaas/_shared.ts`.
-- **Rebrand / white-label:** `src/app/layout.tsx` (metadata), `src/app/page.tsx` header, `src/app/icon.svg`, `globals.css` tokens. Remove `InsufficientCreditsModal`'s billing link before selling to customers — it points at the operator's account.
+- **Rebrand / white-label:** `src/app/layout.tsx` (metadata), `src/app/page.tsx` header, `src/app/icon.svg`, `globals.css` tokens. Remove `TotalumLimitModal` (out of Totalum credits / Totalum project limit, link to totalum.app/whitelabel) before selling to customers — it talks about the operator's account.
 - **Add a workspace capability:** check the endpoint in the API reference above → `vcaas.ts` + types → a `*Modal.tsx` (use `components/primitives/Modal`) → mount it in the workspace page under `openModal`.
 - **Add a language:** replace the frozen `useLocale()` in `i18n/index.ts` with the platform's `LocaleProvider` and add `es.ts`.
 
@@ -142,7 +142,7 @@ Today the app is single-tenant: one key, no login, and the route guards in `src/
 1. Env: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_ID_*` for credit packs or a plan.
 2. `POST /api/billing/checkout`: create a Checkout Session (`mode: "payment"` for packs, `"subscription"` for a plan) with `client_reference_id = user.id`, success URL back to the dashboard.
 3. `POST /api/billing/webhook`: verify the signature; on `checkout.session.completed` / `invoice.paid` do `profiles.credits += pack_size` for that user. Idempotent on the event id.
-4. Gate spending in the catch-all route before forwarding: if the path is one that costs credits (`agent/start`, `projects/launch`, `deployments/deploy`, `versions/*/recover`, `agent/server/start-or-restart`, `domain`, `files/*`, `rebuild`) and `profiles.credits <= 0`, return `{ ok: false, code: "INSUFFICIENT_CREDITS" }` with status 402. The UI already listens for that code and opens `InsufficientCreditsModal` — change its `BUY_CREDITS_URL` to your checkout.
+4. Gate spending in the catch-all route before forwarding: if the path is one that costs credits (`agent/start`, `projects/launch`, `deployments/deploy`, `versions/*/recover`, `agent/server/start-or-restart`, `domain`, `files/*`, `rebuild`) and `profiles.credits <= 0`, return `{ ok: false, code: "INSUFFICIENT_CREDITS" }` with status 402. The UI already listens for that code and opens `TotalumLimitModal` (`lib/totalum-limit.ts`) — point it at your checkout.
 5. Meter: decrement per prompt when `agent/status` reports `done` (`creditsSpent` is on the response), or subscribe to Totalum's webhooks (linked from the API reference) to do it server-side. Reconcile against `GET /api/v1/credits/spending-analytics?projectId=`.
 
 Keep your own price separate from Totalum's credit cost; `GET /api/v1/vcaas/credit-costs` gives the live upstream prices.

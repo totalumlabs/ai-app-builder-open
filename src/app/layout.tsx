@@ -5,7 +5,7 @@ import { DM_Sans, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { GlobalErrorCatcher } from "@/components/GlobalErrorCatcher";
 import { Toaster } from "@/components/ui/sonner";
-import { InsufficientCreditsModal } from "@/components/workspace/InsufficientCreditsModal";
+import { TotalumLimitModal } from "@/components/workspace/TotalumLimitModal";
 
 const dmSans = DM_Sans({ variable: "--font-dm-sans", subsets: ["latin"], weight: ["300", "400", "500", "600", "700"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
@@ -26,12 +26,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <GlobalErrorCatcher />
         <Toaster position="top-right" richColors />
         {/*
-          ⭐ MOUNTED ONCE FOR THE WHOLE APP. Running out of credits can happen on any
+          ⭐ MOUNTED ONCE FOR THE WHOLE APP. A Totalum limit (credits, projects) can hit on any
           screen — the dashboard creating a project, the workspace publishing one — and
           the modal listens for the event the VCaaS client raises rather than being wired
-          per page. See `InsufficientCreditsModal`.
+          per page. See `TotalumLimitModal`.
         */}
-        <InsufficientCreditsModal />
+        <TotalumLimitModal />
         <div className="min-h-screen flex flex-col">
           <main className="flex-1">{children}</main>
         </div>

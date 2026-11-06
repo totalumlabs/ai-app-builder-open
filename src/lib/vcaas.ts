@@ -39,6 +39,7 @@
 // the `"use client"` `@/lib/api` module.
 import type { SiteAnalyticsAnswer } from "./site-analytics";
 import { toBase64 } from "@/lib/base64";
+import { signalTotalumLimit } from "@/lib/totalum-limit";
 import type { ApiResponse } from "@/lib/api";
 import type { VcaasErrorCode, VcaasErrorDetails } from "@/lib/vcaas-errors";
 import type { PaymentsMode, PaymentsStatus, ProjectWebhook } from "@/lib/v2-payments";
@@ -165,36 +166,20 @@ export interface McpServerDraft {
  * `"use client"` module (see the header note on directives).
  */
 /**
- * ═══ THE GLOBAL INSUFFICIENT-CREDITS SIGNAL ══════════════════════
+ * ═══ THE GLOBAL TOTALUM-LIMIT SIGNAL ══════════════════════
  *
- * The brief asks the modal to fire "on `INSUFFICIENT_CREDITS` from ANY VCaaS call".
- * `proxyRequest` is the one chokepoint every one of the ~40 `vcaasApi` methods
- * passes through, so the signal is raised here exactly once rather than at forty
- * call sites — where the next endpoint added would inevitably forget it.
- *
- * ⚠️ A DOM EVENT, NOT A DIRECT CALL, because this module is deliberately NOT a
- * `"use client"` React module (see the note on `proxyRequest`) and so cannot touch
- * a React context. `<CreditsProvider>` subscribes and opens the modal.
- *
- * ⚠️ IT ONLY NOTIFIES — IT NEVER SWALLOWS. The response is returned unchanged, so
- * every existing caller's error handling behaves exactly as it did before this
- * phase. Surfaces with bespoke credit copy (the create-project dialog) keep it.
+ * `proxyRequest` is the one chokepoint every `vcaasApi` method passes through, so a
+ * Totalum account limit (out of credits, project limit) is raised here once rather
+ * than at forty call sites. A DOM event (`signalTotalumLimit`), because this module is
+ * not a React module; `<TotalumLimitModal>` listens. It only notifies: the response is
+ * returned unchanged, so each caller's own error text stays as the fallback.
  */
-export const INSUFFICIENT_CREDITS_EVENT = "totalum:insufficient-credits";
-
-function signalInsufficientCredits(): void {
-  if (typeof window === "undefined") return;
-  window.dispatchEvent(new CustomEvent(INSUFFICIENT_CREDITS_EVENT));
-}
-
 async function proxyRequest<T>(url: string, init?: RequestInit): Promise<VcaasResponse<T>> {
   try {
     const res = await fetch(url, init);
     const payload = (await res.json()) as VcaasResponse<T>;
 
-    if (payload?.ok === false && payload.code === "INSUFFICIENT_CREDITS") {
-      signalInsufficientCredits();
-    }
+    signalTotalumLimit(payload);
 
     // A failure says its HTTP status, so a caller can tell a refusal (4xx) from an outage.
     return payload?.ok === false ? { ...payload, status: res.status } : payload;
@@ -1159,7 +1144,9 @@ export const vcaasApi = {
         method: "POST",
         body: formData,
       });
-      return (await res.json()) as VcaasResponse<{ url: string; fileNameId: string }>;
+      const payload = (await res.json()) as VcaasResponse<{ url: string; fileNameId: string }>;
+      signalTotalumLimit(payload);
+      return payload;
     } catch (err) {
       return {
         ok: false,
