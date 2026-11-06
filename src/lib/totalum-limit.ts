@@ -24,8 +24,9 @@ const ACCOUNT_CREDITS = new Set(["INSUFFICIENT_CREDITS", "VCAAS_INSUFFICIENT_CRE
 
 /**
  * Which Totalum limit a failed `/api/vcaas/*` envelope hit, or null.
- * A per-project credit cap (`PROJECT_CREDIT_LIMIT_REACHED`) is not the account running out,
- * so it keeps its own copy. A bare 402 with no upstream code still counts.
+ * Only Totalum's own codes count (the proxy copies them into `upstreamCode`): a per-project
+ * credit cap (`PROJECT_CREDIT_LIMIT_REACHED`) or an app's own credit gate answering
+ * `INSUFFICIENT_CREDITS` without an upstream code is not the Totalum account running out.
  */
 export function totalumLimitOf(payload: {
     ok?: boolean;
@@ -34,13 +35,9 @@ export function totalumLimitOf(payload: {
     details?: VcaasErrorDetails;
 } | null | undefined): TotalumLimit | null {
     if (!payload || payload.ok !== false) return null;
-    if (payload.code === "PROJECT_LIMIT_REACHED" || payload.upstreamCode === "MAX_PROJECTS_REACHED") {
-        return { kind: "projects", details: payload.details };
-    }
     const upstream = payload.upstreamCode?.toUpperCase();
-    if (payload.code === "INSUFFICIENT_CREDITS" && (!upstream || ACCOUNT_CREDITS.has(upstream))) {
-        return { kind: "credits" };
-    }
+    if (upstream === "MAX_PROJECTS_REACHED") return { kind: "projects", details: payload.details };
+    if (upstream && ACCOUNT_CREDITS.has(upstream)) return { kind: "credits" };
     return null;
 }
 
